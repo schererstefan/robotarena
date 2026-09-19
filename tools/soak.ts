@@ -4,7 +4,7 @@
 
 import { MAX_SPEED, MAX_TICKS } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
-import { Match, type LineupEntry } from '../src/sim/engine';
+import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, type ReplaySpec } from '../src/sim/replay';
 import {
     clearDailyBoard,
@@ -21,6 +21,7 @@ import {
 import { ROBOTS } from '../src/robots/registry';
 import { computeStats, loadoutCost, sanitizeLoadout, type SkillLoadout } from '../src/sim/skills';
 import type { Intent, RobotController, SenseState } from '../src/sim/types';
+import { initialRound, nextRound, roundName, tiebreakWinner } from '../src/game/tournament';
 
 let failures = 0;
 
@@ -351,6 +352,60 @@ console.log('history');
     clearDailyBoard();
     check('daily clear empties board', loadDailyBoard().length === 0);
     delete (globalThis as unknown as { localStorage?: Storage }).localStorage;
+}
+
+// --- 8. Tournament: bracket helpers + full 8-bot headless run ------------
+console.log('tournament');
+{
+    try {
+        initialRound(['a', 'b', 'c']);
+        check('rejects non-4/8 entrants', false);
+    } catch {
+        check('rejects non-4/8 entrants', true);
+    }
+    check('next round waits for winners', nextRound(initialRound(['a', 'b', 'c', 'd'])) === null);
+    check(
+        'round names',
+        roundName(0, 3) === 'QUARTERFINAL' && roundName(0, 2) === 'SEMIFINAL' && roundName(1, 2) === 'FINAL',
+    );
+    const snap = (damage: number): RobotSnapshot => ({ damageDealt: damage }) as RobotSnapshot;
+    check('tiebreak favors damage', tiebreakWinner([snap(50), snap(10)], 'a', 'b') === 'a');
+    check('tiebreak symmetric', tiebreakWinner([snap(10), snap(50)], 'a', 'b') === 'b');
+    check('tiebreak falls back to order', tiebreakWinner([snap(10), snap(10)], 'a', 'b') === 'a');
+
+    // Full bracket, same rules as the scene: fresh controllers per match.
+    const started = Date.now();
+    let round = initialRound(['rusher', 'turret', 'orbiter', 'wanderer', 'hunter', 'rusher', 'turret', 'orbiter']);
+    let champion: string | null = null;
+    let matches = 0;
+    let unfinished = 0;
+    for (;;) {
+        for (const slot of round) {
+            const match = runMatch([slot.a, slot.b], [0, 1], (99 + matches * 2654435761) >>> 0);
+            matches += 1;
+            if (!match.result.over) {
+                unfinished += 1;
+                continue;
+            }
+            slot.ticks = match.result.tick;
+            if (match.result.winner === 0) slot.winner = slot.a;
+            else if (match.result.winner === 1) slot.winner = slot.b;
+            else {
+                slot.winner = tiebreakWinner(match.robotSnapshots, slot.a, slot.b);
+                slot.draw = true;
+            }
+        }
+        const next = nextRound(round);
+        if (!next) {
+            champion = round.length === 1 ? (round[0]?.winner ?? null) : null;
+            break;
+        }
+        round = next;
+    }
+    const elapsed = Date.now() - started;
+    check('every bracket match finishes', unfinished === 0);
+    check('8-bot bracket yields a champion in 7 matches', champion !== null && matches === 7);
+    check(`8-bot tournament under 30s (${(elapsed / 1000).toFixed(1)}s)`, elapsed < 30000);
 }
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);

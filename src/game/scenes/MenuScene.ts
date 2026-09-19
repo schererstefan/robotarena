@@ -98,6 +98,7 @@ export class MenuScene extends Scene {
         this.muteButton = makeButton(this, CX, 728, 200, 26, '', () => this.toggleMute());
         makeButton(this, CX + 215, 728, 200, 26, 'WATCH REPLAY', () => this.openReplayDialog());
         this.dailyButton = makeButton(this, CX - 215, 754, 200, 24, '', () => this.startDaily());
+        makeButton(this, CX, 754, 200, 24, 'TOURNEY', () => this.scene.start('Tournament'));
         makeButton(this, CX + 215, 754, 200, 24, 'STATS', () => this.openStats());
         this.refreshTrailsLabel();
         this.refreshMuteLabel();
