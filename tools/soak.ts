@@ -36,8 +36,9 @@ function runMatch(ids: string[], teams: Array<0 | 1>, seed: number): Match {
 }
 
 function fingerprint(match: Match): string {
+    // Full precision: any divergence, however small, must show.
     const snaps = match.robotSnapshots.map((s) =>
-        [s.code, s.maxHealth, s.health.toFixed(4), s.x.toFixed(4), s.y.toFixed(4), s.kills, s.damageDealt.toFixed(4), s.shotsFired].join(','),
+        [s.code, s.maxHealth, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired].join(','),
     );
     return `${match.result.winner}@${match.result.tick}|${snaps.join('|')}`;
 }
