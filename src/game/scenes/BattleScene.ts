@@ -15,7 +15,7 @@ import type { BattleRequest } from './MenuScene';
 
 const AX = 32;
 const AY = 72;
-const BULLET_POOL = 24;
+const BULLET_POOL = 40;
 const PARTICLE_POOL = 128;
 
 interface Particle {

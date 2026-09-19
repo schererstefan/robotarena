@@ -2,7 +2,7 @@
 // cosmetic skins, and per-slot skill loadouts (symmetric point budgets).
 
 import { Scene } from 'phaser';
-import { ROBOTS } from '../../robots/registry';
+import { getRobot, ROBOTS } from '../../robots/registry';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { chassisKey, ensureArtTextures } from '../art';
 import { COLORS, FONTS } from '../theme';
@@ -23,7 +23,10 @@ const CX = 512;
 export class MenuScene extends Scene {
     private teamSize = 1;
     private lineupIds: string[] = ['hunter', 'orbiter'];
-    private loadouts: SkillLoadout[] = [{ ...ROBOTS[3]!.loadout }, { ...ROBOTS[2]!.loadout }];
+    private loadouts: SkillLoadout[] = [
+        { ...getRobot('hunter')!.loadout },
+        { ...getRobot('orbiter')!.loadout },
+    ];
     private skins: SlotSkin[] = [defaultSkin('HUNTER', 0), defaultSkin('ORBITER', 1)];
     private trails = true;
     private slotObjects: Phaser.GameObjects.GameObject[] = [];
