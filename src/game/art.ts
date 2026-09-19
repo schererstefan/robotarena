@@ -7,6 +7,14 @@
 // only `w` tints to team/paint colors; lenses sit on `k`/`d`; ordered 2px
 // dither only between adjacent ramp steps; glow cores are `w` with `c`/`y`
 // mids and `o` outers; no purple family anywhere.
+//
+// Texture-atlas audit (Phase 19): each key below is one canvas texture baked
+// exactly once per game (guarded by `textures.exists`) and one GPU upload —
+// merging ~50 tiny pixel sprites into a single atlas would add frame
+// bookkeeping to every scene for negligible gain, so per-key textures stand.
+// The expensive layer (arena floor) is pre-composed into ONE 960x640 image,
+// and BattleScene pools all per-frame/per-event objects (bullets, particles,
+// damage numbers, explosion flashes) instead of allocating mid-fight.
 
 import { Scene } from 'phaser';
 import { BIG_MUZZLE, RECOIL_A, RECOIL_B, SPAWN_A, SPAWN_B, TREADS_A, TREADS_B } from './art/anim';
@@ -52,12 +60,24 @@ const TOWER_FOR_ROBOT: Record<string, string> = {
     ghost: 'tower_light',
 };
 
+/** Keys baked this session (the TextureManager is game-global). */
+const bakedKeys = new Set<string>();
+
+/** How many procedural textures are baked (debug overlay + audit). */
+export function bakedTextureCount(): number {
+    return bakedKeys.size;
+}
+
 function bake(scene: Scene, key: string, map: PixelMap): void {
-    if (scene.textures.exists(key)) return;
+    if (scene.textures.exists(key)) {
+        bakedKeys.add(key);
+        return;
+    }
     const height = map.length;
     const width = map[0]?.length ?? 0;
     const texture = scene.textures.createCanvas(key, width, height);
     if (!texture) return;
+    bakedKeys.add(key);
     const context = texture.getContext();
     context.clearRect(0, 0, width, height);
     map.forEach((row, y) => {
@@ -82,9 +102,13 @@ function floorTileAt(tx: number, ty: number): PixelMap {
 
 /** Compose the full 960x640 arena floor once; render as a single image. */
 function bakeArenaFloor(scene: Scene): void {
-    if (scene.textures.exists('floor_big')) return;
+    if (scene.textures.exists('floor_big')) {
+        bakedKeys.add('floor_big');
+        return;
+    }
     const texture = scene.textures.createCanvas('floor_big', 960, 640);
     if (!texture) return;
+    bakedKeys.add('floor_big');
     const context = texture.getContext();
     for (let ty = 0; ty < 40; ty += 1) {
         for (let tx = 0; tx < 60; tx += 1) {

@@ -8,7 +8,7 @@ import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from
 import { clamp } from '../../sim/math';
 import { encodeReplay } from '../../sim/replay';
 import { ROBOT_SOURCES } from '../../robots/sources';
-import { chassisKey, ensureArtTextures, towerKey, wreckKey } from '../art';
+import { bakedTextureCount, chassisKey, ensureArtTextures, towerKey, wreckKey } from '../art';
 import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unlockAudio } from '../audio';
 import { bulletColor, isReducedMotion, teamColor, teamCss } from '../accessibility';
 import { recordDailyResult, recordMatch } from '../history';
@@ -25,6 +25,11 @@ const AY = 72;
 const BULLET_POOL = 40;
 const PARTICLE_POOL = 128;
 const DMG_POOL = 20;
+/** Pool audit: 6 robots max, so 6 explosion flashes can never exhaust. */
+const BOOM_POOL = 6;
+/** Auto-quality: particle spawn factor per level (HIGH/MED/LOW). */
+const QUALITY_FACTORS = [1, 0.5, 0.25];
+const QUALITY_NAMES = ['HIGH', 'MED', 'LOW'];
 const IND_TTL = 0.8;
 const MAP_W = 72;
 const MAP_H = 48;
@@ -114,6 +119,12 @@ export class BattleScene extends Scene {
     private dmgTexts: Phaser.GameObjects.Text[] = [];
     private dmgCursor = 0;
     private dmgToken: number[] = [];
+    private booms: Phaser.GameObjects.Image[] = [];
+    private debugText!: Phaser.GameObjects.Text;
+    private fpsEma = 60;
+    private quality = 0;
+    private qualityTimer = 0;
+    private goodStreak = 0;
     private indicators: EdgeIndicator[] = [];
     private mapG!: Phaser.GameObjects.Graphics;
     private pilot: PilotInput | null = null;
@@ -165,6 +176,11 @@ export class BattleScene extends Scene {
         this.dmgTexts = [];
         this.dmgCursor = 0;
         this.dmgToken = [];
+        this.booms = [];
+        this.fpsEma = 60;
+        this.quality = 0;
+        this.qualityTimer = 0;
+        this.goodStreak = 0;
         this.indicators = [];
         this.pilot = null;
         this.customMatch = false;
@@ -294,7 +310,7 @@ export class BattleScene extends Scene {
             }
         });
 
-        // Bullet + particle pools.
+        // Bullet + particle + explosion-flash pools (no mid-fight allocation).
         for (let i = 0; i < BULLET_POOL; i += 1) {
             this.bullets.push(this.add.image(-50, -50, 'bullet').setScale(2).setDepth(7).setVisible(false));
             this.bulletTeam.push(null);
@@ -302,6 +318,9 @@ export class BattleScene extends Scene {
         for (let i = 0; i < PARTICLE_POOL; i += 1) {
             const img = this.add.image(-50, -50, 'spark').setScale(2).setDepth(8).setVisible(false);
             this.particles.push({ img, vx: 0, vy: 0, life: 0, maxLife: 1, gravity: 0 });
+        }
+        for (let i = 0; i < BOOM_POOL; i += 1) {
+            this.booms.push(this.add.image(-50, -50, 'boom_1').setScale(3).setDepth(8).setVisible(false));
         }
 
         // HUD.
@@ -346,6 +365,15 @@ export class BattleScene extends Scene {
             .setDepth(10);
         this.mapG = this.add.graphics().setDepth(10);
 
+        // Debug overlay (F key): fps meter + auto-quality level + texture
+        // count. Session-only, hidden by default.
+        this.debugText = this.add
+            .text(AX + ARENA_WIDTH - 12, 50, '', FONTS.monoSmall)
+            .setOrigin(1, 0)
+            .setDepth(30)
+            .setVisible(false);
+        this.debugText.setStroke('#0b0e12', 3);
+
         this.pauseButton = makeButton(this, 760, 740, 120, 36, 'PAUSE', () => this.togglePause(), 0, 44);
         this.speedButton = makeButton(this, 890, 740, 100, 36, '1X', () => this.cycleSpeed(), 0, 44);
         this.stepButton = makeButton(this, 600, 740, 120, 36, 'STEP (N)', () => this.stepOnce(), 0, 44);
@@ -363,12 +391,14 @@ export class BattleScene extends Scene {
         }
         this.input.keyboard?.on('keydown-M', this.onMuteKey);
         this.input.keyboard?.on('keydown-N', this.onStepKey);
+        this.input.keyboard?.on('keydown-F', this.onDebugKey);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-SPACE', this.onSpaceKey);
             this.input.keyboard?.off('keydown', this.onPilotKeyDown);
             this.input.keyboard?.off('keyup', this.onPilotKeyUp);
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown-N', this.onStepKey);
+            this.input.keyboard?.off('keydown-F', this.onDebugKey);
         });
 
         if (this.request.tutorial === true) this.buildTutorial();
@@ -414,6 +444,14 @@ export class BattleScene extends Scene {
     update(_time: number, delta: number): void {
         void _time;
         const dt = Math.min(delta / 1000, 0.1);
+        // FPS estimate drives auto-quality (evaluated once a second).
+        this.fpsEma += (Math.min(1000 / Math.max(delta, 1), 120) - this.fpsEma) * 0.05;
+        this.qualityTimer += 1;
+        if (this.qualityTimer >= 60) {
+            this.qualityTimer = 0;
+            this.autoQuality();
+            if (this.debugText.visible) this.refreshDebugText();
+        }
         // Pilot aim follows the pointer (game coords minus the arena offset),
         // refreshed before the sim ticks so the turret tracks the cursor.
         if (this.pilot) {
@@ -546,6 +584,17 @@ export class BattleScene extends Scene {
         this.queueBanner(nowMuted ? 'SOUND OFF' : 'SOUND ON');
     };
 
+    private onDebugKey = (): void => {
+        const show = !this.debugText.visible;
+        this.debugText.setVisible(show);
+        if (show) this.refreshDebugText();
+    };
+
+    private refreshDebugText(): void {
+        const fps = Math.round(Math.min(this.fpsEma, 999));
+        this.debugText.setText(`${fps} FPS - Q ${QUALITY_NAMES[this.quality] as string} - TEX ${bakedTextureCount()}`);
+    }
+
     private togglePause(): void {
         if (this.match.result.over) return;
         this.paused = !this.paused;
@@ -621,12 +670,23 @@ export class BattleScene extends Scene {
         this.burst(cx, cy, 0xffffff, 8, 140, 100);
         if (!this.reducedMotion) this.cameras.main.shake(180, 0.006);
         playExplosion();
-        // Framed explosion, then a persistent per-archetype wreck.
-        const boom = this.add.image(cx, cy, 'boom_1').setScale(3).setDepth(8);
-        this.time.delayedCall(90, () => boom.setTexture('boom_2'));
-        this.time.delayedCall(180, () => boom.setTexture('boom_3'));
-        this.time.delayedCall(270, () => boom.setTexture('boom_4'));
-        this.time.delayedCall(430, () => boom.destroy());
+        // Framed explosion from the pool (6 slots for 6 robots max), then a
+        // persistent per-archetype wreck. The fallback allocates only if a
+        // seventh flash is somehow live within 430 ms.
+        const pooled = this.booms.find((b) => !b.visible) ?? null;
+        if (pooled) {
+            pooled.setPosition(cx, cy).setTexture('boom_1').setVisible(true);
+            this.time.delayedCall(90, () => pooled.setTexture('boom_2'));
+            this.time.delayedCall(180, () => pooled.setTexture('boom_3'));
+            this.time.delayedCall(270, () => pooled.setTexture('boom_4'));
+            this.time.delayedCall(430, () => pooled.setVisible(false));
+        } else {
+            const boom = this.add.image(cx, cy, 'boom_1').setScale(3).setDepth(8);
+            this.time.delayedCall(90, () => boom.setTexture('boom_2'));
+            this.time.delayedCall(180, () => boom.setTexture('boom_3'));
+            this.time.delayedCall(270, () => boom.setTexture('boom_4'));
+            this.time.delayedCall(430, () => boom.destroy());
+        }
         const wreck = this.add.image(cx, cy, wreckKey(robotId)).setScale(2).setDepth(3);
         wreck.setRotation(snap.heading + 0.5);
         wreck.setAlpha(0.95);
@@ -664,9 +724,26 @@ export class BattleScene extends Scene {
         });
     }
 
+    /** Step quality down fast on sustained low fps, up slowly on headroom. */
+    private autoQuality(): void {
+        if (this.fpsEma < 45 && this.quality < QUALITY_FACTORS.length - 1) {
+            this.quality += 1;
+            this.goodStreak = 0;
+        } else if (this.fpsEma > 57) {
+            this.goodStreak += 1;
+            if (this.goodStreak >= 2 && this.quality > 0) {
+                this.quality -= 1;
+                this.goodStreak = 0;
+            }
+        } else {
+            this.goodStreak = 0;
+        }
+    }
+
     private burst(x: number, y: number, color: number, n: number, speed: number, gravity: number): void {
         // Reduced motion: no particles at all.
         if (this.reducedMotion) return;
+        const scaled = Math.max(1, Math.round(n * (QUALITY_FACTORS[this.quality] as number)));
         let spawned = 0;
         for (const p of this.particles) {
             if (p.life > 0) continue;
@@ -680,7 +757,7 @@ export class BattleScene extends Scene {
             p.life = p.maxLife;
             p.gravity = gravity;
             spawned += 1;
-            if (spawned >= n) break;
+            if (spawned >= scaled) break;
         }
     }
 
