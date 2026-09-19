@@ -9,7 +9,7 @@ import { clamp } from '../../sim/math';
 import { encodeReplay } from '../../sim/replay';
 import { ROBOTS } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
-import { chassisKey, ensureArtTextures } from '../art';
+import { chassisKey, ensureArtTextures, towerKey, wreckKey } from '../art';
 import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unlockAudio } from '../audio';
 import { recordDailyResult, recordMatch } from '../history';
 import { createPilotController, PilotInput } from '../pilot';
@@ -101,6 +101,7 @@ export class BattleScene extends Scene {
     private trails: Array<Array<{ x: number; y: number }>> = [];
     private lastTrailTick = -1;
     private stripes: Phaser.GameObjects.Rectangle[] = [];
+    private auras: Phaser.GameObjects.Image[] = [];
     private barBand: number[] = [];
     private bulletTeam: Array<0 | 1 | null> = [];
     private total0 = 0;
@@ -141,6 +142,7 @@ export class BattleScene extends Scene {
         this.trails = [];
         this.lastTrailTick = -1;
         this.stripes = [];
+        this.auras = [];
         this.barBand = [];
         this.bulletTeam = [];
         this.total0 = 0;
@@ -177,8 +179,8 @@ export class BattleScene extends Scene {
         this.match = new Match(lineups, this.request.seed);
         this.prev = this.match.robotSnapshots;
 
-        // Static layers: floor + wall strips.
-        this.add.tileSprite(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT / 2, ARENA_WIDTH, ARENA_HEIGHT, 'tile_floor').setDepth(0);
+        // Static layers: composed floor, wall strips + corners + gates, decals.
+        this.add.image(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT / 2, 'floor_big').setDepth(0);
         const wall = (x: number, y: number, w: number, h: number) => {
             this.add.tileSprite(x, y, w, h, 'tile_wall').setDepth(1);
         };
@@ -186,6 +188,22 @@ export class BattleScene extends Scene {
         wall(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT + 8, ARENA_WIDTH + 32, 16);
         wall(AX - 8, AY + ARENA_HEIGHT / 2, 16, ARENA_HEIGHT + 32);
         wall(AX + ARENA_WIDTH + 8, AY + ARENA_HEIGHT / 2, 16, ARENA_HEIGHT + 32);
+        const corner = (x: number, y: number, flipX: boolean, flipY: boolean) => {
+            this.add.image(x, y, 'wall_corner').setDepth(1).setFlipX(flipX).setFlipY(flipY);
+        };
+        corner(AX - 8, AY - 8, false, false);
+        corner(AX + ARENA_WIDTH + 8, AY - 8, true, false);
+        corner(AX - 8, AY + ARENA_HEIGHT + 8, false, true);
+        corner(AX + ARENA_WIDTH + 8, AY + ARENA_HEIGHT + 8, true, true);
+        this.add.image(AX + ARENA_WIDTH / 2, AY - 8, 'wall_gate').setDepth(1);
+        this.add.image(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT + 8, 'wall_gate').setDepth(1).setFlipY(true);
+        const decal = (key: string, x: number, y: number) => {
+            this.add.image(AX + x, AY + y, key).setDepth(0).setAlpha(0.55);
+        };
+        decal('decor_crate', 44, 44);
+        decal('decor_barrel', ARENA_WIDTH - 44, 44);
+        decal('decor_vent', 44, ARENA_HEIGHT - 44);
+        decal('decor_lamp', ARENA_WIDTH - 44, ARENA_HEIGHT - 44);
 
         this.dyn = this.add.graphics().setDepth(2);
 
@@ -196,7 +214,7 @@ export class BattleScene extends Scene {
             const team = COLORS.team[snap.team];
             const body = this.add.image(0, 0, chassisKey(robotId)).setScale(2).setDepth(4);
             body.setTint(team);
-            const tower = this.add.image(0, 0, 'tower').setScale(2).setDepth(5);
+            const tower = this.add.image(0, 0, towerKey(robotId)).setScale(2).setDepth(5);
             tower.setTint(skin.paint);
             const hub = this.add.image(0, 0, 'hub').setScale(2).setDepth(6);
             hub.setTint(skin.paint);
@@ -210,6 +228,8 @@ export class BattleScene extends Scene {
             const stripe = this.add.rectangle(0, 0, 26, 5, skin.paint).setDepth(4);
             stripe.setVisible(skin.finish === 'Stripe');
             this.stripes.push(stripe);
+            const aura = this.add.image(0, 0, 'charge_aura').setScale(2.5).setDepth(3).setVisible(false);
+            this.auras.push(aura);
             this.chassis.push(body);
             this.towers.push(tower);
             this.hubs.push(hub);
@@ -234,6 +254,12 @@ export class BattleScene extends Scene {
             stripe.setAlpha(0);
             this.tweens.add({ targets: [body, tower, hub], scale: 2, alpha: 1, duration: 350, delay: i * 90, ease: 'Back.easeOut' });
             this.tweens.add({ targets: stripe, alpha: 1, duration: 350, delay: i * 90 });
+            // Spawn ring pop at the spawn point.
+            const ring = this.add.image(AX + snap.x, AY + snap.y, 'spawn_a').setScale(2).setDepth(3).setAlpha(0.9);
+            this.time.delayedCall(i * 90, () => ring.setVisible(true));
+            ring.setVisible(false);
+            this.time.delayedCall(i * 90 + 130, () => ring.setTexture('spawn_b'));
+            this.time.delayedCall(i * 90 + 260, () => ring.destroy());
         });
 
         // Bullet + particle pools.
@@ -524,7 +550,9 @@ export class BattleScene extends Scene {
             if (s.shotsFired > p.shotsFired && s.alive) {
                 this.muzzleLife[i] = 0.09;
                 this.recoil[i] = 5;
-                (this.muzzles[i] as Phaser.GameObjects.Image).setScale(2 + Math.random() * 0.8);
+                (this.muzzles[i] as Phaser.GameObjects.Image)
+                    .setTexture(p.charge > 0.4 ? 'muzzle_big' : 'muzzle')
+                    .setScale(2 + Math.random() * 0.8);
                 this.burst(cx + Math.cos(s.tower) * 26, cy + Math.sin(s.tower) * 26, 0xffe28a, 4, 120, 0);
                 playShoot();
             }
@@ -556,11 +584,15 @@ export class BattleScene extends Scene {
         this.burst(cx, cy, 0xffffff, 8, 140, 100);
         this.cameras.main.shake(180, 0.006);
         playExplosion();
-        // Persistent wreck.
-        const wreck = this.add.image(cx, cy, chassisKey(robotId)).setScale(2).setDepth(3);
-        wreck.setTint(0x1c222a);
+        // Framed explosion, then a persistent per-archetype wreck.
+        const boom = this.add.image(cx, cy, 'boom_1').setScale(3).setDepth(8);
+        this.time.delayedCall(90, () => boom.setTexture('boom_2'));
+        this.time.delayedCall(180, () => boom.setTexture('boom_3'));
+        this.time.delayedCall(270, () => boom.setTexture('boom_4'));
+        this.time.delayedCall(430, () => boom.destroy());
+        const wreck = this.add.image(cx, cy, wreckKey(robotId)).setScale(2).setDepth(3);
         wreck.setRotation(snap.heading + 0.5);
-        wreck.setAlpha(0.9);
+        wreck.setAlpha(0.95);
         const skin = this.request.skins[i] as SlotSkin;
         this.queueBanner(`${skin.callsign} DESTROYED`);
     }
@@ -666,6 +698,10 @@ export class BattleScene extends Scene {
             const stripe = this.stripes[i] as Phaser.GameObjects.Rectangle;
             const skin = this.request.skins[i] as SlotSkin;
             const visible = s.alive;
+            const aura = this.auras[i] as Phaser.GameObjects.Image;
+            const charging = visible && s.charge > 0.05;
+            aura.setVisible(charging).setPosition(cx, cy);
+            if (charging) aura.setAlpha(0.25 + 0.55 * s.charge).setRotation(this.match.result.tick / 24);
             body.setVisible(visible).setPosition(cx, cy).setRotation(s.heading);
             stripe.setVisible(visible && skin.finish === 'Stripe').setPosition(cx, cy).setRotation(s.heading);
             const rec = this.recoil[i] as number;
@@ -707,8 +743,10 @@ export class BattleScene extends Scene {
                 return;
             }
             img.setVisible(true).setPosition(AX + b.x, AY + b.y);
-            if (this.bulletTeam[i] !== b.team) {
+            const want = b.hot ? 'bullet_hot' : 'bullet';
+            if (this.bulletTeam[i] !== b.team || img.texture.key !== want) {
                 this.bulletTeam[i] = b.team;
+                img.setTexture(want);
                 img.setTint(COLORS.bullet[b.team]);
             }
         });
@@ -743,14 +781,6 @@ export class BattleScene extends Scene {
                 cx + Math.cos(a1) * s.scan,
                 cy + Math.sin(a1) * s.scan,
             );
-            if (s.charged) {
-                const pulse = 0.45 + 0.3 * Math.sin(this.match.result.tick / 6);
-                g.lineStyle(2, 0xffffff, pulse);
-                g.strokeCircle(cx, cy, ROBOT_RADIUS + 9);
-            } else if (s.charge > 0.05) {
-                g.lineStyle(2, 0xffe28a, 0.35);
-                g.strokeCircle(cx, cy, ROBOT_RADIUS + 9);
-            }
         }
         for (const ind of this.indicators) this.drawEdgeIndicator(g, ind);
         // Pilot aim reticle: faint sight line plus a crosshair at the cursor.

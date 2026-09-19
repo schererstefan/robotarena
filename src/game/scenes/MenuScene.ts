@@ -5,7 +5,7 @@ import { Scene } from 'phaser';
 import { getRobot, ROBOTS } from '../../robots/registry';
 import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
-import { chassisKey, ensureArtTextures } from '../art';
+import { chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
 import { isMuted, playClick, toggleMuted, unlockAudio } from '../audio';
 import {
     clearDailyBoard,
@@ -108,6 +108,8 @@ export class MenuScene extends Scene {
         this.tourStep = 0;
         this.tourNext = null;
         this.add.text(CX, 44, 'ROBOTARENA', FONTS.title).setOrigin(0.5);
+        this.add.image(CX - 285, 44, 'logo_bar').setScale(2);
+        this.add.image(CX + 285, 44, 'logo_bar').setScale(2);
         this.add
             .text(CX, 86, 'same budget. same catalog. only the code differs.', FONTS.small)
             .setOrigin(0.5);
@@ -281,6 +283,11 @@ export class MenuScene extends Scene {
             this.track(this.add.rectangle(100, y, 14, 14, COLORS.team[team]));
             const preview = this.track(this.add.image(152, y, chassisKey(id)).setScale(2));
             preview.setTint(COLORS.team[team]);
+            // Live paint preview: tower + hub exactly as the battle renders them.
+            const previewTower = this.track(this.add.image(152, y, towerKey(id)).setScale(2));
+            previewTower.setTint(skin.paint).setRotation(-0.5);
+            const previewHub = this.track(this.add.image(152, y, 'hub').setScale(2));
+            previewHub.setTint(skin.paint);
 
             this.cycler(285, 150, y, `${skin.callsign} >`, () => this.cycleCallsign(i), skin.paintCss);
             this.cycler(490, 200, y, `${entry.meta.name} >`, () => this.cycleRobot(i));
@@ -370,6 +377,7 @@ export class MenuScene extends Scene {
         SKILL_DEFS.forEach((def, row) => {
             const y = 232 + row * 38;
             const rank = rankOf(loadout, def.id);
+            this.trackEditor(this.add.image(152, y + 4, skillIconKey(def.id)).setScale(2).setDepth(50));
             this.trackEditor(this.add.text(180, y, `${def.code}  ${def.name}`, FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(50));
             this.trackEditor(this.add.text(180, y + 14, def.desc, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(50));
             const minus = this.trackEditor(this.add.rectangle(640, y + 4, 36, 30, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));

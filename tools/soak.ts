@@ -57,7 +57,7 @@ function fingerprint(match: Match): string {
     const snaps = match.robotSnapshots.map((s) =>
         [s.code, s.maxHealth, s.alive ? 1 : 0, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired, s.cooldown, s.charge].join(','),
     );
-    const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team].join(',')).join(';');
+    const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team, b.hot ? 1 : 0].join(',')).join(';');
     return `${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}`;
 }
 

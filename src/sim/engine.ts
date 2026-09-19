@@ -1,7 +1,7 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_WIDTH, BULLET_RADIUS, DT, MAX_TICKS, REVERSE_FACTOR, ROBOT_RADIUS } from './constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, REVERSE_FACTOR, ROBOT_RADIUS } from './constants';
 import { angleDiff, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
@@ -34,6 +34,7 @@ export interface BulletSnapshot {
     x: number;
     y: number;
     team: 0 | 1;
+    hot: boolean;
 }
 
 export interface MatchResult {
@@ -181,7 +182,7 @@ export class Match {
     }
 
     get bulletSnapshots(): BulletSnapshot[] {
-        return this.bullets.map((b) => ({ x: b.x, y: b.y, team: b.team }));
+        return this.bullets.map((b) => ({ x: b.x, y: b.y, team: b.team, hot: b.damage > BULLET_DAMAGE }));
     }
 
     step(): void {
