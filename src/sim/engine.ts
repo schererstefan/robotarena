@@ -279,7 +279,8 @@ export class Match {
                 speed: robot.speed,
                 health: robot.health,
                 cooldown: robot.cooldown,
-                stats: robot.stats,
+                // Copies: robot code must never alias mutable engine state.
+                stats: { ...robot.stats },
                 charge: robot.charge,
                 charged: robot.charge >= 1,
                 loadout: { ...robot.loadout },

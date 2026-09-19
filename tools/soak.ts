@@ -108,6 +108,33 @@ console.log('isolation');
     );
     while (!match.result.over) match.step();
     check('match completes despite throwing robot', match.result.over);
+
+    // A robot that mutates its sensed stats must not alter real physics.
+    const tamperer: RobotController = {
+        meta: { id: 'tamperer', name: 'Tamperer', author: 'test', version: '0', description: '' },
+        update: (sense: SenseState): Intent => {
+            (sense.self.stats as { maxSpeed: number }).maxSpeed = 99999;
+            (sense.self as { health: number }).health = 99999;
+            return { throttle: 1, turn: 0, towerTurn: 0, fire: false, charge: false };
+        },
+    };
+    const tm = new Match(
+        [
+            { team: 0, controller: tamperer },
+            { team: 1, controller: entry.create() },
+        ],
+        42,
+    );
+    let tamperMax = 0;
+    let tprev = tm.robotSnapshots[0] as { x: number; y: number; health: number };
+    for (let i = 0; i < 300 && !tm.result.over; i += 1) {
+        tm.step();
+        const s = tm.robotSnapshots[0] as { x: number; y: number; health: number };
+        tamperMax = Math.max(tamperMax, Math.hypot(s.x - tprev.x, s.y - tprev.y));
+        tprev = s;
+    }
+    check('stat tampering does not exceed physics', tamperMax <= MAX_SPEED * DT + 2.5, `max=${tamperMax.toFixed(2)}`);
+    check('health tampering does not stick', (tm.robotSnapshots[0]?.health ?? 0) <= 100);
 }
 
 // --- 4. Skills: sanitize, stats, charge ---------------------------------------
