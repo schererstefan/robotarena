@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, GUN_RANGE, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSOR_RANGE, SENSOR_SHARE_DELAY, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSOR_RANGE, SENSOR_SHARE_DELAY, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
@@ -55,7 +55,7 @@ function runMatch(ids: string[], teams: Array<0 | 1>, seed: number, loadouts?: S
 function fingerprint(match: Match): string {
     // Full precision: any divergence, however small, must show.
     const snaps = match.robotSnapshots.map((s) =>
-        [s.code, s.maxHealth, s.alive ? 1 : 0, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired, s.cooldown, s.charge].join(','),
+        [s.code, s.maxHealth, s.alive ? 1 : 0, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired, s.cooldown, s.charge, s.dashCd, s.empCd, s.slowed ? 1 : 0].join(','),
     );
     const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team, b.hot ? 1 : 0].join(',')).join(';');
     return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}`;
@@ -85,7 +85,7 @@ console.log('clamping');
     };
     const garbage: RobotController = {
         meta: { id: 'garbage', name: 'Garbage', author: 'test', version: '0', description: '' },
-        update: () => ({ throttle: NaN, turn: Infinity, towerTurn: -Infinity, fire: 'yes', charge: 1 }) as unknown as Intent,
+        update: () => ({ throttle: NaN, turn: Infinity, towerTurn: -Infinity, fire: 'yes', charge: 1, dash: 'yes', emp: 1 }) as unknown as Intent,
     };
     const match = new Match(
         [
@@ -366,6 +366,226 @@ console.log('skills');
         'no scout skill means no blips',
         runScoutSpy({}).every((entry) => entry.scout === 0),
     );
+}
+
+// --- 4b. Actives: dash burst + EMP slow, exact cooldowns, determinism -----
+console.log('actives');
+{
+    const idleMeta = (id: string): RobotController['meta'] => ({ id, name: id, author: 'test', version: '0', description: '' });
+    const sitter: RobotController = {
+        meta: idleMeta('sitter'),
+        update: (): Intent => ({ throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false }),
+    };
+    // Dash at full speed on tick 120: the burst lands the same tick and the
+    // 8 s cooldown ticks down exactly.
+    interface DashEntry {
+        speed: number;
+        dashCd: number;
+    }
+    const runDash = (dashAt: number, ticks: number): DashEntry[] => {
+        const log: DashEntry[] = [];
+        const dasher: RobotController = {
+            meta: idleMeta('dasher'),
+            update: (sense: SenseState): Intent => {
+                log.push({ speed: sense.self.speed, dashCd: sense.self.dashCd });
+                return { throttle: 1, turn: 0, towerTurn: 0, fire: false, charge: false, dash: sense.tick === dashAt };
+            },
+        };
+        const m = new Match(
+            [
+                { team: 0, controller: dasher },
+                { team: 1, controller: sitter },
+            ],
+            3,
+        );
+        for (let i = 0; i < ticks; i += 1) m.step();
+        return log;
+    };
+    const dashLog = runDash(120, 610);
+    check('cruising speed caps at top speed', Math.abs((dashLog[120]?.speed ?? -1) - MAX_SPEED) < 0.001);
+    check('dash bursts past top speed the same tick', (dashLog[121]?.speed ?? 0) > MAX_SPEED);
+    check('dash cooldown starts at 480 ticks', dashLog[121]?.dashCd === DASH_COOLDOWN_TICKS - 1);
+    check('dash ready again exactly 8 s later', dashLog[600]?.dashCd === 0 && (dashLog[599]?.dashCd ?? -1) === 1);
+    const parked = runDash(-1, 130);
+    check('undashed cooldown stays zero', parked.every((entry) => entry.dashCd === 0));
+    check(
+        'undashed speed never exceeds top speed',
+        parked.every((entry) => entry.speed <= MAX_SPEED + 0.001),
+    );
+    // Dashing while parked does nothing: zero throttle, zero motion.
+    const still = new Match(
+        [
+            {
+                team: 0,
+                controller: {
+                    meta: idleMeta('parker'),
+                    update: (sense: SenseState): Intent => ({
+                        throttle: 0,
+                        turn: 0,
+                        towerTurn: 0,
+                        fire: false,
+                        charge: false,
+                        dash: sense.tick === 10,
+                    }),
+                },
+            },
+            { team: 1, controller: sitter },
+        ],
+        3,
+    );
+    for (let i = 0; i < 30; i += 1) still.step();
+    check('parked dash moves nowhere', still.robotSnapshots[0]?.x === 130 && still.robotSnapshots[0]?.y === 320);
+
+    // EMP: closing driver pulses on entering radius; the sitter logs slowed.
+    const runEmp = (): { userCd: number[]; foeSlow: boolean[]; trigger: number } => {
+        const userCd: number[] = [];
+        const foeSlow: boolean[] = [];
+        const user: RobotController = {
+            meta: idleMeta('emp-user'),
+            update: (sense: SenseState): Intent => {
+                userCd.push(sense.self.empCd);
+                const foe = sense.foes[0];
+                return {
+                    throttle: 1,
+                    turn: 0,
+                    towerTurn: 0,
+                    fire: false,
+                    charge: false,
+                    emp: foe !== undefined && foe.distance < EMP_RADIUS,
+                };
+            },
+        };
+        const foe: RobotController = {
+            meta: idleMeta('emp-foe'),
+            update: (sense: SenseState): Intent => {
+                foeSlow.push(sense.self.slowed);
+                return { throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false };
+            },
+        };
+        const m = new Match(
+            [
+                { team: 0, controller: user },
+                { team: 1, controller: foe },
+            ],
+            3,
+        );
+        for (let i = 0; i < 420; i += 1) m.step();
+        return { userCd, foeSlow, trigger: userCd.findIndex((cd) => cd === EMP_COOLDOWN_TICKS - 1) };
+    };
+    const emp = runEmp();
+    check('EMP triggers on entering radius', emp.trigger > 0, `tick=${emp.trigger}`);
+    if (emp.trigger > 0) {
+        const T = emp.trigger;
+        check('EMP cooldown ticks down exactly', emp.userCd[T + 1] === EMP_COOLDOWN_TICKS - 2);
+        check('foe unslowed before the pulse', emp.foeSlow[T - 1] === false);
+        check('foe slowed the tick after the pulse', emp.foeSlow[T] === true);
+        check(
+            `slow lasts exactly ${EMP_SLOW_TICKS} ticks`,
+            emp.foeSlow[T + EMP_SLOW_TICKS - 2] === true && emp.foeSlow[T + EMP_SLOW_TICKS - 1] === false,
+        );
+    }
+    // Whiffed EMP (foe beyond radius) still pays the 12 s cooldown.
+    const whiffUser: RobotController = {
+        meta: idleMeta('whiffer'),
+        update: (sense: SenseState): Intent => ({
+            throttle: 1,
+            turn: 0,
+            towerTurn: 0,
+            fire: false,
+            charge: false,
+            emp: sense.tick === 0,
+        }),
+    };
+    let whiffSlow = false;
+    let whiffCd = -1;
+    const whiffFoe: RobotController = {
+        meta: idleMeta('whiff-foe'),
+        update: (sense: SenseState): Intent => {
+            if (sense.self.slowed) whiffSlow = true;
+            return { throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false };
+        },
+    };
+    const whiffUserSpy: RobotController = {
+        meta: idleMeta('whiff-spy'),
+        update: (sense: SenseState): Intent => {
+            if (sense.tick === 1) whiffCd = sense.self.empCd;
+            return whiffUser.update(sense);
+        },
+    };
+    const whiff = new Match(
+        [
+            { team: 0, controller: whiffUserSpy },
+            { team: 1, controller: whiffFoe },
+        ],
+        3,
+    );
+    for (let i = 0; i < 60; i += 1) whiff.step();
+    check('out-of-radius EMP slows nobody', !whiffSlow);
+    check('whiffed EMP still pays cooldown', whiffCd === EMP_COOLDOWN_TICKS - 1);
+    // Allies (and the user) are immune, even inside the radius.
+    let allySlow = false;
+    let selfSlow = false;
+    const ally: RobotController = {
+        meta: idleMeta('ally'),
+        update: (sense: SenseState): Intent => {
+            if (sense.self.slowed) allySlow = true;
+            return { throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false };
+        },
+    };
+    const selfish: RobotController = {
+        meta: idleMeta('selfish'),
+        update: (sense: SenseState): Intent => {
+            if (sense.self.slowed) selfSlow = true;
+            return { throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false, emp: sense.tick === 0 };
+        },
+    };
+    const friendly = new Match(
+        [
+            { team: 0, controller: selfish },
+            { team: 0, controller: ally },
+            { team: 1, controller: sitter },
+        ],
+        3,
+    );
+    for (let i = 0; i < 60; i += 1) friendly.step();
+    check('EMP spares allies in radius', !allySlow);
+    check('EMP spares its user', !selfSlow);
+    // Actives are deterministic: brawler + ghost both dash and EMP.
+    const act1 = runMatch(['brawler', 'ghost'], [0, 1], 77);
+    const act2 = runMatch(['brawler', 'ghost'], [0, 1], 77);
+    check('active-skill match is deterministic', fingerprint(act1) === fingerprint(act2));
+    // The hooks fire in real games: a spied brawler-vs-ghost sees cooldowns.
+    let sawCooldown = false;
+    const spyActive = (inner: RobotController): RobotController => ({
+        meta: inner.meta,
+        loadout: inner.loadout,
+        onSpawn:
+            inner.onSpawn === undefined
+                ? undefined
+                : (sense: SenseState): void => {
+                      inner.onSpawn?.(sense);
+                  },
+        update: (sense: SenseState): Intent => {
+            if (sense.self.dashCd > 0 || sense.self.empCd > 0) sawCooldown = true;
+            return inner.update(sense);
+        },
+    });
+    const brawlerEntry = ROBOTS.find((r) => r.meta.id === 'brawler');
+    const ghostEntry = ROBOTS.find((r) => r.meta.id === 'ghost');
+    if (!brawlerEntry || !ghostEntry) throw new Error('missing active-hook robots');
+    const spied = new Match(
+        [
+            { team: 0, controller: spyActive(brawlerEntry.create()), loadout: { ...brawlerEntry.loadout } },
+            { team: 1, controller: spyActive(ghostEntry.create()), loadout: { ...ghostEntry.loadout } },
+        ],
+        77,
+    );
+    let spiedGuard = 0;
+    while (!spied.result.over && spiedGuard <= MAX_TICKS_TOTAL + 10) {
+        spied.step();
+        spiedGuard += 1;
+    }
+    check('hooked bots trigger actives in-match', sawCooldown);
 }
 
 // --- 5. Soak: 1v1 round-robin, 2v2, 3v3 (every arena) -----------------------

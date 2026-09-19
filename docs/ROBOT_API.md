@@ -29,7 +29,7 @@ export function create(): RobotController {
 
     function update(sense: SenseState): Intent {
         // ... your strategy ...
-        return { throttle: 1, turn: 0, towerTurn: 0.5, fire: false, charge: false };
+        return { throttle: 1, turn: 0, towerTurn: 0.5, fire: false, charge: false, dash: false, emp: false };
     }
 
     return { meta, loadout, update };
@@ -47,7 +47,7 @@ y grows downward). The sim ticks at 60 Hz.
 | Field          | Contents                                                                 |
 | -------------- | ------------------------------------------------------------------------ |
 | `tick`, `time` | Match tick and seconds elapsed.                                          |
-| `self`         | Your `id`, `team`, `x`, `y`, `heading`, `tower`, `speed`, `health`, gun `cooldown` (ticks until ready, `0` = ready), plus `stats` (effective values after skills), `charge`/`charged` (banked charge), and your `loadout`. |
+| `self`         | Your `id`, `team`, `x`, `y`, `heading`, `tower`, `speed`, `health`, gun `cooldown` (ticks until ready, `0` = ready), plus `stats` (effective values after skills), `charge`/`charged` (banked charge), `dashCd`/`empCd` (active cooldowns, `0` = ready), `slowed` (enemy EMP on you), and your `loadout`. |
 | `foes`         | Opponents **inside your sensor cone** this tick, nearest first: position, heading, speed, health, `distance`, absolute `bearing`. Empty when blind. |
 | `allies`       | Teammates, always known (radio link), same fields as foes.               |
 | `scout`        | Out-of-cone foe blips from the scout skill (empty without it), nearest first: live `x`, `y`, `distance`, `bearing`, but `heading`, `speed`, `health` always `0`. Covers foes within 2× your sensor range; never duplicates `foes`. |
@@ -73,6 +73,8 @@ tower onto a blip bearing converts it into a full sighting.
 | `towerTurn` | `-1` (counter-clockwise) to `1` (clockwise) tower spin. Clamped. |
 | `fire`      | `true` to shoot. Only fires when `cooldown` is `0`.            |
 | `charge`    | Hold to bank charge (charger skill only). Slows drive to 75%.  |
+| `dash`      | `true` to dash (2.5× top speed, 12 ticks). 8 s cooldown. Optional, defaults `false`. |
+| `emp`       | `true` to pulse EMP (foes in 220 u slowed to 45% for 3 s). 12 s cooldown. Optional, defaults `false`. |
 
 Missing, `NaN`, or non-numeric fields are treated as `0`/`false`. Out-of-range
 values are clamped. There is no way to exceed your loadout's stats.
@@ -119,6 +121,26 @@ at the same gun range; Scout blips never include foes your cone already sees.
 **Validation:** ranks clamp to max, unknown ids drop, and over-budget loadouts
 shed ranks from the end of the catalog until legal. Same loadout + same seed
 replays identically.
+
+## Active skills: dash and EMP
+
+Every robot has both actives from the spawn tick — they cost no skill points
+and need no unlock. Each is gated by its own long cooldown, shown under every
+chassis in battle as `D`/`E` pips (filled = ready).
+
+- **Dash** (`dash: true`, 8 s cooldown): 2.5× top speed for 12 ticks (0.2 s),
+  starting the same tick. It multiplies your throttle, so dash with drive
+  held — toward a foe to engage or away to escape; dashing while parked
+  does nothing. Read `sense.self.dashCd` (`0` = ready).
+- **EMP** (`emp: true`, 12 s cooldown): every foe within 220 units drives at
+  45% top speed for 3 s, starting the same tick. Allies (and you) are immune.
+  The cooldown starts even when no foe is in radius, so check the range first.
+  Read `sense.self.empCd`; `sense.self.slowed` tells you when an enemy pulse
+  has you.
+
+Both trigger only when their cooldown is `0`; holding them `true` re-fires
+the moment they come ready, so pulse them. Like every Intent field, a missing
+`dash`/`emp` reads as `false`, so old robots compile and run unchanged.
 
 ## Shared base platform (before skills)
 

@@ -1,7 +1,7 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSOR_SHARE_DELAY, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
+import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSOR_SHARE_DELAY, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
 import { angleDiff, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
@@ -24,6 +24,9 @@ export interface RobotSnapshot {
     shotsFired: number;
     charge: number;
     charged: boolean;
+    dashCd: number;
+    empCd: number;
+    slowed: boolean;
     code: string;
     scan: number;
     fov: number;
@@ -66,6 +69,12 @@ interface Robot {
     health: number;
     cooldown: number;
     charge: number;
+    dashCd: number;
+    empCd: number;
+    /** Exclusive tick: dashing while `tick < dashUntil`. */
+    dashUntil: number;
+    /** Exclusive tick: slowed while `tick < slowUntil`. */
+    slowUntil: number;
     alive: boolean;
     kills: number;
     damageDealt: number;
@@ -119,6 +128,8 @@ function sanitizeIntent(raw: unknown): Intent {
         towerTurn: clamp(toNumber(r.towerTurn), -1, 1),
         fire: r.fire === true,
         charge: r.charge === true,
+        dash: r.dash === true,
+        emp: r.emp === true,
     };
 }
 
@@ -165,6 +176,10 @@ export class Match {
                 health: stats.maxHealth,
                 cooldown: 0,
                 charge: 0,
+                dashCd: 0,
+                empCd: 0,
+                dashUntil: -1,
+                slowUntil: -1,
                 alive: true,
                 kills: 0,
                 damageDealt: 0,
@@ -230,6 +245,9 @@ export class Match {
             shotsFired: r.shotsFired,
             charge: r.charge,
             charged: r.charge >= 1,
+            dashCd: r.dashCd,
+            empCd: r.empCd,
+            slowed: this.tick < r.slowUntil,
             code: loadoutCode(r.loadout),
             scan: r.stats.sensorRange,
             fov: r.stats.sensorFov,
@@ -258,7 +276,26 @@ export class Match {
                 return { ...IDLE_INTENT };
             }
         });
-        // 2. Drive + towers + charge.
+        // 2. Actives: dash bursts and EMP pulses trigger before the drive so
+        // they apply the same tick. Positions are pre-move for every robot.
+        this.robots.forEach((robot, i) => {
+            if (!robot.alive) return;
+            const intent = intents[i] as Intent;
+            if (intent.dash === true && robot.dashCd <= 0) {
+                robot.dashCd = DASH_COOLDOWN_TICKS;
+                robot.dashUntil = this.tick + DASH_DURATION_TICKS;
+            }
+            if (intent.emp === true && robot.empCd <= 0) {
+                robot.empCd = EMP_COOLDOWN_TICKS;
+                for (const other of this.robots) {
+                    if (!other.alive || other.team === robot.team || other.id === robot.id) continue;
+                    if (dist(robot.x, robot.y, other.x, other.y) <= EMP_RADIUS) {
+                        other.slowUntil = this.tick + EMP_SLOW_TICKS;
+                    }
+                }
+            }
+        });
+        // 3. Drive + towers + charge.
         this.robots.forEach((robot, i) => {
             if (!robot.alive) return;
             const intent = intents[i] as Intent;
@@ -270,7 +307,9 @@ export class Match {
                 robot.charge = Math.max(0, robot.charge - DT / 4); // bank decays in ~4s
             }
             const slow = intent.charge && canCharge ? 0.75 : 1;
-            const top = robot.stats.maxSpeed * slow;
+            const dashing = this.tick < robot.dashUntil;
+            const slowed = this.tick < robot.slowUntil;
+            const top = robot.stats.maxSpeed * slow * (dashing ? DASH_SPEED_MULT : 1) * (slowed ? EMP_SLOW_MULT : 1);
             const target = intent.throttle >= 0 ? intent.throttle * top : intent.throttle * top * REVERSE_FACTOR;
             const dv = clamp(target - robot.speed, -robot.stats.accel * DT, robot.stats.accel * DT);
             robot.speed += dv;
@@ -279,6 +318,8 @@ export class Match {
             robot.x += Math.cos(robot.heading) * robot.speed * DT;
             robot.y += Math.sin(robot.heading) * robot.speed * DT;
             if (robot.cooldown > 0) robot.cooldown -= 1;
+            if (robot.dashCd > 0) robot.dashCd -= 1;
+            if (robot.empCd > 0) robot.empCd -= 1;
             if (robot.stats.regen > 0 && robot.health < robot.stats.maxHealth) {
                 robot.health = Math.min(robot.stats.maxHealth, robot.health + robot.stats.regen * DT);
             }
@@ -287,7 +328,7 @@ export class Match {
         this.collideRobots();
         this.collideObstacles();
         this.collideWalls(); // separation can shove robots past the walls
-        // 3. Fire guns.
+        // 4. Fire guns.
         this.robots.forEach((robot, i) => {
             if (!robot.alive) return;
             const intent = intents[i] as Intent;
@@ -311,9 +352,9 @@ export class Match {
                 });
             }
         });
-        // 4. Bullets.
+        // 5. Bullets.
         this.stepBullets();
-        // 5. Sudden death: past the cap, robots outside the circle pulse damage.
+        // 6. Sudden death: past the cap, robots outside the circle pulse damage.
         if (this.tick >= MAX_TICKS) this.suddenDeath();
         this.tick += 1;
         this.checkEnd();
@@ -428,6 +469,9 @@ export class Match {
                 stats: { ...robot.stats },
                 charge: robot.charge,
                 charged: robot.charge >= 1,
+                dashCd: robot.dashCd,
+                empCd: robot.empCd,
+                slowed: this.tick < robot.slowUntil,
                 loadout: { ...robot.loadout },
             },
             foes,

@@ -33,6 +33,12 @@ export interface SenseSelf {
     charge: number;
     /** True when a full charge is banked. */
     charged: boolean;
+    /** Ticks until dash is ready again. 0 means ready. */
+    dashCd: number;
+    /** Ticks until EMP is ready again. 0 means ready. */
+    empCd: number;
+    /** True while an enemy EMP slows your drive. */
+    slowed: boolean;
     /** Your sanitized skill loadout for this match. */
     loadout: SkillLoadout;
 }
@@ -103,9 +109,20 @@ export interface Intent {
      * bonus damage: damage x (1 + charge x (mult - 1)).
      */
     charge: boolean;
+    /**
+     * Trigger the dash burst (2.5x top speed for 12 ticks). Only fires when
+     * `dashCd` is 0; triggering starts the 8 s cooldown. Optional.
+     */
+    dash?: boolean;
+    /**
+     * Trigger the EMP pulse (foes within 220 units drive at 45% speed for
+     * 3 s). Only fires when `empCd` is 0; triggering starts the 12 s
+     * cooldown, even when no foe is in radius. Optional.
+     */
+    emp?: boolean;
 }
 
-export const IDLE_INTENT: Intent = { throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false };
+export const IDLE_INTENT: Intent = { throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false, dash: false, emp: false };
 
 export interface RobotController {
     meta: RobotMeta;

@@ -1,7 +1,8 @@
 // Brawler: shrugs off hits with heavy plating and walks the gun into
 // knife-fight range. No finesse, no retreat, all forward pressure.
 
-import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, EMP_RADIUS } from '../sim/constants';
+import { angleDiff } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 import { aimed, aimTurret, steerTo, throttleFor } from './common';
@@ -40,12 +41,20 @@ export function create(): RobotController {
             foe !== undefined &&
             foe.distance < self.stats.gunRange &&
             aimed(self.tower, foe.bearing);
+        // Dash down the lane to start the fight on our terms; EMP in the
+        // clinch so the foe can't walk out of it.
+        const facing = Math.abs(angleDiff(self.heading, goalAngle)) < 0.5;
+        const dash =
+            foe !== undefined && self.dashCd <= 0 && facing && foe.distance > 200 && foe.distance < 520;
+        const emp = foe !== undefined && self.empCd <= 0 && foe.distance < EMP_RADIUS;
         return {
             throttle: clinch ? 1 : throttleFor(self.heading, goalAngle),
             turn: steerTo(self.heading, goalAngle),
             towerTurn: foe ? aimTurret(self.tower, foe.bearing) : 0.9,
             fire,
             charge: false,
+            dash,
+            emp,
         };
     }
 

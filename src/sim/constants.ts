@@ -101,3 +101,13 @@ export const GUN_COOLDOWN_TICKS = 24; // 0.4s between shots
 export const BULLET_SPEED = 430;
 export const BULLET_DAMAGE = 12;
 export const BULLET_RADIUS = 3;
+
+// Active skills: universal (no skill points), gated by long cooldowns.
+// Dash is a burst of top speed; EMP slows nearby foes' drives.
+export const DASH_COOLDOWN_TICKS = TICK_HZ * 8;
+export const DASH_DURATION_TICKS = 12;
+export const DASH_SPEED_MULT = 2.5;
+export const EMP_COOLDOWN_TICKS = TICK_HZ * 12;
+export const EMP_RADIUS = 220;
+export const EMP_SLOW_TICKS = TICK_HZ * 3;
+export const EMP_SLOW_MULT = 0.45;

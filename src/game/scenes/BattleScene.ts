@@ -80,6 +80,8 @@ export class BattleScene extends Scene {
     private barBg: Phaser.GameObjects.Rectangle[] = [];
     private barFg: Phaser.GameObjects.Rectangle[] = [];
     private nameTexts: Phaser.GameObjects.Text[] = [];
+    private pipTexts: Phaser.GameObjects.Text[] = [];
+    private pipCache: string[] = [];
     private bullets: Phaser.GameObjects.Image[] = [];
     private muzzles: Phaser.GameObjects.Image[] = [];
     private particles: Particle[] = [];
@@ -137,6 +139,8 @@ export class BattleScene extends Scene {
         this.barBg = [];
         this.barFg = [];
         this.nameTexts = [];
+        this.pipTexts = [];
+        this.pipCache = [];
         this.bullets = [];
         this.muzzles = [];
         this.particles = [];
@@ -251,6 +255,9 @@ export class BattleScene extends Scene {
             const name = this.add.text(0, 0, skin.callsign, FONTS.monoSmall).setOrigin(0.5).setDepth(9);
             name.setColor(COLORS.teamCss[snap.team]);
             this.nameTexts.push(name);
+            // Active-skill cooldown pips: D = dash, E = EMP, filled = ready.
+            this.pipTexts.push(this.add.text(0, 0, '', FONTS.monoSmall).setOrigin(0.5).setDepth(9));
+            this.pipCache.push('');
             const muzzle = this.add.image(0, 0, 'muzzle').setScale(2).setDepth(8).setVisible(false);
             muzzle.setTint(skin.paint);
             this.muzzles.push(muzzle);
@@ -745,6 +752,17 @@ export class BattleScene extends Scene {
             const label = this.nameTexts[i] as Phaser.GameObjects.Text;
             label.setVisible(true).setPosition(cx, cy - 40);
             if (!s.alive) label.setColor('#5d6a78');
+            // Cooldown pips under the chassis; text only re-renders on change.
+            const pips = this.pipTexts[i] as Phaser.GameObjects.Text;
+            pips.setVisible(visible).setPosition(cx, cy + 30);
+            if (visible) {
+                const text = `D${s.dashCd <= 0 ? '●' : '○'} E${s.empCd <= 0 ? '●' : '○'}`;
+                if (text !== this.pipCache[i]) {
+                    this.pipCache[i] = text;
+                    pips.setText(text);
+                    pips.setColor(s.dashCd <= 0 && s.empCd <= 0 ? '#7de08a' : '#9aa7b4');
+                }
+            }
         });
         // Bullets from pool (tint only when the slot's team changes).
         this.bullets.forEach((img, i) => {

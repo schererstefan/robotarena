@@ -2,7 +2,7 @@
 // ready, fires, then breaks away on the cooldown and circles for the next
 // pass. Never trades shots standing still.
 
-import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, EMP_RADIUS } from '../sim/constants';
 import { angleDiff, TAU } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
@@ -55,12 +55,19 @@ export function create(): RobotController {
         const facing = Math.abs(angleDiff(self.heading, drive)) < 1.1;
         const towerTurn = foe ? aimTurret(self.tower, foe.bearing) : 1; // wide sweep
         const fire = foe !== undefined && foe.distance < self.stats.gunRange && aimed(self.tower, foe.bearing);
+        // Break contact on cooldown: dash out of the pocket and EMP the
+        // pursuer so the next pass starts at our range, not theirs.
+        const breaking = self.cooldown > 0 && foe !== undefined && foe.distance < 320;
+        const dash = breaking && self.dashCd <= 0;
+        const emp = breaking && self.empCd <= 0 && (foe?.distance ?? Infinity) < EMP_RADIUS;
         return {
             throttle: facing ? 1 : 0.4,
             turn,
             towerTurn,
             fire,
             charge: false,
+            dash,
+            emp,
         };
     }
 
