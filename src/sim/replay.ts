@@ -4,6 +4,7 @@
 // No Phaser/DOM imports: this module also runs headless in the soak test.
 
 import { sanitizeLoadout, SKILL_DEFS, type SkillLoadout } from './skills';
+import type { ArenaId } from './constants';
 
 export const REPLAY_FORMAT = 1;
 /** Bump together with package.json. Decoders accept any game string. */
@@ -17,6 +18,8 @@ export interface ReplaySpec {
     teamSize: number;
     lineupIds: string[];
     loadouts: SkillLoadout[];
+    /** Arena layout. Defaults to `open`; older codes without it decode as `open`. */
+    arena?: ArenaId;
 }
 
 export interface ReplayData extends ReplaySpec {
@@ -89,6 +92,7 @@ export function encodeReplay(spec: ReplaySpec): string {
         t: spec.teamSize,
         l: spec.lineupIds,
         o: spec.loadouts.map(loadoutToCompact),
+        a: spec.arena ?? 'open',
     };
     return `${PREFIX}.${toB64(JSON.stringify(payload))}`;
 }
@@ -107,11 +111,13 @@ export function decodeReplay(code: string): ReplayData | null {
         const teamSize = raw['t'];
         const lineupIds = raw['l'];
         const loadouts = raw['o'];
+        const arena = raw['a'];
         if (raw['v'] !== REPLAY_FORMAT || typeof game !== 'string') return null;
         if (typeof seed !== 'number' || !Number.isInteger(seed) || seed < 0 || seed > 0xffffffff) return null;
         if (typeof teamSize !== 'number' || !Number.isInteger(teamSize) || teamSize < 1 || teamSize > 3) return null;
         if (!Array.isArray(lineupIds) || lineupIds.length !== teamSize * 2) return null;
         if (!Array.isArray(loadouts) || loadouts.length !== teamSize * 2) return null;
+        if (arena !== undefined && arena !== 'open' && arena !== 'blocks') return null;
         for (const id of lineupIds) {
             if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;
         }
@@ -122,6 +128,7 @@ export function decodeReplay(code: string): ReplayData | null {
             teamSize,
             lineupIds: lineupIds as string[],
             loadouts: (loadouts as unknown[]).map(loadoutFromCompact),
+            arena: (arena ?? 'open') as ArenaId,
         };
     } catch {
         return null;

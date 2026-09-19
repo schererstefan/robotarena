@@ -1,7 +1,7 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, REVERSE_FACTOR, ROBOT_RADIUS } from './constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, REVERSE_FACTOR, ROBOT_RADIUS, type ArenaId, type ArenaObstacle } from './constants';
 import { angleDiff, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
@@ -84,6 +84,11 @@ export interface LineupEntry {
     loadout?: SkillLoadout;
 }
 
+export interface MatchOptions {
+    /** Arena layout. Unknown values fall back to `open`. Defaults to `open`. */
+    arena?: ArenaId;
+}
+
 function sanitizeIntent(raw: unknown): Intent {
     if (typeof raw !== 'object' || raw === null) return { ...IDLE_INTENT };
     const r = raw as Partial<Intent>;
@@ -103,9 +108,11 @@ export class Match {
     private over = false;
     private winner: -1 | 0 | 1 = -1;
     private readonly seed: number;
+    private readonly arena: ArenaId;
 
-    constructor(lineups: LineupEntry[], seed: number) {
+    constructor(lineups: LineupEntry[], seed: number, options: MatchOptions = {}) {
         this.seed = seed;
+        this.arena = options.arena === 'blocks' ? 'blocks' : 'open';
         lineups.forEach((entry, index) => {
             const spawn = Match.spawnFor(entry.team, Match.teamIndex(lineups, index), Match.teamSize(lineups, entry.team));
             // Guarded: hostile getters on the entry/controller must not kill setup.
@@ -154,6 +161,15 @@ export class Match {
 
     get result(): MatchResult {
         return { over: this.over, winner: this.winner, tick: this.tick };
+    }
+
+    get arenaId(): ArenaId {
+        return this.arena;
+    }
+
+    /** Obstacle rects for this match's arena (renderer + tests). */
+    get obstacles(): ArenaObstacle[] {
+        return ARENA_OBSTACLES[this.arena];
     }
 
     get robotSnapshots(): RobotSnapshot[] {
@@ -221,6 +237,7 @@ export class Match {
         });
         this.collideWalls();
         this.collideRobots();
+        this.collideObstacles();
         this.collideWalls(); // separation can shove robots past the walls
         // 3. Fire guns.
         this.robots.forEach((robot, i) => {
@@ -383,6 +400,53 @@ export class Match {
         }
     }
 
+    private collideObstacles(): void {
+        const obstacles = ARENA_OBSTACLES[this.arena];
+        if (obstacles.length === 0) return;
+        for (const robot of this.robots) {
+            if (!robot.alive) continue;
+            for (const o of obstacles) {
+                const cx = clamp(robot.x, o.x, o.x + o.w);
+                const cy = clamp(robot.y, o.y, o.y + o.h);
+                const dx = robot.x - cx;
+                const dy = robot.y - cy;
+                const d = Math.hypot(dx, dy);
+                if (d >= ROBOT_RADIUS) continue;
+                if (d > 0) {
+                    const push = ROBOT_RADIUS - d;
+                    robot.x += (dx / d) * push;
+                    robot.y += (dy / d) * push;
+                } else {
+                    // Center inside the block: shove out along min-penetration axis.
+                    const left = robot.x - o.x;
+                    const right = o.x + o.w - robot.x;
+                    const top = robot.y - o.y;
+                    const bottom = o.y + o.h - robot.y;
+                    const min = Math.min(left, right, top, bottom);
+                    if (min === left) robot.x = o.x - ROBOT_RADIUS;
+                    else if (min === right) robot.x = o.x + o.w + ROBOT_RADIUS;
+                    else if (min === top) robot.y = o.y - ROBOT_RADIUS;
+                    else robot.y = o.y + o.h + ROBOT_RADIUS;
+                }
+                robot.speed *= 0.4;
+            }
+        }
+    }
+
+    private hitsObstacle(x: number, y: number): boolean {
+        for (const o of ARENA_OBSTACLES[this.arena]) {
+            if (
+                x >= o.x - BULLET_RADIUS &&
+                x <= o.x + o.w + BULLET_RADIUS &&
+                y >= o.y - BULLET_RADIUS &&
+                y <= o.y + o.h + BULLET_RADIUS
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private stepBullets(): void {
         const survivors: Bullet[] = [];
         for (const bullet of this.bullets) {
@@ -391,6 +455,7 @@ export class Match {
             bullet.travelled += bullet.speed * DT;
             if (bullet.travelled > bullet.range) continue;
             if (bullet.x < 0 || bullet.x > ARENA_WIDTH || bullet.y < 0 || bullet.y > ARENA_HEIGHT) continue;
+            if (this.hitsObstacle(bullet.x, bullet.y)) continue;
             let hit = false;
             for (const robot of this.robots) {
                 if (!robot.alive || robot.team === bullet.team) continue; // no friendly fire

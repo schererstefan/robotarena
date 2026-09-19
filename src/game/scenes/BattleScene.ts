@@ -3,7 +3,7 @@
 // is sprite transforms plus one small dynamic Graphics (cones + trails).
 
 import { Scene } from 'phaser';
-import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS } from '../../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import { clamp } from '../../sim/math';
 import { encodeReplay } from '../../sim/replay';
@@ -113,6 +113,7 @@ export class BattleScene extends Scene {
     private indicators: EdgeIndicator[] = [];
     private mapG!: Phaser.GameObjects.Graphics;
     private pilot: PilotInput | null = null;
+    private obstacles: ArenaObstacle[] = [];
     private tutStep = 0;
     private tutTitle!: Phaser.GameObjects.Text;
     private tutBody!: Phaser.GameObjects.Text;
@@ -176,7 +177,8 @@ export class BattleScene extends Scene {
                 loadout: { ...(this.request.loadouts[i] ?? {}) },
             };
         });
-        this.match = new Match(lineups, this.request.seed);
+        this.match = new Match(lineups, this.request.seed, { arena: this.request.arena });
+        this.obstacles = this.match.obstacles;
         this.prev = this.match.robotSnapshots;
 
         // Static layers: composed floor, wall strips + corners + gates, decals.
@@ -204,6 +206,13 @@ export class BattleScene extends Scene {
         decal('decor_barrel', ARENA_WIDTH - 44, 44);
         decal('decor_vent', 44, ARENA_HEIGHT - 44);
         decal('decor_lamp', ARENA_WIDTH - 44, ARENA_HEIGHT - 44);
+        // Arena obstacles: wall-textured blocks with an edge frame.
+        for (const o of this.obstacles) {
+            const cx = AX + o.x + o.w / 2;
+            const cy = AY + o.y + o.h / 2;
+            this.add.rectangle(cx, cy, o.w + 4, o.h + 4, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(1);
+            this.add.tileSprite(cx, cy, o.w, o.h, 'tile_wall').setDepth(1);
+        }
 
         this.dyn = this.add.graphics().setDepth(2);
 
@@ -856,6 +865,15 @@ export class BattleScene extends Scene {
     private drawMinimap(snaps: RobotSnapshot[]): void {
         const g = this.mapG;
         g.clear();
+        for (const o of this.obstacles) {
+            g.fillStyle(COLORS.panelEdge, 0.9);
+            g.fillRect(
+                MAP_X0 + (o.x / ARENA_WIDTH) * MAP_W,
+                MAP_Y0 + (o.y / ARENA_HEIGHT) * MAP_H,
+                (o.w / ARENA_WIDTH) * MAP_W,
+                (o.h / ARENA_HEIGHT) * MAP_H,
+            );
+        }
         for (const s of snaps) {
             const mx = MAP_X0 + (s.x / ARENA_WIDTH) * MAP_W;
             const my = MAP_Y0 + (s.y / ARENA_HEIGHT) * MAP_H;
@@ -937,6 +955,7 @@ export class BattleScene extends Scene {
             teamSize: this.request.teamSize,
             lineupIds: this.request.lineupIds,
             loadouts: this.request.loadouts,
+            arena: this.request.arena,
         });
         const copyLabel = this.add
             .text(512, hintY + 26, 'REPLAY CODE - CLICK CODE TO COPY', FONTS.monoSmall)

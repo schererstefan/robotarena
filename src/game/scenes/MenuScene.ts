@@ -3,6 +3,7 @@
 
 import { Scene } from 'phaser';
 import { getRobot, ROBOTS } from '../../robots/registry';
+import type { ArenaId } from '../../sim/constants';
 import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
@@ -29,6 +30,7 @@ export interface BattleRequest {
     skins: SlotSkin[];
     trails: boolean;
     seed: number;
+    arena: ArenaId;
     /** True when this battle replays a shared code (HUD tag only). */
     replay?: boolean;
     /** Daily-challenge date key (YYYY-MM-DD) when this is the daily match. */
@@ -66,6 +68,8 @@ export class MenuScene extends Scene {
     ];
     private skins: SlotSkin[] = [defaultSkin('HUNTER', 0), defaultSkin('ORBITER', 1)];
     private trails = true;
+    private arena: ArenaId = 'open';
+    private arenaButton!: { setLabel: (label: string) => void };
     private slotObjects: Phaser.GameObjects.GameObject[] = [];
     private editorObjects: Phaser.GameObjects.GameObject[] = [];
     private statsObjects: Phaser.GameObjects.GameObject[] = [];
@@ -119,6 +123,8 @@ export class MenuScene extends Scene {
             this.modeButtons.push(btn);
         });
         this.refreshModeLabels();
+        this.arenaButton = makeButton(this, CX + 290, 136, 200, 42, '', () => this.cycleArena());
+        this.refreshArenaLabel();
 
         this.add.text(92, 176, 'SLOT', FONTS.monoSmall).setOrigin(0, 0.5);
         this.add.text(208, 176, 'CALLSIGN', FONTS.monoSmall).setOrigin(0, 0.5);
@@ -203,6 +209,7 @@ export class MenuScene extends Scene {
             skins: lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
             trails: this.trails,
             seed: dailySeed(date),
+            arena: 'open',
             daily: date,
         } satisfies BattleRequest);
     }
@@ -234,6 +241,15 @@ export class MenuScene extends Scene {
             const active = i + 1 === this.teamSize;
             btn.setLabel(`${active ? '> ' : ''}${labels[i]}${active ? ' <' : ''}`);
         });
+    }
+
+    private cycleArena(): void {
+        this.arena = this.arena === 'open' ? 'blocks' : 'open';
+        this.refreshArenaLabel();
+    }
+
+    private refreshArenaLabel(): void {
+        this.arenaButton.setLabel(`ARENA: ${this.arena.toUpperCase()}`);
     }
 
     private refreshTrailsLabel(): void {
@@ -507,6 +523,7 @@ export class MenuScene extends Scene {
             skins: lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
             trails: this.trails,
             seed: TUTORIAL_SEED,
+            arena: 'open',
             tutorial: true,
         } satisfies BattleRequest);
     }
@@ -613,6 +630,7 @@ export class MenuScene extends Scene {
                 skins: data.lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
                 trails: this.trails,
                 seed: data.seed,
+                arena: data.arena ?? 'open',
                 replay: true,
             } satisfies BattleRequest);
         };
@@ -737,6 +755,7 @@ export class MenuScene extends Scene {
             skins: this.skins.map((s) => ({ ...s })),
             trails: this.trails,
             seed: (Math.random() * 0x7fffffff) | 0,
+            arena: this.arena,
         } satisfies BattleRequest);
     }
 
@@ -749,6 +768,7 @@ export class MenuScene extends Scene {
             skins: [{ ...(this.skins[0] as SlotSkin) }, { ...(this.skins[1] as SlotSkin) }],
             trails: this.trails,
             seed: (Math.random() * 0x7fffffff) | 0,
+            arena: this.arena,
             pilot: true,
         } satisfies BattleRequest);
     }

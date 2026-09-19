@@ -109,8 +109,10 @@ replays identically.
 
 From `src/sim/constants.ts`: top speed 150 u/s (reverse ×0.6), turn 2.7 rad/s,
 tower 3.6 rad/s, gun range 470, 0.4 s cooldown, 12 damage, 100 health, no
-friendly fire. Arena is 960×640 with mirrored spawns. Matches cap at 2.5 minutes,
-then a draw.
+friendly fire. Arena is 960×640 with mirrored spawns. The BLOCKS layout adds
+four center blocks (mirrored through the arena center); robots and bullets
+collide with them, but your sensors don't report them — walls sense still
+measures the outer walls only. Matches cap at 2.5 minutes, then a draw.
 
 ## Rules for robot code
 

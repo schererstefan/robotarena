@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { MAX_SPEED, MAX_TICKS } from '../src/sim/constants';
+import { ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, MAX_SPEED, MAX_TICKS, ROBOT_RADIUS, type ArenaId } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, type ReplaySpec } from '../src/sim/replay';
@@ -36,14 +36,14 @@ function check(name: string, condition: boolean, detail = ''): void {
     }
 }
 
-function runMatch(ids: string[], teams: Array<0 | 1>, seed: number, loadouts?: SkillLoadout[]): Match {
+function runMatch(ids: string[], teams: Array<0 | 1>, seed: number, loadouts?: SkillLoadout[], arena: ArenaId = 'open'): Match {
     const lineups: LineupEntry[] = ids.map((id, i) => {
         const entry = ROBOTS.find((r) => r.meta.id === id);
         if (!entry) throw new Error(`unknown robot ${id}`);
         const loadout = loadouts?.[i] ?? entry.loadout;
         return { team: teams[i] as 0 | 1, controller: entry.create(), loadout: { ...loadout } };
     });
-    const match = new Match(lineups, seed);
+    const match = new Match(lineups, seed, { arena });
     let guard = 0;
     while (!match.result.over && guard <= MAX_TICKS + 10) {
         match.step();
@@ -58,7 +58,7 @@ function fingerprint(match: Match): string {
         [s.code, s.maxHealth, s.alive ? 1 : 0, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired, s.cooldown, s.charge].join(','),
     );
     const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team, b.hot ? 1 : 0].join(',')).join(';');
-    return `${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}`;
+    return `${match.arenaId}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}`;
 }
 
 // --- 1. Determinism: same seed, same everything ------------------------------
@@ -71,6 +71,9 @@ console.log('determinism');
     const d = runMatch(['wanderer', 'rusher'], [0, 1], 1234);
     const e = runMatch(['wanderer', 'rusher'], [0, 1], 999);
     check('seed affects RNG-drawing robots', fingerprint(d) !== fingerprint(e));
+    const f = runMatch(['hunter', 'orbiter'], [0, 1], 1234, undefined, 'blocks');
+    const g = runMatch(['hunter', 'orbiter'], [0, 1], 1234, undefined, 'blocks');
+    check('identical fingerprint on blocks arena', fingerprint(f) === fingerprint(g));
 }
 
 // --- 2. Intent clamping: a cheating robot cannot break physics ---------------
@@ -210,46 +213,142 @@ console.log('skills');
     check('charger match completes', fm.result.tick > 0);
 }
 
-// --- 5. Soak: 1v1 round-robin, 2v2, 3v3 --------------------------------------
+// --- 5. Soak: 1v1 round-robin, 2v2, 3v3 (every arena) -----------------------
 console.log('soak');
 {
     const ids = ROBOTS.map((r) => r.meta.id);
-    const wins = new Map<string, number>(ids.map((id) => [id, 0]));
-    let draws = 0;
+    const seeds = [11, 22, 33];
     let games = 0;
     let totalErrors = 0;
-    const seeds = [11, 22, 33];
-    for (const a of ids) {
-        for (const b of ids) {
-            if (a === b) continue;
-            for (const seed of seeds) {
-                const match = runMatch([a, b], [0, 1], seed);
-                games += 1;
-                totalErrors += match.robotSnapshots.reduce((sum, s) => sum + s.errors, 0);
-                if (!match.result.over) {
-                    check(`1v1 ${a} vs ${b} seed ${seed} finishes`, false);
-                    continue;
+    for (const arena of ARENA_IDS) {
+        const wins = new Map<string, number>(ids.map((id) => [id, 0]));
+        let draws = 0;
+        for (const a of ids) {
+            for (const b of ids) {
+                if (a === b) continue;
+                for (const seed of seeds) {
+                    const match = runMatch([a, b], [0, 1], seed, undefined, arena);
+                    games += 1;
+                    totalErrors += match.robotSnapshots.reduce((sum, s) => sum + s.errors, 0);
+                    if (!match.result.over) {
+                        check(`1v1 ${a} vs ${b} seed ${seed} ${arena} finishes`, false);
+                        continue;
+                    }
+                    if (match.result.winner === 0) wins.set(a, (wins.get(a) ?? 0) + 1);
+                    else if (match.result.winner === 1) wins.set(b, (wins.get(b) ?? 0) + 1);
+                    else draws += 1;
                 }
-                if (match.result.winner === 0) wins.set(a, (wins.get(a) ?? 0) + 1);
-                else if (match.result.winner === 1) wins.set(b, (wins.get(b) ?? 0) + 1);
-                else draws += 1;
+            }
+        }
+        console.log(`       ${arena} record: ${ids.map((id) => `${id}=${wins.get(id)}`).join(' ')} draws=${draws}`);
+        const maxWins = Math.max(...[...wins.values()]);
+        const arenaGames = ids.length * (ids.length - 1) * seeds.length;
+        check(`no robot wins every ${arena} matchup (balance smell)`, maxWins < arenaGames);
+    }
+    check(`all ${games} 1v1 games finished`, games === ids.length * (ids.length - 1) * seeds.length * ARENA_IDS.length);
+    check('built-in robots run error-free', totalErrors === 0, `errors=${totalErrors}`);
+
+    for (const arena of ARENA_IDS) {
+        const m2 = runMatch(['rusher', 'hunter', 'turret', 'orbiter'], [0, 0, 1, 1], 5, undefined, arena);
+        check(`2v2 completes on ${arena}`, m2.result.over);
+        const m3 = runMatch(
+            ['rusher', 'hunter', 'orbiter', 'turret', 'wanderer', 'hunter'],
+            [0, 0, 0, 1, 1, 1],
+            6,
+            undefined,
+            arena,
+        );
+        check(`3v3 completes on ${arena}`, m3.result.over);
+    }
+}
+
+// --- 5b. Arena: mirrored layout, safe spawns, solid blocks --------------------
+console.log('arena');
+{
+    const open = new Match(
+        [
+            { team: 0, controller: ROBOTS[0]!.create() },
+            { team: 1, controller: ROBOTS[1]!.create() },
+        ],
+        1,
+        { arena: 'open' },
+    );
+    const blocks = new Match(
+        [
+            { team: 0, controller: ROBOTS[0]!.create() },
+            { team: 1, controller: ROBOTS[1]!.create() },
+        ],
+        1,
+        { arena: 'blocks' },
+    );
+    check('open arena has no obstacles', open.obstacles.length === 0);
+    check('blocks arena has obstacles', blocks.obstacles.length > 0);
+    check('unknown arena falls back to open', new Match(
+        [
+            { team: 0, controller: ROBOTS[0]!.create() },
+            { team: 1, controller: ROBOTS[1]!.create() },
+        ],
+        1,
+        { arena: 'void' as ArenaId },
+    ).arenaId === 'open');
+    // Every block mirrors through the arena center onto another block.
+    const rects = ARENA_OBSTACLES.blocks;
+    const mirrored = rects.every((o) =>
+        rects.some(
+            (p) =>
+                p.x === ARENA_WIDTH - o.x - o.w &&
+                p.y === ARENA_HEIGHT - o.y - o.h &&
+                p.w === o.w &&
+                p.h === o.h,
+        ),
+    );
+    check('blocks mirror through arena center', mirrored);
+    const clearOf = (x: number, y: number): boolean =>
+        rects.every((o) => {
+            const cx = Math.max(o.x, Math.min(x, o.x + o.w));
+            const cy = Math.max(o.y, Math.min(y, o.y + o.h));
+            // Epsilon: push-out normalization leaves float dust (~1e-14).
+            return Math.hypot(x - cx, y - cy) >= ROBOT_RADIUS - 1e-6;
+        });
+    // Spawns for 1v1 through 3v3 never start inside a block.
+    let spawnsClear = true;
+    for (const teamSize of [1, 2, 3]) {
+        const ids: string[] = [];
+        const teams: Array<0 | 1> = [];
+        for (let i = 0; i < teamSize * 2; i += 1) {
+            ids.push(ROBOTS[i % ROBOTS.length]!.meta.id);
+            teams.push(i < teamSize ? 0 : 1);
+        }
+        const lineups: LineupEntry[] = ids.map((id, i) => {
+            const entry = ROBOTS.find((r) => r.meta.id === id);
+            if (!entry) throw new Error(`unknown robot ${id}`);
+            return { team: teams[i] as 0 | 1, controller: entry.create() };
+        });
+        const fresh = new Match(lineups, 9, { arena: 'blocks' });
+        for (const s of fresh.robotSnapshots) {
+            if (!clearOf(s.x, s.y)) spawnsClear = false;
+        }
+    }
+    check('spawns never start inside blocks', spawnsClear);
+    // Collision holds mid-match: sample a full game, nobody clips a block.
+    const probeLineups: LineupEntry[] = ['rusher', 'turret'].map((id, i) => {
+        const entry = ROBOTS.find((r) => r.meta.id === id);
+        if (!entry) throw new Error(`unknown robot ${id}`);
+        return { team: (i === 0 ? 0 : 1) as 0 | 1, controller: entry.create() };
+    });
+    const probe = new Match(probeLineups, 77, { arena: 'blocks' });
+    let clipped = false;
+    let sampled = 0;
+    while (!probe.result.over) {
+        probe.step();
+        sampled += 1;
+        if (sampled % 10 === 0) {
+            for (const s of probe.robotSnapshots) {
+                if (s.alive && !clearOf(s.x, s.y)) clipped = true;
             }
         }
     }
-    check(`all ${games} 1v1 games finished`, games === ids.length * (ids.length - 1) * seeds.length);
-    check('built-in robots run error-free', totalErrors === 0, `errors=${totalErrors}`);
-    console.log(`       record: ${ids.map((id) => `${id}=${wins.get(id)}`).join(' ')} draws=${draws}`);
-    const maxWins = Math.max(...[...wins.values()]);
-    check('no robot wins every matchup (balance smell)', maxWins < games);
-
-    const m2 = runMatch(['rusher', 'hunter', 'turret', 'orbiter'], [0, 0, 1, 1], 5);
-    check('2v2 completes', m2.result.over);
-    const m3 = runMatch(
-        ['rusher', 'hunter', 'orbiter', 'turret', 'wanderer', 'hunter'],
-        [0, 0, 0, 1, 1, 1],
-        6,
-    );
-    check('3v3 completes', m3.result.over);
+    check('robots never clip blocks mid-match', !clipped && sampled > 0);
 }
 
 // --- 6. Replay codes: round-trip + same code => identical fingerprint ------
@@ -261,6 +360,7 @@ console.log('replay');
             teamSize: 1,
             lineupIds: ['hunter', 'orbiter'],
             loadouts: [{ overdrive: 2, trigger: 3 }, { plating: 2, charger: 1, wideband: 1 }],
+            arena: 'blocks',
         },
         {
             seed: 7,
@@ -278,12 +378,13 @@ console.log('replay');
                 back.seed === spec.seed &&
                 back.teamSize === spec.teamSize &&
                 JSON.stringify(back.lineupIds) === JSON.stringify(spec.lineupIds) &&
-                JSON.stringify(back.loadouts) === JSON.stringify(spec.loadouts.map((l) => sanitizeLoadout(l)));
-            check(`replay preserves seed+lineups+loadouts (${spec.teamSize}v${spec.teamSize})`, sameSetup);
+                JSON.stringify(back.loadouts) === JSON.stringify(spec.loadouts.map((l) => sanitizeLoadout(l))) &&
+                back.arena === (spec.arena ?? 'open');
+            check(`replay preserves seed+lineups+loadouts+arena (${spec.teamSize}v${spec.teamSize})`, sameSetup);
             const teams = spec.lineupIds.map((_, i) => (i < spec.teamSize ? 0 : 1) as 0 | 1);
-            const direct = runMatch(spec.lineupIds, teams, spec.seed, spec.loadouts);
+            const direct = runMatch(spec.lineupIds, teams, spec.seed, spec.loadouts, spec.arena ?? 'open');
             // Re-run purely from the decoded code, as Watch Replay does.
-            const replayed = runMatch(back.lineupIds, teams, back.seed, back.loadouts);
+            const replayed = runMatch(back.lineupIds, teams, back.seed, back.loadouts, back.arena ?? 'open');
             check(
                 `same code => identical fingerprint (${spec.teamSize}v${spec.teamSize})`,
                 fingerprint(direct) === fingerprint(replayed),
@@ -295,6 +396,13 @@ console.log('replay');
     check('bad base64 rejected', decodeReplay('RA1.!!!not-base64!!!') === null);
     const valid = encodeReplay(specs[0] as ReplaySpec);
     check('truncated code rejected', decodeReplay(valid.slice(0, -4)) === null);
+    {
+        // Tamper the arena field inside an otherwise valid code.
+        const payload = valid.slice(valid.indexOf('.') + 1);
+        const json = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+        const tampered = `RA1.${Buffer.from(json.replace('"blocks"', '"void"'), 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+        check('bad arena rejected', decodeReplay(tampered) === null);
+    }
     check('overlong code rejected', decodeReplay(`RA1.${'A'.repeat(3000)}`) === null);
 }
 

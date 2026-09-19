@@ -9,6 +9,33 @@ export const MAX_TICKS = TICK_HZ * 150; // 2.5 minute match cap, then draw
 export const ARENA_WIDTH = 960;
 export const ARENA_HEIGHT = 640;
 
+/** Arena layouts: `open` is empty, `blocks` adds mirrored center blocks. */
+export type ArenaId = 'open' | 'blocks';
+export const ARENA_IDS: readonly ArenaId[] = ['open', 'blocks'];
+
+export interface ArenaObstacle {
+    /** Top-left corner in arena coordinates. */
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+}
+
+/**
+ * Obstacle rects per arena. The blocks layout mirrors every rect through the
+ * arena center (480, 320) so neither team gains cover or a shorter path.
+ * All blocks sit clear of the spawn columns (x = 130 / 830).
+ */
+export const ARENA_OBSTACLES: Record<ArenaId, ArenaObstacle[]> = {
+    open: [],
+    blocks: [
+        { x: 300, y: 130, w: 90, h: 90 },
+        { x: 570, y: 130, w: 90, h: 90 },
+        { x: 300, y: 420, w: 90, h: 90 },
+        { x: 570, y: 420, w: 90, h: 90 },
+    ],
+};
+
 export const ROBOT_RADIUS = 14;
 export const START_HEALTH = 100;
 
