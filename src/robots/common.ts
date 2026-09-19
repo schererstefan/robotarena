@@ -1,0 +1,27 @@
+// Optional steering helpers for robot authors. Robots may use these or
+// inline their own math; everything here is plain deterministic code.
+
+import { angleDiff, clamp } from '../sim/math';
+
+/** Proportional tower control: returns a -1..1 towerTurn toward a target angle. */
+export function aimTurret(current: number, target: number, gain = 3): number {
+    return clamp(angleDiff(current, target) * gain, -1, 1);
+}
+
+/** Proportional chassis steering: returns a -1..1 turn toward a target angle. */
+export function steerTo(heading: number, target: number, gain = 2.5): number {
+    return clamp(angleDiff(heading, target) * gain, -1, 1);
+}
+
+/** Full throttle when facing the target, easing off as alignment worsens. */
+export function throttleFor(heading: number, target: number): number {
+    const error = Math.abs(angleDiff(heading, target));
+    if (error > 2.2) return -0.5; // target behind us: back up while turning
+    if (error > 1.1) return 0.25;
+    return 1;
+}
+
+/** True when the tower is close enough to the target angle to fire. */
+export function aimed(current: number, target: number, tolerance = 0.07): boolean {
+    return Math.abs(angleDiff(current, target)) < tolerance;
+}

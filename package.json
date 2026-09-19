@@ -1,0 +1,21 @@
+{
+  "name": "robotarena",
+  "description": "RobotArena: 2D Phaser robot battles where identical robots differ only in player-written AI.",
+  "version": "0.1.0",
+  "license": "MIT",
+  "scripts": {
+    "dev": "node log.js dev & vite --config vite/config.dev.mjs",
+    "build": "node log.js build & vite build --config vite/config.prod.mjs",
+    "dev-nolog": "vite --config vite/config.dev.mjs",
+    "build-nolog": "vite build --config vite/config.prod.mjs",
+    "test:sim": "esbuild tools/soak.ts --bundle --platform=node --format=esm --outfile=/tmp/robotarena-soak.mjs --log-level=warning && node /tmp/robotarena-soak.mjs"
+  },
+  "devDependencies": {
+    "typescript": "~5.7.2",
+    "vite": "^6.3.1"
+  },
+  "dependencies": {
+    "phaser": "4.2.1",
+    "terser": "^5.39.0"
+  }
+}
