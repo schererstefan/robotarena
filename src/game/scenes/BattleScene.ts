@@ -10,6 +10,7 @@ import { encodeReplay } from '../../sim/replay';
 import { ROBOT_SOURCES } from '../../robots/sources';
 import { chassisKey, ensureArtTextures, towerKey, wreckKey } from '../art';
 import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unlockAudio } from '../audio';
+import { bulletColor, isReducedMotion, teamColor, teamCss } from '../accessibility';
 import { recordDailyResult, recordMatch } from '../history';
 import { displayRobotId, isImportedId, resolveLineupEntry } from '../importRobot';
 import { createPilotController, PilotInput } from '../pilot';
@@ -112,6 +113,7 @@ export class BattleScene extends Scene {
     private lastAlive: [number, number] = [-1, -1];
     private dmgTexts: Phaser.GameObjects.Text[] = [];
     private dmgCursor = 0;
+    private dmgToken: number[] = [];
     private indicators: EdgeIndicator[] = [];
     private mapG!: Phaser.GameObjects.Graphics;
     private pilot: PilotInput | null = null;
@@ -119,6 +121,7 @@ export class BattleScene extends Scene {
     private sdAnnounced = false;
     private exhibition = false;
     private customMatch = false;
+    private reducedMotion = false;
     private tutStep = 0;
     private tutTitle!: Phaser.GameObjects.Text;
     private tutBody!: Phaser.GameObjects.Text;
@@ -161,6 +164,7 @@ export class BattleScene extends Scene {
         this.lastAlive = [-1, -1];
         this.dmgTexts = [];
         this.dmgCursor = 0;
+        this.dmgToken = [];
         this.indicators = [];
         this.pilot = null;
         this.customMatch = false;
@@ -171,6 +175,7 @@ export class BattleScene extends Scene {
 
     create(): void {
         ensureArtTextures(this);
+        this.reducedMotion = isReducedMotion();
         // Pilot mode: slot 0 keeps its robot identity but is driven by human
         // input through the same Intent pipeline (no sim changes).
         this.pilot = this.request.pilot === true ? new PilotInput() : null;
@@ -232,7 +237,7 @@ export class BattleScene extends Scene {
         this.match.robotSnapshots.forEach((snap, i) => {
             const skin = this.request.skins[i] as SlotSkin;
             const robotId = displayRobotId(this.request.lineupIds[i] as string);
-            const team = COLORS.team[snap.team];
+            const team = teamColor(snap.team);
             const body = this.add.image(0, 0, chassisKey(robotId)).setScale(2).setDepth(4);
             body.setTint(team);
             const tower = this.add.image(0, 0, towerKey(robotId)).setScale(2).setDepth(5);
@@ -257,7 +262,7 @@ export class BattleScene extends Scene {
             this.barBg.push(this.add.rectangle(0, 0, 46, 6, 0x000000, 0.7).setDepth(9));
             this.barFg.push(this.add.rectangle(0, 0, 44, 4, COLORS.accent).setDepth(9));
             const name = this.add.text(0, 0, skin.callsign, FONTS.monoSmall).setOrigin(0.5).setDepth(9);
-            name.setColor(COLORS.teamCss[snap.team]);
+            name.setColor(teamCss(snap.team));
             this.nameTexts.push(name);
             // Active-skill cooldown pips: D = dash, E = EMP, filled = ready.
             this.pipTexts.push(this.add.text(0, 0, '', FONTS.monoSmall).setOrigin(0.5).setDepth(9));
@@ -272,18 +277,21 @@ export class BattleScene extends Scene {
             if (snap.team === 0) this.total0 += 1;
             else this.total1 += 1;
             // Spawn-in pop (chassis + tower + hub scale together).
-            body.setScale(0.5).setAlpha(0);
-            tower.setScale(0.5).setAlpha(0);
-            hub.setScale(0.5).setAlpha(0);
-            stripe.setAlpha(0);
-            this.tweens.add({ targets: [body, tower, hub], scale: 2, alpha: 1, duration: 350, delay: i * 90, ease: 'Back.easeOut' });
-            this.tweens.add({ targets: stripe, alpha: 1, duration: 350, delay: i * 90 });
-            // Spawn ring pop at the spawn point.
-            const ring = this.add.image(AX + snap.x, AY + snap.y, 'spawn_a').setScale(2).setDepth(3).setAlpha(0.9);
-            this.time.delayedCall(i * 90, () => ring.setVisible(true));
-            ring.setVisible(false);
-            this.time.delayedCall(i * 90 + 130, () => ring.setTexture('spawn_b'));
-            this.time.delayedCall(i * 90 + 260, () => ring.destroy());
+            // Reduced motion: robots simply appear, no pop or spawn rings.
+            if (!this.reducedMotion) {
+                body.setScale(0.5).setAlpha(0);
+                tower.setScale(0.5).setAlpha(0);
+                hub.setScale(0.5).setAlpha(0);
+                stripe.setAlpha(0);
+                this.tweens.add({ targets: [body, tower, hub], scale: 2, alpha: 1, duration: 350, delay: i * 90, ease: 'Back.easeOut' });
+                this.tweens.add({ targets: stripe, alpha: 1, duration: 350, delay: i * 90 });
+                // Spawn ring pop at the spawn point.
+                const ring = this.add.image(AX + snap.x, AY + snap.y, 'spawn_a').setScale(2).setDepth(3).setAlpha(0.9);
+                this.time.delayedCall(i * 90, () => ring.setVisible(true));
+                ring.setVisible(false);
+                this.time.delayedCall(i * 90 + 130, () => ring.setTexture('spawn_b'));
+                this.time.delayedCall(i * 90 + 260, () => ring.destroy());
+            }
         });
 
         // Bullet + particle pools.
@@ -330,6 +338,7 @@ export class BattleScene extends Scene {
             text.setColor('#ffffff');
             text.setStroke('#0b0e12', 3);
             this.dmgTexts.push(text);
+            this.dmgToken.push(0);
         }
         this.add
             .rectangle(MAP_CX, MAP_CY, MAP_W + 10, MAP_H + 10, COLORS.panel)
@@ -577,7 +586,7 @@ export class BattleScene extends Scene {
             const cy = AY + s.y;
             if (s.shotsFired > p.shotsFired && s.alive) {
                 this.muzzleLife[i] = 0.09;
-                this.recoil[i] = 5;
+                if (!this.reducedMotion) this.recoil[i] = 5;
                 (this.muzzles[i] as Phaser.GameObjects.Image)
                     .setTexture(p.charge > 0.4 ? 'muzzle_big' : 'muzzle')
                     .setScale(2 + Math.random() * 0.8);
@@ -608,9 +617,9 @@ export class BattleScene extends Scene {
     private explode(i: number, cx: number, cy: number): void {
         const snap = this.match.robotSnapshots[i] as RobotSnapshot;
         const robotId = displayRobotId(this.request.lineupIds[i] as string);
-        this.burst(cx, cy, COLORS.team[snap.team], 22, 260, 200);
+        this.burst(cx, cy, teamColor(snap.team), 22, 260, 200);
         this.burst(cx, cy, 0xffffff, 8, 140, 100);
-        this.cameras.main.shake(180, 0.006);
+        if (!this.reducedMotion) this.cameras.main.shake(180, 0.006);
         playExplosion();
         // Framed explosion, then a persistent per-archetype wreck.
         const boom = this.add.image(cx, cy, 'boom_1').setScale(3).setDepth(8);
@@ -638,6 +647,13 @@ export class BattleScene extends Scene {
         }
         this.bannerBusy = true;
         this.banner.setText(text).setAlpha(1).setY(AY + 56);
+        if (this.reducedMotion) {
+            this.time.delayedCall(1300, () => {
+                this.banner.setAlpha(0);
+                this.nextBanner();
+            });
+            return;
+        }
         this.tweens.add({
             targets: this.banner,
             y: AY + 34,
@@ -649,6 +665,8 @@ export class BattleScene extends Scene {
     }
 
     private burst(x: number, y: number, color: number, n: number, speed: number, gravity: number): void {
+        // Reduced motion: no particles at all.
+        if (this.reducedMotion) return;
         let spawned = 0;
         for (const p of this.particles) {
             if (p.life > 0) continue;
@@ -682,10 +700,20 @@ export class BattleScene extends Scene {
     }
 
     private spawnDamageNumber(x: number, y: number, dmg: number): void {
-        const text = this.dmgTexts[this.dmgCursor] as Phaser.GameObjects.Text;
+        const slot = this.dmgCursor;
+        const text = this.dmgTexts[slot] as Phaser.GameObjects.Text;
         this.dmgCursor = (this.dmgCursor + 1) % this.dmgTexts.length;
         this.tweens.killTweensOf(text);
         text.setText(`-${dmg}`).setPosition(x, y).setAlpha(1).setVisible(true);
+        if (this.reducedMotion) {
+            // Static show; the token keeps a stale timer from hiding a reuse.
+            this.dmgToken[slot] = (this.dmgToken[slot] as number) + 1;
+            const token = this.dmgToken[slot] as number;
+            this.time.delayedCall(650, () => {
+                if (this.dmgToken[slot] === token) text.setVisible(false);
+            });
+            return;
+        }
         this.tweens.add({
             targets: text,
             y: y - 34,
@@ -729,7 +757,8 @@ export class BattleScene extends Scene {
             const aura = this.auras[i] as Phaser.GameObjects.Image;
             const charging = visible && s.charge > 0.05;
             aura.setVisible(charging).setPosition(cx, cy);
-            if (charging) aura.setAlpha(0.25 + 0.55 * s.charge).setRotation(this.match.result.tick / 24);
+            if (charging) aura.setAlpha(0.25 + 0.55 * s.charge);
+            if (charging && !this.reducedMotion) aura.setRotation(this.match.result.tick / 24);
             body.setVisible(visible).setPosition(cx, cy).setRotation(s.heading);
             stripe.setVisible(visible && skin.finish === 'Stripe').setPosition(cx, cy).setRotation(s.heading);
             const rec = this.recoil[i] as number;
@@ -786,7 +815,7 @@ export class BattleScene extends Scene {
             if (this.bulletTeam[i] !== b.team || img.texture.key !== want) {
                 this.bulletTeam[i] = b.team;
                 img.setTexture(want);
-                img.setTint(COLORS.bullet[b.team]);
+                img.setTint(bulletColor(b.team));
             }
         });
     }
@@ -811,7 +840,7 @@ export class BattleScene extends Scene {
             const cy = AY + s.y;
             const a0 = s.tower - s.fov / 2;
             const a1 = s.tower + s.fov / 2;
-            g.fillStyle(COLORS.team[s.team], 0.07);
+            g.fillStyle(teamColor(s.team), 0.07);
             g.fillTriangle(
                 cx,
                 cy,
@@ -867,7 +896,7 @@ export class BattleScene extends Scene {
         const px = -ny;
         const py = nx;
         const alpha = Math.min(Math.max(ind.ttl / IND_TTL, 0), 1);
-        g.fillStyle(COLORS.team[ind.team], alpha);
+        g.fillStyle(teamColor(ind.team), alpha);
         g.fillTriangle(
             ex + nx * size,
             ey + ny * size,
@@ -921,10 +950,10 @@ export class BattleScene extends Scene {
             const mx = MAP_X0 + (s.x / ARENA_WIDTH) * MAP_W;
             const my = MAP_Y0 + (s.y / ARENA_HEIGHT) * MAP_H;
             if (s.alive) {
-                g.fillStyle(COLORS.team[s.team], 1);
+                g.fillStyle(teamColor(s.team), 1);
                 g.fillCircle(mx, my, 2.5);
             } else {
-                g.lineStyle(1, COLORS.team[s.team], 0.75);
+                g.lineStyle(1, teamColor(s.team), 0.75);
                 g.strokeCircle(mx, my, 2.5);
             }
         }
@@ -972,7 +1001,7 @@ export class BattleScene extends Scene {
                   : result.winner === 0
                     ? 'TEAM 1 WINS'
                     : 'TEAM 2 WINS';
-        const color = result.winner === -1 ? COLORS.ink : COLORS.teamCss[result.winner];
+        const color = result.winner === -1 ? COLORS.ink : teamCss(result.winner);
         this.add.rectangle(512, 384, 620, 440, 0x0b0e12, 0.94).setStrokeStyle(2, COLORS.panelEdge).setDepth(20);
         this.add.text(512, 196, title, { ...FONTS.banner, color }).setOrigin(0.5).setDepth(20);
         this.add
@@ -998,7 +1027,7 @@ export class BattleScene extends Scene {
             const code = this.add.text(232, y + 13, s.code, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
             code.setColor('#5d6a78');
             const text = this.add.text(232, y, row, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
-            text.setColor(s.alive ? COLORS.teamCss[s.team] : '#5d6a78');
+            text.setColor(s.alive ? teamCss(s.team) : '#5d6a78');
             const hit = this.add.rectangle(512, y, 560, 26).setDepth(20);
             hit.setInteractive({ useHandCursor: true });
             hit.on('pointerdown', () => this.exportRobot(s.id));

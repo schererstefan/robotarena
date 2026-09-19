@@ -19,7 +19,9 @@ import {
     winRates,
 } from '../history';
 import { COLORS, FONTS } from '../theme';
+import { isColorblind, isReducedMotion, setColorblind, setReducedMotion, teamColor } from '../accessibility';
 import { displayRobotId, getImported, importRobotFromFile, importRobotFromUrl } from '../importRobot';
+import { FocusNav, type NavTarget } from '../nav';
 import { markTutorialSeen, shouldShowTutorial, TUTORIAL_LINEUP, TUTORIAL_SEED } from '../tutorial';
 import { makeButton, makePanel, type Button } from '../ui';
 import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } from '../customize';
@@ -84,7 +86,12 @@ export class MenuScene extends Scene {
     private modeButtons: Array<{ setLabel: (label: string) => void }> = [];
     private trailsButton!: { setLabel: (label: string) => void };
     private muteButton!: { setLabel: (label: string) => void };
+    private colorButton!: { setLabel: (label: string) => void };
+    private motionButton!: { setLabel: (label: string) => void };
     private dailyButton!: { setLabel: (label: string) => void };
+    private nav!: FocusNav;
+    private navBase: NavTarget[] = [];
+    private navSlots: NavTarget[] = [];
     private replayOverlay: HTMLDivElement | null = null;
     private importOverlay: HTMLDivElement | null = null;
     private tourRequested = false;
@@ -118,6 +125,10 @@ export class MenuScene extends Scene {
         this.tourButtons = [];
         this.tourStep = 0;
         this.tourNext = null;
+        this.navBase = [];
+        this.navSlots = [];
+        this.nav = new FocusNav(this);
+        this.nav.onEscape = () => this.escapeOverlay();
         this.add.text(CX, 44, 'ROBOTARENA', FONTS.title).setOrigin(0.5);
         this.add.image(CX - 285, 44, 'logo_bar').setScale(2);
         this.add.image(CX + 285, 44, 'logo_bar').setScale(2);
@@ -126,13 +137,13 @@ export class MenuScene extends Scene {
             .setOrigin(0.5);
 
         [1, 2, 3].forEach((size, i) => {
-            const btn = makeButton(this, CX - 150 + i * 150, 136, 130, 42, '', () => this.setMode(size));
+            const btn = this.navButton(CX - 150 + i * 150, 136, 130, 42, '', () => this.setMode(size));
             this.modeButtons.push(btn);
         });
         this.refreshModeLabels();
-        this.arenaButton = makeButton(this, CX + 323, 136, 200, 42, '', () => this.cycleArena());
+        this.arenaButton = this.navButton(CX + 323, 136, 200, 42, '', () => this.cycleArena());
         this.refreshArenaLabel();
-        this.modsButton = makeButton(this, CX - 350, 136, 200, 42, '', () => this.openMods());
+        this.modsButton = this.navButton(CX - 350, 136, 200, 42, '', () => this.openMods());
         this.refreshModsLabel();
 
         this.add.text(92, 176, 'SLOT', FONTS.monoSmall).setOrigin(0, 0.5);
@@ -147,21 +158,26 @@ export class MenuScene extends Scene {
         this.descText = this.add.text(CX - 420, 562, '', FONTS.body).setWordWrapWidth(840);
         this.showDescription(0);
 
-        makeButton(this, CX - 290, 684, 270, 50, 'RANDOMIZE SKINS', () => this.randomizeSkins());
-        makeButton(this, CX, 684, 270, 50, 'START BATTLE', () => this.startBattle());
-        makeButton(this, CX + 290, 684, 270, 50, 'PILOT 1V1', () => this.startPilot());
-        this.trailsButton = makeButton(this, CX - 215, 728, 200, 26, '', () => this.toggleTrails());
-        this.muteButton = makeButton(this, CX, 728, 200, 26, '', () => this.toggleMute());
-        makeButton(this, CX + 215, 728, 200, 26, 'WATCH REPLAY', () => this.openReplayDialog());
-        this.dailyButton = makeButton(this, CX - 362, 754, 130, 24, '', () => this.startDaily());
-        makeButton(this, CX - 218, 754, 130, 24, 'TOURNEY', () => this.scene.start('Tournament'));
-        makeButton(this, CX - 74, 754, 130, 24, 'STATS', () => this.openStats());
-        makeButton(this, CX + 74, 754, 130, 24, 'WORKSHOP', () => this.scene.start('Workshop'));
-        makeButton(this, CX + 218, 754, 130, 24, 'IMPORT', () => this.openImportDialog());
-        makeButton(this, CX + 362, 754, 130, 24, 'TUTORIAL', () => this.startTutorial());
+        this.navButton(CX - 290, 684, 270, 50, 'RANDOMIZE SKINS', () => this.randomizeSkins());
+        this.navButton(CX, 684, 270, 50, 'START BATTLE', () => this.startBattle());
+        this.navButton(CX + 290, 684, 270, 50, 'PILOT 1V1', () => this.startPilot());
+        this.trailsButton = this.navButton(CX - 320, 728, 150, 26, '', () => this.toggleTrails());
+        this.muteButton = this.navButton(CX - 160, 728, 150, 26, '', () => this.toggleMute());
+        this.navButton(CX, 728, 150, 26, 'WATCH REPLAY', () => this.openReplayDialog());
+        this.colorButton = this.navButton(CX + 160, 728, 150, 26, '', () => this.toggleColorblind());
+        this.motionButton = this.navButton(CX + 320, 728, 150, 26, '', () => this.toggleMotion());
+        this.dailyButton = this.navButton(CX - 362, 754, 130, 24, '', () => this.startDaily());
+        this.navButton(CX - 218, 754, 130, 24, 'TOURNEY', () => this.scene.start('Tournament'));
+        this.navButton(CX - 74, 754, 130, 24, 'STATS', () => this.openStats());
+        this.navButton(CX + 74, 754, 130, 24, 'WORKSHOP', () => this.scene.start('Workshop'));
+        this.navButton(CX + 218, 754, 130, 24, 'IMPORT', () => this.openImportDialog());
+        this.navButton(CX + 362, 754, 130, 24, 'TUTORIAL', () => this.startTutorial());
         this.refreshTrailsLabel();
         this.refreshMuteLabel();
+        this.refreshColorLabel();
+        this.refreshMotionLabel();
         this.refreshDailyLabel();
+        this.restoreNav();
         // Tutorial routing: the battle half hands off to the loadout tour;
         // first-run visits get the prompt instead.
         const startTour = this.tourRequested;
@@ -176,8 +192,10 @@ export class MenuScene extends Scene {
         // every click gets a UI blip.
         this.input.on('pointerdown', this.onAnyPointer);
         this.input.keyboard?.on('keydown-M', this.onMuteKey);
+        this.input.keyboard?.on('keydown', this.onNavKey);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
+            this.input.keyboard?.off('keydown', this.onNavKey);
             this.closeReplayDialog();
             this.closeImportDialog();
         });
@@ -186,7 +204,52 @@ export class MenuScene extends Scene {
     private onAnyPointer = (): void => {
         unlockAudio();
         playClick();
+        this.nav.hideRing();
     };
+
+    private onNavKey = (event: KeyboardEvent): void => {
+        // Typing in a DOM dialog must not drive canvas focus.
+        const active = document.activeElement;
+        if (active instanceof HTMLInputElement || active instanceof HTMLSelectElement || active instanceof HTMLTextAreaElement) {
+            return;
+        }
+        this.nav.handleKey(event);
+    };
+
+    // ---- Keyboard navigation ----------------------------------------------
+    /** makeButton plus a keyboard-focus target at the same bounds. */
+    private navButton(x: number, y: number, w: number, h: number, label: string, onClick: () => void, depth = 0): Button {
+        this.navBase.push({ x, y, w, h, activate: onClick });
+        return makeButton(this, x, y, w, h, label, onClick, depth);
+    }
+
+    private overlayOpen(): boolean {
+        return this.editorSlot >= 0 || this.statsObjects.length > 0 || this.modsObjects.length > 0 || this.tourMode !== 'none';
+    }
+
+    private restoreNav(): void {
+        if (!this.overlayOpen()) this.nav.replaceTargets([...this.navBase, ...this.navSlots]);
+    }
+
+    private escapeOverlay(): void {
+        if (this.tourMode === 'prompt') {
+            markTutorialSeen();
+            this.clearTour();
+            return;
+        }
+        if (this.editorSlot >= 0) {
+            this.closeEditor();
+            this.rebuildSlots();
+            return;
+        }
+        if (this.statsObjects.length > 0) {
+            this.closeStats();
+            return;
+        }
+        if (this.modsObjects.length > 0) {
+            this.closeMods();
+        }
+    }
 
     private onMuteKey = (): void => {
         // Typing in the replay-code input must not flip the mute toggle.
@@ -198,6 +261,25 @@ export class MenuScene extends Scene {
     private toggleMute(): void {
         toggleMuted();
         this.refreshMuteLabel();
+    }
+
+    private toggleColorblind(): void {
+        setColorblind(!isColorblind());
+        this.refreshColorLabel();
+        this.rebuildSlots();
+    }
+
+    private refreshColorLabel(): void {
+        this.colorButton.setLabel(isColorblind() ? 'COLOR: CB' : 'COLOR: STD');
+    }
+
+    private toggleMotion(): void {
+        setReducedMotion(!isReducedMotion());
+        this.refreshMotionLabel();
+    }
+
+    private refreshMotionLabel(): void {
+        this.motionButton.setLabel(isReducedMotion() ? 'MOTION: LOW' : 'MOTION: FULL');
     }
 
     private refreshMuteLabel(): void {
@@ -284,6 +366,7 @@ export class MenuScene extends Scene {
     }
 
     private cycler(x: number, w: number, y: number, label: string, onClick: () => void, color = COLORS.ink): void {
+        this.navSlots.push({ x, y, w, h: 40, activate: onClick });
         const bg = this.track(this.add.rectangle(x, y, w, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge));
         const text = this.track(this.add.text(x, y, label, FONTS.buttonSmall).setOrigin(0.5));
         text.setColor(color);
@@ -296,6 +379,7 @@ export class MenuScene extends Scene {
     private rebuildSlots(): void {
         for (const obj of this.slotObjects) obj.destroy();
         this.slotObjects = [];
+        this.navSlots = [];
 
         const rows = this.teamSize * 2;
         const startY = rows <= 2 ? 252 : rows <= 4 ? 228 : 210;
@@ -309,9 +393,9 @@ export class MenuScene extends Scene {
             const loadout = this.loadouts[i] as SkillLoadout;
             const spriteId = displayRobotId(id);
 
-            this.track(this.add.rectangle(100, y, 14, 14, COLORS.team[team]));
+            this.track(this.add.rectangle(100, y, 14, 14, teamColor(team)));
             const preview = this.track(this.add.image(152, y, chassisKey(spriteId)).setScale(2));
-            preview.setTint(COLORS.team[team]);
+            preview.setTint(teamColor(team));
             // Live paint preview: tower + hub exactly as the battle renders them.
             const previewTower = this.track(this.add.image(152, y, towerKey(spriteId)).setScale(2));
             previewTower.setTint(skin.paint).setRotation(-0.5);
@@ -324,10 +408,12 @@ export class MenuScene extends Scene {
             const paintBg = this.track(this.add.rectangle(646, y, 56, 40, skin.paint).setStrokeStyle(2, 0x0b0e12));
             paintBg.setInteractive({ useHandCursor: true });
             paintBg.on('pointerdown', () => this.cyclePaint(i));
+            this.navSlots.push({ x: 646, y, w: 56, h: 40, activate: () => this.cyclePaint(i) });
 
             this.cycler(748, 110, y, `${skin.finish} >`, () => this.cycleFinish(i));
             this.cycler(885, 100, y, `SKL ${loadoutCost(loadout)}`, () => this.openEditor(i), '#7de08a');
         }
+        this.restoreNav();
     }
 
     private cycleCallsign(i: number): void {
@@ -389,6 +475,7 @@ export class MenuScene extends Scene {
         this.trackEditor(this.add.text(CX, 166, `${entry.meta.name} - ${entry.meta.description}`, FONTS.small).setOrigin(0.5).setDepth(50));
         this.editorPoints = this.trackEditor(this.add.text(CX, 196, '', FONTS.mono).setOrigin(0.5).setDepth(50));
         this.refreshEditorRows();
+        this.nav.reset();
     }
 
     private refreshEditorRows(): void {
@@ -403,6 +490,7 @@ export class MenuScene extends Scene {
         this.editorPoints.setText(`POINTS  ${spent} / ${SKILL_BUDGET}`);
         this.editorPoints.setColor(spent >= SKILL_BUDGET ? '#ffd23f' : COLORS.ink);
 
+        const targets: NavTarget[] = [];
         SKILL_DEFS.forEach((def, row) => {
             const y = 226 + row * 30;
             const rank = rankOf(loadout, def.id);
@@ -413,12 +501,14 @@ export class MenuScene extends Scene {
             this.trackEditor(this.add.text(640, y + 4, '-', FONTS.button).setOrigin(0.5).setDepth(50));
             minus.setInteractive({ useHandCursor: true });
             minus.on('pointerdown', () => this.bumpSkill(def.id, -1));
+            targets.push({ x: 640, y: y + 4, w: 36, h: 30, activate: () => this.bumpSkill(def.id, -1) });
             const rankText = this.trackEditor(this.add.text(684, y + 4, `${rank}/${def.maxRank}`, FONTS.mono).setOrigin(0.5).setDepth(50));
             rankText.setColor(rank > 0 ? '#7de08a' : COLORS.dim);
             const plus = this.trackEditor(this.add.rectangle(740, y + 4, 36, 30, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
             this.trackEditor(this.add.text(740, y + 4, '+', FONTS.button).setOrigin(0.5).setDepth(50));
             plus.setInteractive({ useHandCursor: true });
             plus.on('pointerdown', () => this.bumpSkill(def.id, 1));
+            targets.push({ x: 740, y: y + 4, w: 36, h: 30, activate: () => this.bumpSkill(def.id, 1) });
         });
 
         const footer = 226 + SKILL_DEFS.length * 30 + 8;
@@ -426,12 +516,23 @@ export class MenuScene extends Scene {
         this.trackEditor(this.add.text(CX - 150, footer, 'RANDOM', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         random.setInteractive({ useHandCursor: true });
         random.on('pointerdown', () => this.randomLoadout());
+        targets.push({ x: CX - 150, y: footer, w: 170, h: 40, activate: () => this.randomLoadout() });
         const clear = this.trackEditor(this.add.rectangle(CX + 20, footer, 130, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
         this.trackEditor(this.add.text(CX + 20, footer, 'CLEAR', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         clear.setInteractive({ useHandCursor: true });
         clear.on('pointerdown', () => {
             this.loadouts[slot] = {};
             this.refreshEditorRows();
+        });
+        targets.push({
+            x: CX + 20,
+            y: footer,
+            w: 130,
+            h: 40,
+            activate: () => {
+                this.loadouts[slot] = {};
+                this.refreshEditorRows();
+            },
         });
         const done = this.trackEditor(this.add.rectangle(CX + 190, footer, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50));
         this.trackEditor(this.add.text(CX + 190, footer, 'DONE', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
@@ -440,6 +541,23 @@ export class MenuScene extends Scene {
             this.closeEditor();
             this.rebuildSlots();
         });
+        targets.push({
+            x: CX + 190,
+            y: footer,
+            w: 170,
+            h: 40,
+            activate: () => {
+                this.closeEditor();
+                this.rebuildSlots();
+            },
+        });
+        if (this.tourMode === 'tour') {
+            targets.push(
+                { x: 668, y: 632, w: 120, h: 36, activate: () => this.nextTourStep() },
+                { x: 796, y: 632, w: 90, h: 36, activate: () => this.finishTour() },
+            );
+        }
+        this.nav.replaceTargets(targets);
     }
 
     private bumpSkill(id: SkillId, delta: number): void {
@@ -483,6 +601,7 @@ export class MenuScene extends Scene {
             markTutorialSeen();
             this.clearTour();
         }
+        this.restoreNav();
     }
 
     // ---- Onboarding tutorial: first-run prompt + loadout-editor tour ------
@@ -498,6 +617,7 @@ export class MenuScene extends Scene {
         this.tourButtons = [];
         this.tourMode = 'none';
         this.tourNext = null;
+        this.restoreNav();
     }
 
     private showTutorialPrompt(): void {
@@ -524,6 +644,28 @@ export class MenuScene extends Scene {
                 this.clearTour();
             }, 60),
         );
+        this.nav.setTargets([
+            {
+                x: CX - 110,
+                y: 440,
+                w: 200,
+                h: 40,
+                activate: () => {
+                    this.clearTour();
+                    this.startTutorial();
+                },
+            },
+            {
+                x: CX + 110,
+                y: 440,
+                w: 200,
+                h: 40,
+                activate: () => {
+                    markTutorialSeen();
+                    this.clearTour();
+                },
+            },
+        ]);
     }
 
     /** Scripted spectated 1v1: fixed seed and matchup, coach marks on top. */
@@ -555,6 +697,8 @@ export class MenuScene extends Scene {
         this.tourButtons.push(this.tourNext);
         this.tourButtons.push(makeButton(this, 796, 632, 90, 36, 'SKIP', () => this.finishTour(), 60));
         this.refreshTourStep();
+        // Pick up the tour NEXT/SKIP buttons in the editor focus list.
+        if (this.editorSlot >= 0) this.refreshEditorRows();
     }
 
     private refreshTourStep(): void {
@@ -775,6 +919,7 @@ export class MenuScene extends Scene {
         this.trackStats(this.add.rectangle(CX, 384, 560, 600, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
         this.trackStats(this.add.text(CX, 118, 'MATCH HISTORY', FONTS.heading).setOrigin(0.5).setDepth(50));
         this.refreshStatsRows();
+        this.nav.reset();
     }
 
     private refreshStatsRows(): void {
@@ -850,11 +995,26 @@ export class MenuScene extends Scene {
         this.trackStats(this.add.text(CX + 120, 630, 'CLOSE', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         close.setInteractive({ useHandCursor: true });
         close.on('pointerdown', () => this.closeStats());
+        this.nav.replaceTargets([
+            {
+                x: CX - 120,
+                y: 630,
+                w: 170,
+                h: 40,
+                activate: () => {
+                    clearHistory();
+                    clearDailyBoard();
+                    this.refreshStatsRows();
+                },
+            },
+            { x: CX + 120, y: 630, w: 170, h: 40, activate: () => this.closeStats() },
+        ]);
     }
 
     private closeStats(): void {
         for (const obj of this.statsObjects) obj.destroy();
         this.statsObjects = [];
+        this.restoreNav();
     }
 
     // ---- Exhibition modifiers overlay ------------------------------------
@@ -878,6 +1038,7 @@ export class MenuScene extends Scene {
             this.add.text(CX, 236, 'exhibition matches never touch stats', FONTS.small).setOrigin(0.5).setDepth(50),
         );
         this.refreshModsRows();
+        this.nav.reset();
     }
 
     private refreshModsRows(): void {
@@ -891,6 +1052,15 @@ export class MenuScene extends Scene {
             { key: 'hardcoreFog', name: 'HARDCORE FOG', desc: 'sensor range halved for every robot' },
             { key: 'mirror', name: 'MIRROR MODE', desc: 'team 2 mirrors team 1 robots + builds' },
         ];
+        const targets: NavTarget[] = [];
+        const toggle = (key: 'doubleDamage' | 'hardcoreFog' | 'mirror', on: boolean): void => {
+            const next = { ...this.mods };
+            if (on) delete next[key];
+            else next[key] = true;
+            this.mods = next;
+            this.refreshModsLabel();
+            this.refreshModsRows();
+        };
         rows.forEach((row, i) => {
             const y = 292 + i * 64;
             const on = this.mods[row.key] === true;
@@ -903,14 +1073,8 @@ export class MenuScene extends Scene {
             const state = this.trackMods(this.add.text(CX + 220, y, on ? 'ON' : 'OFF', FONTS.button).setOrigin(1, 0.5).setDepth(50));
             state.setColor(on ? '#7de08a' : COLORS.dim);
             bg.setInteractive({ useHandCursor: true });
-            bg.on('pointerdown', () => {
-                const next = { ...this.mods };
-                if (on) delete next[row.key];
-                else next[row.key] = true;
-                this.mods = next;
-                this.refreshModsLabel();
-                this.refreshModsRows();
-            });
+            bg.on('pointerdown', () => toggle(row.key, on));
+            targets.push({ x: CX, y, w: 480, h: 52, activate: () => toggle(row.key, on) });
         });
 
         const done = this.trackMods(
@@ -919,11 +1083,14 @@ export class MenuScene extends Scene {
         this.trackMods(this.add.text(CX, 520, 'DONE', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         done.setInteractive({ useHandCursor: true });
         done.on('pointerdown', () => this.closeMods());
+        targets.push({ x: CX, y: 520, w: 170, h: 40, activate: () => this.closeMods() });
+        this.nav.replaceTargets(targets);
     }
 
     private closeMods(): void {
         for (const obj of this.modsObjects) obj.destroy();
         this.modsObjects = [];
+        this.restoreNav();
     }
 
     /** Mirror mode: team 2 runs team 1's robots and builds (skins stay put). */

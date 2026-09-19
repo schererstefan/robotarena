@@ -45,3 +45,11 @@ body {
     padding: 8px 4px;
     user-select: none;
 }
+
+/* Keyboard focus must be visible in the DOM dialogs (replay, import). */
+input:focus-visible,
+select:focus-visible,
+button:focus-visible {
+    outline: 2px solid #ffd23f;
+    outline-offset: 1px;
+}
