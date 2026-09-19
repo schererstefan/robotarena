@@ -7,7 +7,16 @@ import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { chassisKey, ensureArtTextures } from '../art';
 import { isMuted, playClick, toggleMuted, unlockAudio } from '../audio';
-import { clearHistory, loadHistory, winRates } from '../history';
+import {
+    clearDailyBoard,
+    clearHistory,
+    dailyDateKey,
+    dailyLineup,
+    dailySeed,
+    loadDailyBoard,
+    loadHistory,
+    winRates,
+} from '../history';
 import { COLORS, FONTS } from '../theme';
 import { makeButton, makePanel } from '../ui';
 import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } from '../customize';
@@ -21,6 +30,8 @@ export interface BattleRequest {
     seed: number;
     /** True when this battle replays a shared code (HUD tag only). */
     replay?: boolean;
+    /** Daily-challenge date key (YYYY-MM-DD) when this is the daily match. */
+    daily?: string;
 }
 
 const CX = 512;
@@ -43,6 +54,7 @@ export class MenuScene extends Scene {
     private modeButtons: Array<{ setLabel: (label: string) => void }> = [];
     private trailsButton!: { setLabel: (label: string) => void };
     private muteButton!: { setLabel: (label: string) => void };
+    private dailyButton!: { setLabel: (label: string) => void };
     private replayOverlay: HTMLDivElement | null = null;
 
     constructor() {
@@ -85,9 +97,11 @@ export class MenuScene extends Scene {
         this.trailsButton = makeButton(this, CX - 215, 728, 200, 26, '', () => this.toggleTrails());
         this.muteButton = makeButton(this, CX, 728, 200, 26, '', () => this.toggleMute());
         makeButton(this, CX + 215, 728, 200, 26, 'WATCH REPLAY', () => this.openReplayDialog());
+        this.dailyButton = makeButton(this, CX - 215, 754, 200, 24, '', () => this.startDaily());
         makeButton(this, CX + 215, 754, 200, 24, 'STATS', () => this.openStats());
         this.refreshTrailsLabel();
         this.refreshMuteLabel();
+        this.refreshDailyLabel();
         // First click creates/resumes the AudioContext (autoplay policy);
         // every click gets a UI blip.
         this.input.on('pointerdown', this.onAnyPointer);
@@ -117,6 +131,26 @@ export class MenuScene extends Scene {
 
     private refreshMuteLabel(): void {
         this.muteButton.setLabel(isMuted() ? 'SOUND: OFF (M)' : 'SOUND: ON (M)');
+    }
+
+    private refreshDailyLabel(): void {
+        const done = loadDailyBoard().some((entry) => entry.date === dailyDateKey());
+        this.dailyButton.setLabel(done ? 'DAILY (DONE)' : 'DAILY');
+    }
+
+    /** Daily seeded challenge: fixed matchup, date-derived seed. */
+    private startDaily(): void {
+        const date = dailyDateKey();
+        const lineupIds = dailyLineup();
+        this.scene.start('Battle', {
+            teamSize: 1,
+            lineupIds: [...lineupIds],
+            loadouts: lineupIds.map((id) => ({ ...(getRobot(id)?.loadout ?? {}) })),
+            skins: lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
+            trails: this.trails,
+            seed: dailySeed(date),
+            daily: date,
+        } satisfies BattleRequest);
     }
 
     private setMode(size: number): void {
@@ -452,8 +486,8 @@ export class MenuScene extends Scene {
         this.closeStats();
         // Backdrop swallows clicks so menu controls beneath can't fire.
         this.trackStats(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50).setInteractive());
-        this.trackStats(this.add.rectangle(CX, 384, 560, 470, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
-        this.trackStats(this.add.text(CX, 178, 'MATCH HISTORY', FONTS.heading).setOrigin(0.5).setDepth(50));
+        this.trackStats(this.add.rectangle(CX, 384, 560, 600, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
+        this.trackStats(this.add.text(CX, 118, 'MATCH HISTORY', FONTS.heading).setOrigin(0.5).setDepth(50));
         this.refreshStatsRows();
     }
 
@@ -466,18 +500,18 @@ export class MenuScene extends Scene {
         const history = loadHistory();
         const draws = history.filter((r) => r.winner === -1).length;
         this.trackStats(
-            this.add.text(CX, 208, `MATCHES ${history.length}   DRAWS ${draws}`, FONTS.mono).setOrigin(0.5).setDepth(50),
+            this.add.text(CX, 148, `MATCHES ${history.length}   DRAWS ${draws}`, FONTS.mono).setOrigin(0.5).setDepth(50),
+        );
+        const rows = winRates(ROBOTS.map((r) => r.meta.id)).sort(
+            (a, b) => b.rate - a.rate || b.games - a.games,
         );
         if (history.length === 0) {
             this.trackStats(
-                this.add.text(CX, 300, 'no matches recorded yet - go battle!', FONTS.small).setOrigin(0.5).setDepth(50),
+                this.add.text(CX, 196, 'no matches recorded yet - go battle!', FONTS.small).setOrigin(0.5).setDepth(50),
             );
         } else {
-            const rows = winRates(ROBOTS.map((r) => r.meta.id)).sort(
-                (a, b) => b.rate - a.rate || b.games - a.games,
-            );
             rows.forEach((row, i) => {
-                const y = 246 + i * 30;
+                const y = 182 + i * 26;
                 const entry = ROBOTS.find((r) => r.meta.id === row.id) ?? ROBOTS[0]!;
                 const pct = row.games > 0 ? `${Math.round(row.rate * 100)}%` : '--';
                 const name = this.trackStats(
@@ -490,19 +524,44 @@ export class MenuScene extends Scene {
             });
         }
 
-        const clear = this.trackStats(
-            this.add.rectangle(CX - 120, 570, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50),
+        const dailyY = 182 + Math.max(rows.length, 1) * 26 + 22;
+        this.trackStats(
+            this.add.text(CX, dailyY, 'DAILY BEST (LAST 5)', FONTS.buttonSmall).setOrigin(0.5).setDepth(50),
         );
-        this.trackStats(this.add.text(CX - 120, 570, 'CLEAR', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        const board = loadDailyBoard().slice(0, 5);
+        if (board.length === 0) {
+            this.trackStats(
+                this.add.text(CX, dailyY + 26, 'no daily results yet - play the daily!', FONTS.small).setOrigin(0.5).setDepth(50),
+            );
+        } else {
+            board.forEach((entry, i) => {
+                const y = dailyY + 26 + i * 24;
+                const outcome =
+                    entry.winner === -1
+                        ? 'DRAW'
+                        : `${(ROBOTS.find((r) => r.meta.id === entry.lineupIds[entry.winner])?.meta.name ?? 'team').toUpperCase()} WINS`;
+                const second = Math.floor(entry.ticks / 60);
+                const time = `${Math.floor(second / 60)}:${(second % 60).toString().padStart(2, '0')}`;
+                this.trackStats(
+                    this.add.text(CX, y, `${entry.date.slice(5)}  ${outcome}  ${time}`, FONTS.monoSmall).setOrigin(0.5).setDepth(50),
+                );
+            });
+        }
+
+        const clear = this.trackStats(
+            this.add.rectangle(CX - 120, 630, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50),
+        );
+        this.trackStats(this.add.text(CX - 120, 630, 'CLEAR', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         clear.setInteractive({ useHandCursor: true });
         clear.on('pointerdown', () => {
             clearHistory();
+            clearDailyBoard();
             this.refreshStatsRows();
         });
         const close = this.trackStats(
-            this.add.rectangle(CX + 120, 570, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50),
+            this.add.rectangle(CX + 120, 630, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50),
         );
-        this.trackStats(this.add.text(CX + 120, 570, 'CLOSE', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        this.trackStats(this.add.text(CX + 120, 630, 'CLOSE', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         close.setInteractive({ useHandCursor: true });
         close.on('pointerdown', () => this.closeStats());
     }

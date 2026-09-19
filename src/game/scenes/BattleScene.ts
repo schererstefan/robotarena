@@ -10,7 +10,7 @@ import { ROBOTS } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
 import { chassisKey, ensureArtTextures } from '../art';
 import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unlockAudio } from '../audio';
-import { recordMatch } from '../history';
+import { recordDailyResult, recordMatch } from '../history';
 import { COLORS, FONTS } from '../theme';
 import { copyText, downloadText, makeButton } from '../ui';
 import type { SlotSkin } from '../customize';
@@ -212,7 +212,8 @@ export class BattleScene extends Scene {
         this.add.rectangle(AX + ARENA_WIDTH / 2, 26, ARENA_WIDTH + 32, 40, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(10);
         this.hudPips = this.add.text(AX + 12, 26, '', FONTS.mono).setOrigin(0, 0.5).setDepth(10);
         this.hudTimer = this.add.text(AX + ARENA_WIDTH / 2, 26, '', FONTS.heading).setOrigin(0.5).setDepth(10);
-        const seedLabel = this.request.replay === true ? `SEED ${this.request.seed} - REPLAY` : `SEED ${this.request.seed}`;
+        const tag = this.request.daily !== undefined ? 'DAILY' : this.request.replay === true ? 'REPLAY' : null;
+        const seedLabel = tag ? `SEED ${this.request.seed} - ${tag}` : `SEED ${this.request.seed}`;
         this.add.text(AX + ARENA_WIDTH - 12, 26, seedLabel, FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
         this.banner = this.add.text(AX + ARENA_WIDTH / 2, AY + 56, '', FONTS.heading).setOrigin(0.5).setDepth(10).setAlpha(0);
 
@@ -658,8 +659,17 @@ export class BattleScene extends Scene {
     private showResults(): void {
         const result = this.match.result;
         this.stepButton.setEnabled(false);
-        // Replays re-watch history; only live battles append to it.
-        if (this.request.replay !== true) {
+        // Replays re-watch history; only live battles append to it. Daily
+        // matches go to the daily board instead of the main log so the fixed
+        // daily matchup can't skew per-robot win rates.
+        if (this.request.daily !== undefined) {
+            recordDailyResult(this.request.daily, {
+                seed: this.request.seed,
+                lineupIds: [...this.request.lineupIds],
+                winner: result.winner,
+                ticks: result.tick,
+            });
+        } else if (this.request.replay !== true) {
             recordMatch({
                 teamSize: this.request.teamSize,
                 lineupIds: [...this.request.lineupIds],
@@ -728,7 +738,12 @@ export class BattleScene extends Scene {
             44,
             'REMATCH',
             () => {
-                this.scene.restart({ ...this.request, seed: (Math.random() * 0x7fffffff) | 0, replay: false });
+                this.scene.restart({
+                    ...this.request,
+                    seed: (Math.random() * 0x7fffffff) | 0,
+                    replay: false,
+                    daily: undefined,
+                });
             },
             21,
         );

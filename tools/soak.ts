@@ -6,7 +6,18 @@ import { MAX_SPEED, MAX_TICKS } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, type ReplaySpec } from '../src/sim/replay';
-import { clearHistory, loadHistory, recordMatch, winRates } from '../src/game/history';
+import {
+    clearDailyBoard,
+    clearHistory,
+    dailyDateKey,
+    dailyLineup,
+    dailySeed,
+    loadDailyBoard,
+    loadHistory,
+    recordDailyResult,
+    recordMatch,
+    winRates,
+} from '../src/game/history';
 import { ROBOTS } from '../src/robots/registry';
 import { computeStats, loadoutCost, sanitizeLoadout, type SkillLoadout } from '../src/sim/skills';
 import type { Intent, RobotController, SenseState } from '../src/sim/types';
@@ -317,6 +328,28 @@ console.log('history');
     check('corrupt storage loads as empty', loadHistory().length === 0);
     clearHistory();
     check('clear empties the log', loadHistory().length === 0);
+
+    // Daily board (same storage stub still installed).
+    clearDailyBoard();
+    check('same date => same seed', dailySeed('2026-09-19') === dailySeed('2026-09-19'));
+    check('different dates => different seeds', dailySeed('2026-09-19') !== dailySeed('2026-09-20'));
+    check('daily date key format', dailyDateKey(new Date(2026, 8, 19)) === '2026-09-19');
+    check('fixed daily matchup', JSON.stringify(dailyLineup()) === JSON.stringify(['hunter', 'orbiter']));
+    const day = { seed: 1, lineupIds: ['hunter', 'orbiter'] };
+    recordDailyResult('2026-09-19', { ...day, winner: -1, ticks: 9000 });
+    recordDailyResult('2026-09-19', { ...day, winner: 0, ticks: 3000 });
+    let board = loadDailyBoard();
+    check('decisive replaces draw', board.length === 1 && board[0]?.winner === 0);
+    recordDailyResult('2026-09-19', { ...day, winner: 1, ticks: 5000 });
+    board = loadDailyBoard();
+    check('slower result does not replace best', board[0]?.winner === 0 && board[0]?.ticks === 3000);
+    recordDailyResult('2026-09-18', { ...day, winner: 1, ticks: 100 });
+    board = loadDailyBoard();
+    check('board newest-first', board.length === 2 && board[0]?.date === '2026-09-19' && board[1]?.date === '2026-09-18');
+    store.set('robotarena.daily.v1', 'not-json{{{');
+    check('corrupt daily loads as empty', loadDailyBoard().length === 0);
+    clearDailyBoard();
+    check('daily clear empties board', loadDailyBoard().length === 0);
     delete (globalThis as unknown as { localStorage?: Storage }).localStorage;
 }
 
