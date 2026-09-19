@@ -2,6 +2,7 @@
 // TournamentScene renders these, and the soak test runs them headless.
 
 import type { RobotSnapshot } from '../sim/engine';
+import { roundNameFor } from './strings';
 
 export interface BracketMatch {
     a: string;
@@ -47,9 +48,5 @@ export function tiebreakWinner(snaps: RobotSnapshot[], a: string, b: string): st
 }
 
 export function roundName(roundIndex: number, roundCount: number): string {
-    const fromEnd = roundCount - 1 - roundIndex;
-    if (fromEnd === 0) return 'FINAL';
-    if (fromEnd === 1) return 'SEMIFINAL';
-    if (fromEnd === 2) return 'QUARTERFINAL';
-    return `ROUND ${roundIndex + 1}`;
+    return roundNameFor(roundIndex, roundCount);
 }

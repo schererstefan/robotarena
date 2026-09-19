@@ -4,6 +4,16 @@
 // and string literals stripped out). Execution arrives nowhere in this app.
 
 import { SKILL_DEFS } from '../sim/skills';
+import {
+    blockedImportDetail,
+    commaList,
+    FALLBACK_ROBOT_FILENAME,
+    loadoutPointsDetail,
+    missingDetail,
+    tsFilename,
+    unknownSkillDetail,
+    WORKSHOP_CHECKS,
+} from './strings';
 
 /** Starter robot: the one-file shape from docs/ROBOT_API.md, ready to edit. */
 export const WORKSHOP_TEMPLATE = `// MyBot: describe your strategy in one line.
@@ -108,8 +118,8 @@ export function extractMetaId(source: string): string | null {
 /** Download name from the draft's meta id, with a safe fallback. */
 export function suggestFilename(source: string): string {
     const id = extractMetaId(source);
-    if (id && /^[a-z0-9-]+$/.test(id)) return `${id}.ts`;
-    return 'my-robot.ts';
+    if (id && /^[a-z0-9-]+$/.test(id)) return tsFilename(id);
+    return FALLBACK_ROBOT_FILENAME;
 }
 
 interface LoadoutParse {
@@ -174,22 +184,22 @@ export function checkRobotSource(source: string): WorkshopCheck[] {
     const missingKeys = metaKeys.filter((key) => !new RegExp(`\\b${key}\\s*:`).test(source));
     checks.push({
         id: 'meta-shape',
-        label: 'exports a meta object (id, name, author, version, description)',
+        label: WORKSHOP_CHECKS.metaShape.label,
         pass: metaExport && missingKeys.length === 0,
-        detail: !metaExport ? 'no exported meta found' : missingKeys.map((k) => `missing ${k}`).join(', '),
+        detail: !metaExport ? WORKSHOP_CHECKS.metaShape.noMeta : missingDetail(missingKeys),
     });
 
     const id = extractMetaId(source);
     checks.push({
         id: 'meta-id',
-        label: 'meta id is lowercase (letters, digits, dashes)',
+        label: WORKSHOP_CHECKS.metaId.label,
         pass: id !== null && /^[a-z0-9-]+$/.test(id),
-        detail: id === null ? 'no meta id string found' : id,
+        detail: id === null ? WORKSHOP_CHECKS.metaId.noId : id,
     });
 
     checks.push({
         id: 'loadout-export',
-        label: 'exports a default loadout',
+        label: WORKSHOP_CHECKS.loadoutExport.label,
         pass: /export\s+(const|let|var)\s+loadout\b/.test(source),
         detail: '',
     });
@@ -197,20 +207,20 @@ export function checkRobotSource(source: string): WorkshopCheck[] {
     const parsed = parseLoadout(source);
     checks.push({
         id: 'loadout-budget',
-        label: 'loadout fits the 6-point budget',
+        label: WORKSHOP_CHECKS.loadoutBudget.label,
         pass: !parsed.found || parsed.total <= 6,
-        detail: !parsed.found ? 'dynamic loadout — budget not checked' : `${parsed.total} / 6 points`,
+        detail: !parsed.found ? WORKSHOP_CHECKS.loadoutBudget.dynamic : loadoutPointsDetail(parsed.total),
     });
     checks.push({
         id: 'loadout-skills',
-        label: 'loadout uses known skill ids',
+        label: WORKSHOP_CHECKS.loadoutSkills.label,
         pass: parsed.unknown.length === 0,
-        detail: !parsed.found ? 'dynamic loadout — skills not checked' : parsed.unknown.map((s) => `unknown ${s}`).join(', '),
+        detail: !parsed.found ? WORKSHOP_CHECKS.loadoutSkills.dynamic : unknownSkillDetail(parsed.unknown),
     });
 
     checks.push({
         id: 'create-export',
-        label: 'exports a create() factory',
+        label: WORKSHOP_CHECKS.createExport.label,
         pass: /export\s+function\s+create\b/.test(source) || /export\s+(const|let|var)\s+create\s*=/.test(source),
         detail: '',
     });
@@ -219,9 +229,9 @@ export function checkRobotSource(source: string): WorkshopCheck[] {
     const missingFields = intentFields.filter((field) => !tokenPresent(code, field));
     checks.push({
         id: 'intent-shape',
-        label: 'update returns an Intent (throttle/turn/towerTurn/fire/charge)',
+        label: WORKSHOP_CHECKS.intentShape.label,
         pass: missingFields.length === 0,
-        detail: missingFields.map((f) => `missing ${f}`).join(', '),
+        detail: missingDetail(missingFields),
     });
 
     const badImports = importSpecifiers(source).filter(
@@ -229,32 +239,32 @@ export function checkRobotSource(source: string): WorkshopCheck[] {
     );
     checks.push({
         id: 'imports',
-        label: 'imports only sim helpers (../sim/*, ./common)',
+        label: WORKSHOP_CHECKS.imports.label,
         pass: badImports.length === 0,
-        detail: badImports.map((spec) => `blocked ${spec}`).join(', '),
+        detail: blockedImportDetail(badImports),
     });
 
     const time = offenders(code, BANNED_TIME);
     checks.push({
         id: 'no-nondeterminism',
-        label: 'no random/time APIs (use sense.rand())',
+        label: WORKSHOP_CHECKS.noNondeterminism.label,
         pass: time.length === 0,
-        detail: time.join(', '),
+        detail: commaList(time),
     });
     const io = offenders(code, BANNED_IO);
     checks.push({
         id: 'no-io',
-        label: 'no network or storage APIs',
+        label: WORKSHOP_CHECKS.noIo.label,
         pass: io.length === 0,
-        detail: io.join(', '),
+        detail: commaList(io),
     });
     const host = offenders(code, BANNED_HOST);
     const dynamicImport = /\bimport\s*\(/.test(code);
     checks.push({
         id: 'no-host',
-        label: 'no DOM or code-escape APIs',
+        label: WORKSHOP_CHECKS.noHost.label,
         pass: host.length === 0 && !dynamicImport,
-        detail: [...host, ...(dynamicImport ? ['import('] : [])].join(', '),
+        detail: commaList([...host, ...(dynamicImport ? [WORKSHOP_CHECKS.noHost.dynamicImportToken] : [])]),
     });
 
     return checks;

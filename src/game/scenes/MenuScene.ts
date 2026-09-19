@@ -22,6 +22,45 @@ import { COLORS, FONTS } from '../theme';
 import { isColorblind, isReducedMotion, setColorblind, setReducedMotion, teamColor } from '../accessibility';
 import { displayRobotId, getImported, importRobotFromFile, importRobotFromUrl } from '../importRobot';
 import { FocusNav, type NavTarget } from '../nav';
+import {
+    APP,
+    arenaLabel,
+    bracketedLabel,
+    colorLabel,
+    COMMON,
+    cyclerLabel,
+    dailyLabel,
+    dailyRow,
+    dailyWinnerName,
+    EDITOR,
+    editorPoints,
+    editorSlotTitle,
+    editorSubtitle,
+    IMPORT_DIALOG,
+    importDoneNotice,
+    importSlotOption,
+    LOADOUT_TOUR_STEPS,
+    loadoutTourTitle,
+    MENU,
+    MOD_ROWS,
+    MODS,
+    modsButtonLabel,
+    motionLabel,
+    rankText,
+    REPLAY_DIALOG,
+    replayUnknownRobot,
+    robotByline,
+    skillLine,
+    skillsButtonLabel,
+    soundLabel,
+    STATS,
+    statsPct,
+    statsRow,
+    statsSummary,
+    trailsLabel,
+    TUTORIAL_PROMPT,
+    type CopyStep,
+} from '../strings';
 import { markTutorialSeen, shouldShowTutorial, TUTORIAL_LINEUP, TUTORIAL_SEED } from '../tutorial';
 import { addTouchHit, makeButton, makePanel, type Button } from '../ui';
 import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } from '../customize';
@@ -47,22 +86,6 @@ export interface BattleRequest {
 
 const CX = 512;
 
-/** Guided loadout-editor tour: shown over the open editor, slot 0. */
-const LOADOUT_TOUR: Array<{ title: string; body: string }> = [
-    {
-        title: 'POINTS',
-        body: 'Every slot gets the same 6-point budget. Spend it across the 9-skill catalog - anyone can run any legal build.',
-    },
-    {
-        title: 'RANKS',
-        body: 'Plus and minus set ranks per skill; green counts are active. Builds are public, shown as codes on results.',
-    },
-    {
-        title: 'DONE',
-        body: 'DONE locks the build. RANDOM rolls one, CLEAR empties it. Next: START BATTLE to run your builds.',
-    },
-];
-
 export class MenuScene extends Scene {
     private teamSize = 1;
     private lineupIds: string[] = ['hunter', 'orbiter'];
@@ -70,7 +93,9 @@ export class MenuScene extends Scene {
         { ...getRobot('hunter')!.loadout },
         { ...getRobot('orbiter')!.loadout },
     ];
-    private skins: SlotSkin[] = [defaultSkin('HUNTER', 0), defaultSkin('ORBITER', 1)];
+    private skins: SlotSkin[] = ['hunter', 'orbiter'].map((id, i) =>
+        defaultSkin((getRobot(id)?.meta.name ?? id).toUpperCase(), i),
+    );
     private trails = true;
     private arena: ArenaId = 'open';
     private arenaButton!: { setLabel: (label: string) => void };
@@ -129,11 +154,11 @@ export class MenuScene extends Scene {
         this.navSlots = [];
         this.nav = new FocusNav(this);
         this.nav.onEscape = () => this.escapeOverlay();
-        this.add.text(CX, 44, 'ROBOTARENA', FONTS.title).setOrigin(0.5);
+        this.add.text(CX, 44, APP.title, FONTS.title).setOrigin(0.5);
         this.add.image(CX - 285, 44, 'logo_bar').setScale(2);
         this.add.image(CX + 285, 44, 'logo_bar').setScale(2);
         this.add
-            .text(CX, 86, 'same budget. same catalog. only the code differs.', FONTS.small)
+            .text(CX, 86, APP.tagline, FONTS.small)
             .setOrigin(0.5);
 
         [1, 2, 3].forEach((size, i) => {
@@ -146,32 +171,32 @@ export class MenuScene extends Scene {
         this.modsButton = this.navButton(CX - 350, 136, 200, 42, '', () => this.openMods(), 0, 44);
         this.refreshModsLabel();
 
-        this.add.text(92, 176, 'SLOT', FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(208, 176, 'CALLSIGN', FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(392, 176, 'ROBOT', FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(618, 176, 'PAINT', FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(694, 176, 'FINISH', FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(836, 176, 'SKILLS', FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(92, 176, MENU.headers.slot, FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(208, 176, MENU.headers.callsign, FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(392, 176, MENU.headers.robot, FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(618, 176, MENU.headers.paint, FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(694, 176, MENU.headers.finish, FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(836, 176, MENU.headers.skills, FONTS.monoSmall).setOrigin(0, 0.5);
         this.rebuildSlots();
 
         makePanel(this, CX, 592, 880, 76);
         this.descText = this.add.text(CX - 420, 562, '', FONTS.body).setWordWrapWidth(840);
         this.showDescription(0);
 
-        this.navButton(CX - 290, 684, 270, 50, 'RANDOMIZE SKINS', () => this.randomizeSkins());
-        this.navButton(CX, 684, 270, 50, 'START BATTLE', () => this.startBattle());
-        this.navButton(CX + 290, 684, 270, 50, 'PILOT 1V1', () => this.startPilot());
+        this.navButton(CX - 290, 684, 270, 50, MENU.randomizeSkins, () => this.randomizeSkins());
+        this.navButton(CX, 684, 270, 50, MENU.startBattle, () => this.startBattle());
+        this.navButton(CX + 290, 684, 270, 50, MENU.pilot, () => this.startPilot());
         this.trailsButton = this.navButton(CX - 320, 728, 150, 26, '', () => this.toggleTrails());
         this.muteButton = this.navButton(CX - 160, 728, 150, 26, '', () => this.toggleMute());
-        this.navButton(CX, 728, 150, 26, 'WATCH REPLAY', () => this.openReplayDialog());
+        this.navButton(CX, 728, 150, 26, MENU.watchReplay, () => this.openReplayDialog());
         this.colorButton = this.navButton(CX + 160, 728, 150, 26, '', () => this.toggleColorblind());
         this.motionButton = this.navButton(CX + 320, 728, 150, 26, '', () => this.toggleMotion());
         this.dailyButton = this.navButton(CX - 362, 754, 130, 24, '', () => this.startDaily());
-        this.navButton(CX - 218, 754, 130, 24, 'TOURNEY', () => this.scene.start('Tournament'));
-        this.navButton(CX - 74, 754, 130, 24, 'STATS', () => this.openStats());
-        this.navButton(CX + 74, 754, 130, 24, 'WORKSHOP', () => this.scene.start('Workshop'));
-        this.navButton(CX + 218, 754, 130, 24, 'IMPORT', () => this.openImportDialog());
-        this.navButton(CX + 362, 754, 130, 24, 'TUTORIAL', () => this.startTutorial());
+        this.navButton(CX - 218, 754, 130, 24, MENU.tourney, () => this.scene.start('Tournament'));
+        this.navButton(CX - 74, 754, 130, 24, MENU.stats, () => this.openStats());
+        this.navButton(CX + 74, 754, 130, 24, MENU.workshop, () => this.scene.start('Workshop'));
+        this.navButton(CX + 218, 754, 130, 24, MENU.import, () => this.openImportDialog());
+        this.navButton(CX + 362, 754, 130, 24, MENU.tutorial, () => this.startTutorial());
         this.refreshTrailsLabel();
         this.refreshMuteLabel();
         this.refreshColorLabel();
@@ -279,7 +304,7 @@ export class MenuScene extends Scene {
     }
 
     private refreshColorLabel(): void {
-        this.colorButton.setLabel(isColorblind() ? 'COLOR: CB' : 'COLOR: STD');
+        this.colorButton.setLabel(colorLabel(isColorblind()));
     }
 
     private toggleMotion(): void {
@@ -288,16 +313,16 @@ export class MenuScene extends Scene {
     }
 
     private refreshMotionLabel(): void {
-        this.motionButton.setLabel(isReducedMotion() ? 'MOTION: LOW' : 'MOTION: FULL');
+        this.motionButton.setLabel(motionLabel(isReducedMotion()));
     }
 
     private refreshMuteLabel(): void {
-        this.muteButton.setLabel(isMuted() ? 'SOUND: OFF (M)' : 'SOUND: ON (M)');
+        this.muteButton.setLabel(soundLabel(isMuted()));
     }
 
     private refreshDailyLabel(): void {
         const done = loadDailyBoard().some((entry) => entry.date === dailyDateKey());
-        this.dailyButton.setLabel(done ? 'DAILY (DONE)' : 'DAILY');
+        this.dailyButton.setLabel(dailyLabel(done));
     }
 
     /** Daily seeded challenge: fixed matchup, date-derived seed. */
@@ -339,10 +364,8 @@ export class MenuScene extends Scene {
     }
 
     private refreshModeLabels(): void {
-        const labels = ['1 v 1', '2 v 2', '3 v 3'];
         this.modeButtons.forEach((btn, i) => {
-            const active = i + 1 === this.teamSize;
-            btn.setLabel(`${active ? '> ' : ''}${labels[i]}${active ? ' <' : ''}`);
+            btn.setLabel(bracketedLabel(MENU.modeLabels[i] as string, i + 1 === this.teamSize));
         });
     }
 
@@ -352,11 +375,11 @@ export class MenuScene extends Scene {
     }
 
     private refreshArenaLabel(): void {
-        this.arenaButton.setLabel(`ARENA: ${this.arena.toUpperCase()}`);
+        this.arenaButton.setLabel(arenaLabel(this.arena));
     }
 
     private refreshTrailsLabel(): void {
-        this.trailsButton.setLabel(`TRAILS: ${this.trails ? 'ON' : 'OFF'}`);
+        this.trailsButton.setLabel(trailsLabel(this.trails));
     }
 
     private toggleTrails(): void {
@@ -411,16 +434,16 @@ export class MenuScene extends Scene {
             const previewHub = this.track(this.add.image(152, y, 'hub').setScale(2));
             previewHub.setTint(skin.paint);
 
-            this.cycler(285, 150, y, `${skin.callsign} >`, () => this.cycleCallsign(i), skin.paintCss);
-            this.cycler(490, 200, y, `${entry.meta.name} >`, () => this.cycleRobot(i));
+            this.cycler(285, 150, y, cyclerLabel(skin.callsign), () => this.cycleCallsign(i), skin.paintCss);
+            this.cycler(490, 200, y, cyclerLabel(entry.meta.name), () => this.cycleRobot(i));
 
             const paintBg = this.track(this.add.rectangle(646, y, 56, 44, skin.paint).setStrokeStyle(2, 0x0b0e12));
             paintBg.setInteractive({ useHandCursor: true });
             paintBg.on('pointerdown', () => this.cyclePaint(i));
             this.navSlots.push({ x: 646, y, w: 56, h: 44, activate: () => this.cyclePaint(i) });
 
-            this.cycler(748, 110, y, `${skin.finish} >`, () => this.cycleFinish(i));
-            this.cycler(885, 100, y, `SKL ${loadoutCost(loadout)}`, () => this.openEditor(i), '#7de08a');
+            this.cycler(748, 110, y, cyclerLabel(skin.finish), () => this.cycleFinish(i));
+            this.cycler(885, 100, y, skillsButtonLabel(loadoutCost(loadout)), () => this.openEditor(i), '#7de08a');
         }
         this.restoreNav();
     }
@@ -480,8 +503,8 @@ export class MenuScene extends Scene {
         // Backdrop swallows clicks so menu controls beneath can't fire.
         this.trackEditor(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50).setInteractive());
         this.trackEditor(this.add.rectangle(CX, 384, 740, 560, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
-        this.trackEditor(this.add.text(CX, 140, `SLOT ${slot + 1} LOADOUT`, FONTS.heading).setOrigin(0.5).setDepth(50));
-        this.trackEditor(this.add.text(CX, 166, `${entry.meta.name} - ${entry.meta.description}`, FONTS.small).setOrigin(0.5).setDepth(50));
+        this.trackEditor(this.add.text(CX, 140, editorSlotTitle(slot), FONTS.heading).setOrigin(0.5).setDepth(50));
+        this.trackEditor(this.add.text(CX, 166, editorSubtitle(entry.meta.name, entry.meta.description), FONTS.small).setOrigin(0.5).setDepth(50));
         this.editorPoints = this.trackEditor(this.add.text(CX, 196, '', FONTS.mono).setOrigin(0.5).setDepth(50));
         this.refreshEditorRows();
         this.nav.reset();
@@ -496,7 +519,7 @@ export class MenuScene extends Scene {
         const slot = this.editorSlot;
         const loadout = this.loadouts[slot] as SkillLoadout;
         const spent = loadoutCost(loadout);
-        this.editorPoints.setText(`POINTS  ${spent} / ${SKILL_BUDGET}`);
+        this.editorPoints.setText(editorPoints(spent));
         this.editorPoints.setColor(spent >= SKILL_BUDGET ? '#ffd23f' : COLORS.ink);
 
         const targets: NavTarget[] = [];
@@ -504,18 +527,18 @@ export class MenuScene extends Scene {
             const y = 226 + row * 30;
             const rank = rankOf(loadout, def.id);
             this.trackEditor(this.add.image(152, y + 4, skillIconKey(def.id)).setScale(2).setDepth(50));
-            this.trackEditor(this.add.text(180, y, `${def.code}  ${def.name}`, FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(50));
+            this.trackEditor(this.add.text(180, y, skillLine(def.code, def.name), FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(50));
             this.trackEditor(this.add.text(180, y + 14, def.desc, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(50));
             const minus = this.trackEditor(this.add.rectangle(640, y + 4, 36, 30, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
-            this.trackEditor(this.add.text(640, y + 4, '-', FONTS.button).setOrigin(0.5).setDepth(50));
+            this.trackEditor(this.add.text(640, y + 4, COMMON.minus, FONTS.button).setOrigin(0.5).setDepth(50));
             minus.setInteractive({ useHandCursor: true });
             minus.on('pointerdown', () => this.bumpSkill(def.id, -1));
             this.trackEditor(addTouchHit(this, 640, y + 4, 52, 36, () => this.bumpSkill(def.id, -1), 50));
             targets.push({ x: 640, y: y + 4, w: 36, h: 30, activate: () => this.bumpSkill(def.id, -1) });
-            const rankText = this.trackEditor(this.add.text(684, y + 4, `${rank}/${def.maxRank}`, FONTS.mono).setOrigin(0.5).setDepth(50));
-            rankText.setColor(rank > 0 ? '#7de08a' : COLORS.dim);
+            const rankLabel = this.trackEditor(this.add.text(684, y + 4, rankText(rank, def.maxRank), FONTS.mono).setOrigin(0.5).setDepth(50));
+            rankLabel.setColor(rank > 0 ? '#7de08a' : COLORS.dim);
             const plus = this.trackEditor(this.add.rectangle(740, y + 4, 36, 30, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
-            this.trackEditor(this.add.text(740, y + 4, '+', FONTS.button).setOrigin(0.5).setDepth(50));
+            this.trackEditor(this.add.text(740, y + 4, COMMON.plus, FONTS.button).setOrigin(0.5).setDepth(50));
             plus.setInteractive({ useHandCursor: true });
             plus.on('pointerdown', () => this.bumpSkill(def.id, 1));
             this.trackEditor(addTouchHit(this, 740, y + 4, 52, 36, () => this.bumpSkill(def.id, 1), 50));
@@ -524,12 +547,12 @@ export class MenuScene extends Scene {
 
         const footer = 226 + SKILL_DEFS.length * 30 + 8;
         const random = this.trackEditor(this.add.rectangle(CX - 150, footer, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
-        this.trackEditor(this.add.text(CX - 150, footer, 'RANDOM', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        this.trackEditor(this.add.text(CX - 150, footer, EDITOR.random, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         random.setInteractive({ useHandCursor: true });
         random.on('pointerdown', () => this.randomLoadout());
         targets.push({ x: CX - 150, y: footer, w: 170, h: 40, activate: () => this.randomLoadout() });
         const clear = this.trackEditor(this.add.rectangle(CX + 20, footer, 130, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
-        this.trackEditor(this.add.text(CX + 20, footer, 'CLEAR', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        this.trackEditor(this.add.text(CX + 20, footer, COMMON.clear, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         clear.setInteractive({ useHandCursor: true });
         clear.on('pointerdown', () => {
             this.loadouts[slot] = {};
@@ -546,7 +569,7 @@ export class MenuScene extends Scene {
             },
         });
         const done = this.trackEditor(this.add.rectangle(CX + 190, footer, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50));
-        this.trackEditor(this.add.text(CX + 190, footer, 'DONE', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        this.trackEditor(this.add.text(CX + 190, footer, COMMON.done, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         done.setInteractive({ useHandCursor: true });
         done.on('pointerdown', () => {
             this.closeEditor();
@@ -636,21 +659,21 @@ export class MenuScene extends Scene {
         this.tourMode = 'prompt';
         this.trackTour(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(60).setInteractive());
         this.trackTour(this.add.rectangle(CX, 384, 460, 220, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(60));
-        this.trackTour(this.add.text(CX, 320, 'NEW HERE?', FONTS.heading).setOrigin(0.5).setDepth(60));
+        this.trackTour(this.add.text(CX, 320, TUTORIAL_PROMPT.title, FONTS.heading).setOrigin(0.5).setDepth(60));
         this.trackTour(
-            this.add.text(CX, 352, 'Play the 60-second tutorial: a spectated battle,', FONTS.small).setOrigin(0.5).setDepth(60),
+            this.add.text(CX, 352, TUTORIAL_PROMPT.line1, FONTS.small).setOrigin(0.5).setDepth(60),
         );
         this.trackTour(
-            this.add.text(CX, 370, 'then a guided tour of the loadout editor.', FONTS.small).setOrigin(0.5).setDepth(60),
+            this.add.text(CX, 370, TUTORIAL_PROMPT.line2, FONTS.small).setOrigin(0.5).setDepth(60),
         );
         this.tourButtons.push(
-            makeButton(this, CX - 110, 440, 200, 40, 'PLAY TUTORIAL', () => {
+            makeButton(this, CX - 110, 440, 200, 40, TUTORIAL_PROMPT.play, () => {
                 this.clearTour();
                 this.startTutorial();
             }, 60),
         );
         this.tourButtons.push(
-            makeButton(this, CX + 110, 440, 200, 40, 'SKIP', () => {
+            makeButton(this, CX + 110, 440, 200, 40, COMMON.skip, () => {
                 markTutorialSeen();
                 this.clearTour();
             }, 60),
@@ -706,21 +729,21 @@ export class MenuScene extends Scene {
         this.tourBody.setWordWrapWidth(430);
         this.tourNext = makeButton(this, 668, 632, 120, 36, '', () => this.nextTourStep(), 60);
         this.tourButtons.push(this.tourNext);
-        this.tourButtons.push(makeButton(this, 796, 632, 90, 36, 'SKIP', () => this.finishTour(), 60));
+        this.tourButtons.push(makeButton(this, 796, 632, 90, 36, COMMON.skip, () => this.finishTour(), 60));
         this.refreshTourStep();
         // Pick up the tour NEXT/SKIP buttons in the editor focus list.
         if (this.editorSlot >= 0) this.refreshEditorRows();
     }
 
     private refreshTourStep(): void {
-        const step = LOADOUT_TOUR[this.tourStep] as { title: string; body: string };
-        this.tourTitle.setText(`LOADOUT TOUR ${this.tourStep + 1}/${LOADOUT_TOUR.length} - ${step.title}`);
+        const step = LOADOUT_TOUR_STEPS[this.tourStep] as CopyStep;
+        this.tourTitle.setText(loadoutTourTitle(this.tourStep, LOADOUT_TOUR_STEPS.length, step.title));
         this.tourBody.setText(step.body);
-        this.tourNext?.setLabel(this.tourStep === LOADOUT_TOUR.length - 1 ? 'FINISH' : 'NEXT');
+        this.tourNext?.setLabel(this.tourStep === LOADOUT_TOUR_STEPS.length - 1 ? COMMON.finish : COMMON.next);
     }
 
     private nextTourStep(): void {
-        if (this.tourStep >= LOADOUT_TOUR.length - 1) {
+        if (this.tourStep >= LOADOUT_TOUR_STEPS.length - 1) {
             this.finishTour();
             return;
         }
@@ -739,7 +762,7 @@ export class MenuScene extends Scene {
         const id = this.lineupIds[i] as string;
         const entry = getRobot(id) ?? getImported(id) ?? ROBOTS[0]!;
         this.descText.setText(
-            `${entry.meta.name} by ${entry.meta.author} v${entry.meta.version} — ${entry.meta.description}`,
+            robotByline(entry.meta.name, entry.meta.author, entry.meta.version, entry.meta.description),
         );
     }
 
@@ -755,17 +778,17 @@ export class MenuScene extends Scene {
             'background:#141a21;border:2px solid #2b3542;padding:24px;width:440px;max-width:90vw;' +
             "font-family:Menlo,Consolas,'Courier New',monospace;";
         panel.innerHTML =
-            '<div style="color:#e8edf2;font-size:14px;margin-bottom:12px;">WATCH REPLAY</div>' +
-            '<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">paste a replay code:</div>' +
-            '<input type="text" spellcheck="false" placeholder="RA2-XXXX-…" ' +
+            `<div style="color:#e8edf2;font-size:14px;margin-bottom:12px;">${REPLAY_DIALOG.title}</div>` +
+            `<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">${REPLAY_DIALOG.prompt}</div>` +
+            `<input type="text" spellcheck="false" placeholder="${REPLAY_DIALOG.placeholder}" ` +
             'style="width:100%;box-sizing:border-box;background:#0b0e12;border:1px solid #2b3542;' +
             'color:#e8edf2;padding:8px;font-family:inherit;font-size:12px;" />' +
             '<div class="replay-error" style="color:#ff5d5d;font-size:12px;min-height:18px;margin-top:6px;"></div>' +
             '<div style="display:flex;gap:8px;margin-top:8px;">' +
             '<button class="replay-watch" style="flex:1;background:#1d2530;border:2px solid #ffb340;' +
-            'color:#e8edf2;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">WATCH</button>' +
+            `color:#e8edf2;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${REPLAY_DIALOG.watch}</button>` +
             '<button class="replay-cancel" style="flex:1;background:#141a21;border:2px solid #2b3542;' +
-            'color:#9aa7b4;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">CANCEL</button>' +
+            `color:#9aa7b4;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${COMMON.cancel}</button>` +
             '</div>';
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
@@ -782,12 +805,12 @@ export class MenuScene extends Scene {
         const submit = (): void => {
             const data = decodeReplay(input.value);
             if (!data) {
-                error.textContent = 'invalid replay code';
+                error.textContent = REPLAY_DIALOG.invalidCode;
                 return;
             }
             for (const id of data.lineupIds) {
                 if (!getRobot(id)) {
-                    error.textContent = `unknown robot in code: ${id}`;
+                    error.textContent = replayUnknownRobot(id);
                     return;
                 }
             }
@@ -834,28 +857,31 @@ export class MenuScene extends Scene {
             'background:#141a21;border:2px solid #2b3542;padding:24px;width:460px;max-width:90vw;' +
             "font-family:Menlo,Consolas,'Courier New',monospace;";
         const slotOptions = this.lineupIds
-            .map((id, i) => `<option value="${i}">SLOT ${i + 1} (team ${(i < this.teamSize ? 1 : 2)}) — ${(getRobot(id)?.meta.name ?? 'custom').toUpperCase()}</option>`)
+            .map((id, i) => {
+                const name = getRobot(id)?.meta.name ?? IMPORT_DIALOG.unknownName;
+                return `<option value="${i}">${importSlotOption(i, i < this.teamSize ? 1 : 2, name)}</option>`;
+            })
             .join('');
         panel.innerHTML =
-            '<div style="color:#e8edf2;font-size:14px;margin-bottom:4px;">IMPORT ROBOT — EXHIBITION ONLY</div>' +
-            '<div style="color:#ffd23f;font-size:12px;margin-bottom:12px;">imported bots never touch tournaments or leaderboards</div>' +
-            '<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">load a dependency-free .js/.mjs robot module:</div>' +
+            `<div style="color:#e8edf2;font-size:14px;margin-bottom:4px;">${IMPORT_DIALOG.title}</div>` +
+            `<div style="color:#ffd23f;font-size:12px;margin-bottom:12px;">${IMPORT_DIALOG.warning}</div>` +
+            `<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">${IMPORT_DIALOG.fileLabel}</div>` +
             '<input type="file" accept=".js,.mjs" class="import-file" ' +
             'style="width:100%;box-sizing:border-box;color:#e8edf2;font-family:inherit;font-size:12px;margin-bottom:8px;" />' +
-            '<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">or fetch from a URL:</div>' +
-            '<input type="text" spellcheck="false" placeholder="https://…/mybot.mjs" class="import-url" ' +
+            `<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">${IMPORT_DIALOG.urlLabel}</div>` +
+            `<input type="text" spellcheck="false" placeholder="${IMPORT_DIALOG.urlPlaceholder}" class="import-url" ` +
             'style="width:100%;box-sizing:border-box;background:#0b0e12;border:1px solid #2b3542;' +
             'color:#e8edf2;padding:8px;font-family:inherit;font-size:12px;margin-bottom:8px;" />' +
-            '<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">assign to:</div>' +
+            `<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">${IMPORT_DIALOG.slotLabel}</div>` +
             `<select class="import-slot" style="width:100%;box-sizing:border-box;background:#0b0e12;border:1px solid #2b3542;` +
             'color:#e8edf2;padding:8px;font-family:inherit;font-size:12px;margin-bottom:8px;">' +
             `${slotOptions}</select>` +
             '<div class="import-status" style="color:#ff5d5d;font-size:12px;min-height:18px;margin-top:6px;"></div>' +
             '<div style="display:flex;gap:8px;margin-top:8px;">' +
             '<button class="import-go" style="flex:1;background:#1d2530;border:2px solid #ffb340;' +
-            'color:#e8edf2;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">IMPORT</button>' +
+            `color:#e8edf2;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${IMPORT_DIALOG.import}</button>` +
             '<button class="import-cancel" style="flex:1;background:#141a21;border:2px solid #2b3542;' +
-            'color:#9aa7b4;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">CANCEL</button>' +
+            `color:#9aa7b4;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${COMMON.cancel}</button>` +
             '</div>';
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
@@ -876,11 +902,11 @@ export class MenuScene extends Scene {
             const file = fileInput.files?.[0] ?? null;
             const url = urlInput.value.trim();
             if (!file && url === '') {
-                status.textContent = 'pick a file or enter a URL';
+                status.textContent = IMPORT_DIALOG.noSource;
                 return;
             }
             status.style.color = '#9aa7b4';
-            status.textContent = 'loading…';
+            status.textContent = IMPORT_DIALOG.loading;
             go.disabled = true;
             const done = file !== null ? importRobotFromFile(file) : importRobotFromUrl(url);
             void done.then((result) => {
@@ -895,7 +921,7 @@ export class MenuScene extends Scene {
                 this.rebuildSlots();
                 this.showDescription(slot);
                 status.style.color = '#7de08a';
-                status.textContent = `imported ${result.robot.meta.name} into slot ${slot + 1}`;
+                status.textContent = importDoneNotice(result.robot.meta.name, slot);
                 this.time.delayedCall(900, () => this.closeImportDialog());
             });
         };
@@ -928,7 +954,7 @@ export class MenuScene extends Scene {
         // Backdrop swallows clicks so menu controls beneath can't fire.
         this.trackStats(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50).setInteractive());
         this.trackStats(this.add.rectangle(CX, 384, 560, 600, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
-        this.trackStats(this.add.text(CX, 118, 'MATCH HISTORY', FONTS.heading).setOrigin(0.5).setDepth(50));
+        this.trackStats(this.add.text(CX, 118, STATS.title, FONTS.heading).setOrigin(0.5).setDepth(50));
         this.refreshStatsRows();
         this.nav.reset();
     }
@@ -942,50 +968,47 @@ export class MenuScene extends Scene {
         const history = loadHistory();
         const draws = history.filter((r) => r.winner === -1).length;
         this.trackStats(
-            this.add.text(CX, 148, `MATCHES ${history.length}   DRAWS ${draws}`, FONTS.mono).setOrigin(0.5).setDepth(50),
+            this.add.text(CX, 148, statsSummary(history.length, draws), FONTS.mono).setOrigin(0.5).setDepth(50),
         );
         const rows = winRates(ROBOTS.map((r) => r.meta.id)).sort(
             (a, b) => b.rate - a.rate || b.games - a.games,
         );
         if (history.length === 0) {
             this.trackStats(
-                this.add.text(CX, 196, 'no matches recorded yet - go battle!', FONTS.small).setOrigin(0.5).setDepth(50),
+                this.add.text(CX, 196, STATS.empty, FONTS.small).setOrigin(0.5).setDepth(50),
             );
         } else {
             rows.forEach((row, i) => {
                 const y = 182 + i * 26;
                 const entry = ROBOTS.find((r) => r.meta.id === row.id) ?? ROBOTS[0]!;
-                const pct = row.games > 0 ? `${Math.round(row.rate * 100)}%` : '--';
                 const name = this.trackStats(
                     this.add.text(CX - 220, y, entry.meta.name.toUpperCase(), FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(50),
                 );
                 name.setColor(COLORS.ink);
                 this.trackStats(
-                    this.add.text(CX + 220, y, `${row.games}G ${row.wins}W ${row.draws}D ${pct}`, FONTS.mono).setOrigin(1, 0.5).setDepth(50),
+                    this.add.text(CX + 220, y, statsRow(row.games, row.wins, row.draws, statsPct(row.games, row.rate)), FONTS.mono).setOrigin(1, 0.5).setDepth(50),
                 );
             });
         }
 
         const dailyY = 182 + Math.max(rows.length, 1) * 26 + 22;
         this.trackStats(
-            this.add.text(CX, dailyY, 'DAILY BEST (LAST 5)', FONTS.buttonSmall).setOrigin(0.5).setDepth(50),
+            this.add.text(CX, dailyY, STATS.dailyTitle, FONTS.buttonSmall).setOrigin(0.5).setDepth(50),
         );
         const board = loadDailyBoard().slice(0, 5);
         if (board.length === 0) {
             this.trackStats(
-                this.add.text(CX, dailyY + 26, 'no daily results yet - play the daily!', FONTS.small).setOrigin(0.5).setDepth(50),
+                this.add.text(CX, dailyY + 26, STATS.dailyEmpty, FONTS.small).setOrigin(0.5).setDepth(50),
             );
         } else {
             board.forEach((entry, i) => {
                 const y = dailyY + 26 + i * 24;
                 const outcome =
                     entry.winner === -1
-                        ? 'DRAW'
-                        : `${(ROBOTS.find((r) => r.meta.id === entry.lineupIds[entry.winner])?.meta.name ?? 'team').toUpperCase()} WINS`;
-                const second = Math.floor(entry.ticks / 60);
-                const time = `${Math.floor(second / 60)}:${(second % 60).toString().padStart(2, '0')}`;
+                        ? STATS.draw
+                        : dailyWinnerName((ROBOTS.find((r) => r.meta.id === entry.lineupIds[entry.winner])?.meta.name ?? STATS.unknownTeam).toUpperCase());
                 this.trackStats(
-                    this.add.text(CX, y, `${entry.date.slice(5)}  ${outcome}  ${time}`, FONTS.monoSmall).setOrigin(0.5).setDepth(50),
+                    this.add.text(CX, y, dailyRow(entry.date, outcome, entry.ticks), FONTS.monoSmall).setOrigin(0.5).setDepth(50),
                 );
             });
         }
@@ -993,7 +1016,7 @@ export class MenuScene extends Scene {
         const clear = this.trackStats(
             this.add.rectangle(CX - 120, 630, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50),
         );
-        this.trackStats(this.add.text(CX - 120, 630, 'CLEAR', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        this.trackStats(this.add.text(CX - 120, 630, COMMON.clear, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         clear.setInteractive({ useHandCursor: true });
         clear.on('pointerdown', () => {
             clearHistory();
@@ -1003,7 +1026,7 @@ export class MenuScene extends Scene {
         const close = this.trackStats(
             this.add.rectangle(CX + 120, 630, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50),
         );
-        this.trackStats(this.add.text(CX + 120, 630, 'CLOSE', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        this.trackStats(this.add.text(CX + 120, 630, COMMON.close, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         close.setInteractive({ useHandCursor: true });
         close.on('pointerdown', () => this.closeStats());
         this.nav.replaceTargets([
@@ -1035,8 +1058,7 @@ export class MenuScene extends Scene {
     }
 
     private refreshModsLabel(): void {
-        const codes = modifierCodes(this.mods);
-        this.modsButton.setLabel(codes.length === 0 ? 'MODS: OFF' : `MODS: ${codes.join('+')}`);
+        this.modsButton.setLabel(modsButtonLabel(modifierCodes(this.mods)));
     }
 
     private openMods(): void {
@@ -1044,9 +1066,9 @@ export class MenuScene extends Scene {
         // Backdrop swallows clicks so menu controls beneath can't fire.
         this.trackMods(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50).setInteractive());
         this.trackMods(this.add.rectangle(CX, 384, 560, 420, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
-        this.trackMods(this.add.text(CX, 208, 'EXHIBITION MODIFIERS', FONTS.heading).setOrigin(0.5).setDepth(50));
+        this.trackMods(this.add.text(CX, 208, MODS.title, FONTS.heading).setOrigin(0.5).setDepth(50));
         this.trackMods(
-            this.add.text(CX, 236, 'exhibition matches never touch stats', FONTS.small).setOrigin(0.5).setDepth(50),
+            this.add.text(CX, 236, MODS.subtitle, FONTS.small).setOrigin(0.5).setDepth(50),
         );
         this.refreshModsRows();
         this.nav.reset();
@@ -1058,11 +1080,6 @@ export class MenuScene extends Scene {
         for (const obj of this.modsObjects.slice(4)) obj.destroy();
         this.modsObjects = frame;
 
-        const rows: Array<{ key: 'doubleDamage' | 'hardcoreFog' | 'mirror'; name: string; desc: string }> = [
-            { key: 'doubleDamage', name: 'DOUBLE DAMAGE', desc: 'every shot deals double damage' },
-            { key: 'hardcoreFog', name: 'HARDCORE FOG', desc: 'sensor range halved for every robot' },
-            { key: 'mirror', name: 'MIRROR MODE', desc: 'team 2 mirrors team 1 robots + builds' },
-        ];
         const targets: NavTarget[] = [];
         const toggle = (key: 'doubleDamage' | 'hardcoreFog' | 'mirror', on: boolean): void => {
             const next = { ...this.mods };
@@ -1072,7 +1089,7 @@ export class MenuScene extends Scene {
             this.refreshModsLabel();
             this.refreshModsRows();
         };
-        rows.forEach((row, i) => {
+        MOD_ROWS.forEach((row, i) => {
             const y = 292 + i * 64;
             const on = this.mods[row.key] === true;
             const bg = this.trackMods(
@@ -1081,7 +1098,7 @@ export class MenuScene extends Scene {
             const name = this.trackMods(this.add.text(CX - 220, y - 10, row.name, FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(50));
             name.setColor(on ? '#7de08a' : COLORS.ink);
             this.trackMods(this.add.text(CX - 220, y + 12, row.desc, FONTS.small).setOrigin(0, 0.5).setDepth(50));
-            const state = this.trackMods(this.add.text(CX + 220, y, on ? 'ON' : 'OFF', FONTS.button).setOrigin(1, 0.5).setDepth(50));
+            const state = this.trackMods(this.add.text(CX + 220, y, on ? COMMON.on : COMMON.off, FONTS.button).setOrigin(1, 0.5).setDepth(50));
             state.setColor(on ? '#7de08a' : COLORS.dim);
             bg.setInteractive({ useHandCursor: true });
             bg.on('pointerdown', () => toggle(row.key, on));
@@ -1091,7 +1108,7 @@ export class MenuScene extends Scene {
         const done = this.trackMods(
             this.add.rectangle(CX, 520, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50),
         );
-        this.trackMods(this.add.text(CX, 520, 'DONE', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        this.trackMods(this.add.text(CX, 520, COMMON.done, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         done.setInteractive({ useHandCursor: true });
         done.on('pointerdown', () => this.closeMods());
         targets.push({ x: CX, y: 520, w: 170, h: 40, activate: () => this.closeMods() });

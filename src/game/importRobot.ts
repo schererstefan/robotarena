@@ -9,6 +9,15 @@
 import { getRobot, ROBOTS, type RobotEntry } from '../robots/registry';
 import { computeStats, sanitizeLoadout, type SkillLoadout } from '../sim/skills';
 import { IDLE_INTENT, type RobotController, type RobotFactory, type RobotMeta, type SenseState } from '../sim/types';
+import {
+    checkFailureLine,
+    IMPORT_ERROR,
+    importBlockedApi,
+    importCreateThrew,
+    importFetchHttp,
+    importLoadFailed,
+    importUpdateThrew,
+} from './strings';
 import { checkRobotSource } from './workshop';
 
 export interface ImportedRobot {
@@ -108,14 +117,14 @@ function dryRunSense(): SenseState {
  * resolved safely from a blob, so they are rejected with a clear error.
  */
 export function prepareModuleSource(source: string): { ok: true; code: string } | { ok: false; error: string } {
-    if (source.length > MAX_SOURCE_BYTES) return { ok: false, error: 'file too large (256 KB max)' };
+    if (source.length > MAX_SOURCE_BYTES) return { ok: false, error: IMPORT_ERROR.tooLarge };
     const code = source
         .split('\n')
         .filter((line) => !/^\s*import\s+type\b/.test(line))
         .join('\n');
-    if (/\bimport\s*\(/.test(code)) return { ok: false, error: 'dynamic import() is not allowed' };
+    if (/\bimport\s*\(/.test(code)) return { ok: false, error: IMPORT_ERROR.dynamicImport };
     if (/^\s*import\s+[^'";]*?from\s*['"]/m.test(code) || /^\s*import\s*['"]/m.test(code)) {
-        return { ok: false, error: 'value imports cannot be resolved — ship a dependency-free module' };
+        return { ok: false, error: IMPORT_ERROR.valueImports };
     }
     return { ok: true, code };
 }
@@ -125,7 +134,7 @@ function safetyError(source: string): string | null {
     const wanted = new Set(['no-nondeterminism', 'no-io', 'no-host']);
     for (const check of checkRobotSource(source)) {
         if (wanted.has(check.id) && !check.pass) {
-            return `${check.label}: ${check.detail}`;
+            return checkFailureLine(check.label, check.detail);
         }
     }
     return null;
@@ -139,34 +148,34 @@ function safetyError(source: string): string | null {
  */
 export function validateAndRegister(module: unknown): ImportResult {
     if (!isRecord(module) || typeof module['create'] !== 'function') {
-        return { ok: false, error: 'module must export a create() factory' };
+        return { ok: false, error: IMPORT_ERROR.noCreate };
     }
     const meta = validMeta(module['meta']);
     if (!meta) {
-        return { ok: false, error: 'module must export a meta object (id, name, author, version, description)' };
+        return { ok: false, error: IMPORT_ERROR.badMeta };
     }
     let loadout: SkillLoadout = {};
     try {
         loadout = sanitizeLoadout(module['loadout'] ?? {});
     } catch {
-        return { ok: false, error: 'loadout could not be sanitized' };
+        return { ok: false, error: IMPORT_ERROR.badLoadout };
     }
     let controller: RobotController;
     try {
         controller = (module['create'] as RobotFactory)();
     } catch (error) {
-        return { ok: false, error: `create() threw: ${error instanceof Error ? error.message : 'unknown'}` };
+        return { ok: false, error: importCreateThrew(error instanceof Error ? error.message : IMPORT_ERROR.unknown) };
     }
     if (!isRecord(controller) || typeof controller['update'] !== 'function') {
-        return { ok: false, error: 'create() must return a controller with an update() function' };
+        return { ok: false, error: IMPORT_ERROR.noUpdate };
     }
     const update = controller['update'] as RobotController['update'];
     try {
         // Timeout-free pure call: one synchronous tick against synthetic sense.
         const intent = update(dryRunSense());
-        if (!validIntent(intent)) return { ok: false, error: 'update() must return an Intent (throttle/turn/towerTurn/fire/charge)' };
+        if (!validIntent(intent)) return { ok: false, error: IMPORT_ERROR.badIntent };
     } catch (error) {
-        return { ok: false, error: `update() threw on the dry run: ${error instanceof Error ? error.message : 'unknown'}` };
+        return { ok: false, error: importUpdateThrew(error instanceof Error ? error.message : IMPORT_ERROR.unknown) };
     }
     const create: RobotFactory = () => {
         const inner = (module['create'] as RobotFactory)();
@@ -199,8 +208,8 @@ async function importPrepared(code: string): Promise<ImportResult> {
         const module = (await import(/* @vite-ignore */ url)) as unknown;
         return validateAndRegister(module);
     } catch (error) {
-        const message = error instanceof Error ? error.message : 'unknown';
-        return { ok: false, error: `could not load module (plain JavaScript .js/.mjs only): ${message}` };
+        const message = error instanceof Error ? error.message : IMPORT_ERROR.unknown;
+        return { ok: false, error: importLoadFailed(message) };
     } finally {
         URL.revokeObjectURL(url);
     }
@@ -208,7 +217,7 @@ async function importPrepared(code: string): Promise<ImportResult> {
 
 export async function importRobotFromText(source: string): Promise<ImportResult> {
     const blocked = safetyError(source);
-    if (blocked !== null) return { ok: false, error: `blocked API: ${blocked}` };
+    if (blocked !== null) return { ok: false, error: importBlockedApi(blocked) };
     const prepared = prepareModuleSource(source);
     if (!prepared.ok) return prepared;
     return importPrepared(prepared.code);
@@ -219,7 +228,7 @@ export async function importRobotFromFile(file: File): Promise<ImportResult> {
     try {
         source = await file.text();
     } catch {
-        return { ok: false, error: 'could not read file' };
+        return { ok: false, error: IMPORT_ERROR.readFailed };
     }
     return importRobotFromText(source);
 }
@@ -229,18 +238,18 @@ export async function importRobotFromUrl(url: string): Promise<ImportResult> {
     try {
         parsed = new URL(url);
     } catch {
-        return { ok: false, error: 'invalid URL' };
+        return { ok: false, error: IMPORT_ERROR.badUrl };
     }
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-        return { ok: false, error: 'only http(s) URLs are allowed' };
+        return { ok: false, error: IMPORT_ERROR.badProtocol };
     }
     let source: string;
     try {
         const response = await fetch(parsed.toString());
-        if (!response.ok) return { ok: false, error: `fetch failed: HTTP ${response.status}` };
+        if (!response.ok) return { ok: false, error: importFetchHttp(response.status) };
         source = await response.text();
     } catch {
-        return { ok: false, error: 'fetch failed (network or CORS)' };
+        return { ok: false, error: IMPORT_ERROR.fetchFailed };
     }
     return importRobotFromText(source);
 }

@@ -5,6 +5,13 @@
 
 import { Scene } from 'phaser';
 import { playClick, unlockAudio } from '../audio';
+import {
+    checkDetailSuffix,
+    COMMON,
+    WORKSHOP,
+    workshopDownloaded,
+    workshopSummary,
+} from '../strings';
 import { FONTS } from '../theme';
 import { copyText, downloadText } from '../ui';
 import { checkRobotSource, suggestFilename, WORKSHOP_TEMPLATE, workshopPassed } from '../workshop';
@@ -28,9 +35,9 @@ export class WorkshopScene extends Scene {
         this.checksBox = null;
         this.summary = null;
         this.status = null;
-        this.add.text(512, 44, 'ROBOT WORKSHOP', FONTS.title).setOrigin(0.5);
+        this.add.text(512, 44, WORKSHOP.title, FONTS.title).setOrigin(0.5);
         this.add
-            .text(512, 86, 'starter template + static checks - your code never runs here', FONTS.small)
+            .text(512, 86, WORKSHOP.subtitle, FONTS.small)
             .setOrigin(0.5);
         this.buildOverlay();
         this.input.keyboard?.on('keydown-ESC', this.onEscapeKey);
@@ -59,11 +66,11 @@ export class WorkshopScene extends Scene {
 
         const title = document.createElement('div');
         title.style.cssText = 'color:#e8edf2;font-size:14px;margin-bottom:4px;';
-        title.textContent = 'ROBOT WORKSHOP';
+        title.textContent = WORKSHOP.title;
         panel.appendChild(title);
         const sub = document.createElement('div');
         sub.style.cssText = 'color:#9aa7b4;font-size:12px;margin-bottom:10px;';
-        sub.textContent = 'edit the template, watch the checks, download your robot file.';
+        sub.textContent = WORKSHOP.panelSub;
         panel.appendChild(sub);
 
         const area = document.createElement('textarea');
@@ -97,21 +104,21 @@ export class WorkshopScene extends Scene {
         const row = document.createElement('div');
         row.style.cssText = 'display:flex;gap:8px;';
         panel.appendChild(row);
-        this.domButton(row, 'DOWNLOAD .TS', true, () => {
+        this.domButton(row, WORKSHOP.download, true, () => {
             const source = this.area?.value ?? '';
             downloadText(suggestFilename(source), source);
-            this.setStatus(`downloaded ${suggestFilename(source)}`);
+            this.setStatus(workshopDownloaded(suggestFilename(source)));
         });
-        this.domButton(row, 'COPY', false, () => {
+        this.domButton(row, WORKSHOP.copy, false, () => {
             const source = this.area?.value ?? '';
-            void copyText(source).then((ok) => this.setStatus(ok ? 'copied to clipboard' : 'copy failed'));
+            void copyText(source).then((ok) => this.setStatus(ok ? WORKSHOP.copied : WORKSHOP.copyFailed));
         });
-        this.domButton(row, 'RESET', false, () => {
+        this.domButton(row, WORKSHOP.reset, false, () => {
             if (this.area) this.area.value = WORKSHOP_TEMPLATE;
-            this.setStatus('template restored');
+            this.setStatus(WORKSHOP.resetDone);
             this.refresh();
         });
-        this.domButton(row, 'MENU', false, () => this.scene.start('Menu'));
+        this.domButton(row, COMMON.menu, false, () => this.scene.start('Menu'));
 
         this.refresh();
     }
@@ -141,14 +148,14 @@ export class WorkshopScene extends Scene {
         const checks = checkRobotSource(source);
         const passed = checks.filter((check) => check.pass).length;
         const ok = workshopPassed(checks);
-        this.summary.textContent = `${suggestFilename(source)} — ${passed}/${checks.length} checks passing`;
+        this.summary.textContent = workshopSummary(suggestFilename(source), passed, checks.length);
         this.summary.style.color = ok ? '#7de08a' : '#ffd23f';
         this.checksBox.replaceChildren();
         for (const check of checks) {
             const row = document.createElement('div');
             row.style.cssText = 'margin:2px 0;';
             const tag = document.createElement('span');
-            tag.textContent = check.pass ? '[PASS] ' : '[FAIL] ';
+            tag.textContent = check.pass ? WORKSHOP.passTag : WORKSHOP.failTag;
             tag.style.color = check.pass ? '#7de08a' : '#ff5d5d';
             row.appendChild(tag);
             const label = document.createElement('span');
@@ -157,7 +164,7 @@ export class WorkshopScene extends Scene {
             row.appendChild(label);
             if (check.detail !== '') {
                 const detail = document.createElement('span');
-                detail.textContent = ` — ${check.detail}`;
+                detail.textContent = checkDetailSuffix(check.detail);
                 detail.style.color = '#9aa7b4';
                 row.appendChild(detail);
             }

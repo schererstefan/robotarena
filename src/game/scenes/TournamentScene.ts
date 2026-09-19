@@ -7,6 +7,16 @@ import { getRobot, ROBOTS } from '../../robots/registry';
 import { Match } from '../../sim/engine';
 import { loadoutCode } from '../../sim/skills';
 import { unlockAudio, playClick, toggleMuted } from '../audio';
+import {
+    bracketedLabel,
+    bracketResultText,
+    championLabel,
+    COMMON,
+    cyclerLabel,
+    liveStatusText,
+    TOURNAMENT,
+    tourneySeedLabel,
+} from '../strings';
 import { COLORS, FONTS } from '../theme';
 import { initialRound, nextRound, roundName, tiebreakWinner, type BracketMatch } from '../tournament';
 
@@ -14,7 +24,6 @@ const CX = 512;
 /** Headless sim budget per frame: a full 8-bot bracket settles in seconds. */
 const TICKS_PER_FRAME = 300;
 const DEFAULT_8 = ['rusher', 'turret', 'orbiter', 'wanderer', 'hunter', 'rusher', 'turret', 'orbiter'];
-const SIZE_LABEL = ['4 BOTS', '8 BOTS'];
 
 interface LiveMatch {
     match: Match;
@@ -92,9 +101,9 @@ export class TournamentScene extends Scene {
     }
 
     private buildSetup(): void {
-        this.trackSetup(this.add.text(CX, 44, 'TOURNAMENT', FONTS.title).setOrigin(0.5));
+        this.trackSetup(this.add.text(CX, 44, TOURNAMENT.title, FONTS.title).setOrigin(0.5));
         this.trackSetup(
-            this.add.text(CX, 86, 'single elimination - bots only, headless sim', FONTS.small).setOrigin(0.5),
+            this.add.text(CX, 86, TOURNAMENT.subtitle, FONTS.small).setOrigin(0.5),
         );
         ([4, 8] as const).forEach((size, i) => {
             const btn = this.trackSetupButton(CX - 110 + i * 220, 136, () => this.setSize(size));
@@ -103,8 +112,8 @@ export class TournamentScene extends Scene {
         this.refreshSizeLabels();
         this.rebuildEntrants();
 
-        this.setupButton(CX - 160, 700, 260, 50, 'RUN TOURNAMENT', () => this.startTournament());
-        this.setupButton(CX + 160, 700, 260, 50, 'MENU', () => this.scene.start('Menu'));
+        this.setupButton(CX - 160, 700, 260, 50, TOURNAMENT.run, () => this.startTournament());
+        this.setupButton(CX + 160, 700, 260, 50, COMMON.menu, () => this.scene.start('Menu'));
     }
 
     private trackSetupButton(x: number, y: number, onClick: () => void): { setLabel: (label: string) => void } {
@@ -128,9 +137,7 @@ export class TournamentScene extends Scene {
 
     private refreshSizeLabels(): void {
         this.sizeButtons.forEach((btn, i) => {
-            const active = (i === 0 ? 4 : 8) === this.size;
-            const label = SIZE_LABEL[i] as string;
-            btn.setLabel(`${active ? '> ' : ''}${label}${active ? ' <' : ''}`);
+            btn.setLabel(bracketedLabel(TOURNAMENT.sizeLabels[i] as string, (i === 0 ? 4 : 8) === this.size));
         });
     }
 
@@ -158,9 +165,9 @@ export class TournamentScene extends Scene {
         this.entrants.forEach((id, i) => {
             const y = startY + i * step;
             const entry = getRobot(id) ?? ROBOTS[0]!;
-            this.trackEntrant(this.add.text(250, y, `SEED ${i + 1}`, FONTS.monoSmall).setOrigin(0, 0.5));
+            this.trackEntrant(this.add.text(250, y, tourneySeedLabel(i), FONTS.monoSmall).setOrigin(0, 0.5));
             const bg = this.trackEntrant(this.add.rectangle(CX + 40, y, 300, 44, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge));
-            const text = this.trackEntrant(this.add.text(CX + 40, y, `${entry.meta.name} >`, FONTS.buttonSmall).setOrigin(0.5));
+            const text = this.trackEntrant(this.add.text(CX + 40, y, cyclerLabel(entry.meta.name), FONTS.buttonSmall).setOrigin(0.5));
             text.setColor(COLORS.ink);
             bg.setInteractive({ useHandCursor: true });
             bg.on('pointerover', () => bg.setStrokeStyle(2, COLORS.team[0]));
@@ -251,7 +258,7 @@ export class TournamentScene extends Scene {
         const live = this.live;
         if (!live) return '';
         const round = this.rounds[live.round] as BracketMatch[];
-        return `${roundName(live.round, this.rounds.length)} - MATCH ${live.index + 1}/${round.length} - TICK ${tick}`;
+        return liveStatusText(roundName(live.round, this.rounds.length), live.index, round.length, tick);
     }
 
     private champion(): string | null {
@@ -283,7 +290,7 @@ export class TournamentScene extends Scene {
         for (const obj of this.bracketObjects) obj.destroy();
         this.bracketObjects = [];
 
-        this.trackBracket(this.add.text(CX, 34, 'TOURNAMENT', FONTS.heading).setOrigin(0.5));
+        this.trackBracket(this.add.text(CX, 34, TOURNAMENT.title, FONTS.heading).setOrigin(0.5));
         this.statusText = this.trackBracket(this.add.text(CX, 64, '', FONTS.monoSmall).setOrigin(0.5));
         if (this.mode === 'running' && this.live) {
             this.statusText.setText(this.liveStatus(this.live.match.result.tick));
@@ -313,11 +320,13 @@ export class TournamentScene extends Scene {
                     this.add.text(pos.x - boxW / 2 + 12, pos.y, this.nameOf(slot.b), FONTS.buttonSmall).setOrigin(0, 0.5),
                 );
                 textB.setColor(colorB);
-                const result = slot.winner
-                    ? `${(slot.ticks / 60).toFixed(1)}s${slot.draw ? ' TB' : ''}`
-                    : isLive
-                      ? `LIVE ${this.live?.match.result.tick ?? 0}`
-                      : 'vs';
+                const result = bracketResultText(
+                    slot.winner !== null,
+                    slot.ticks,
+                    slot.draw,
+                    isLive,
+                    this.live?.match.result.tick ?? 0,
+                );
                 this.trackBracket(this.add.text(pos.x - boxW / 2 + 12, pos.y + 26, result, FONTS.monoSmall).setOrigin(0, 0.5));
             });
         });
@@ -343,19 +352,19 @@ export class TournamentScene extends Scene {
         if (this.mode === 'done') {
             const champ = this.champion();
             const label = this.trackBracket(
-                this.add.text(CX, 678, champ ? `CHAMPION: ${this.nameOf(champ)}` : 'NO CHAMPION', FONTS.heading).setOrigin(0.5),
+                this.add.text(CX, 678, championLabel(champ ? this.nameOf(champ) : null), FONTS.heading).setOrigin(0.5),
             );
             label.setColor('#ffd23f');
-            this.bracketButton(CX - 240, 726, 200, 36, 'RUN AGAIN', () => this.startTournament());
-            this.bracketButton(CX, 726, 200, 36, 'LINEUP', () => {
+            this.bracketButton(CX - 240, 726, 200, 36, TOURNAMENT.runAgain, () => this.startTournament());
+            this.bracketButton(CX, 726, 200, 36, TOURNAMENT.lineup, () => {
                 for (const obj of this.bracketObjects) obj.destroy();
                 this.bracketObjects = [];
                 this.mode = 'setup';
                 this.buildSetup();
             });
-            this.bracketButton(CX + 240, 726, 200, 36, 'MENU', () => this.scene.start('Menu'));
+            this.bracketButton(CX + 240, 726, 200, 36, COMMON.menu, () => this.scene.start('Menu'));
         } else {
-            this.bracketButton(CX, 726, 200, 36, 'MENU', () => this.scene.start('Menu'));
+            this.bracketButton(CX, 726, 200, 36, COMMON.menu, () => this.scene.start('Menu'));
         }
     }
 

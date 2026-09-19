@@ -14,6 +14,27 @@ import { bulletColor, isReducedMotion, teamColor, teamCss } from '../accessibili
 import { recordDailyResult, recordMatch } from '../history';
 import { displayRobotId, isImportedId, resolveLineupEntry } from '../importRobot';
 import { createPilotController, PilotInput } from '../pilot';
+import {
+    BATTLE,
+    battleTutorialTitle,
+    BATTLE_TUTORIAL,
+    BATTLE_TUTORIAL_STEPS,
+    COMMON,
+    cooldownPips,
+    damageText,
+    destroyedBanner,
+    exhibitionResultsLine,
+    exhibitionTag,
+    formatClock,
+    hudTeamPips,
+    resultRow,
+    resultsSub,
+    resultsTitle,
+    seedLabel,
+    speedLabel,
+    tsFilename,
+    type CopyStep,
+} from '../strings';
 import { COLORS, FONTS } from '../theme';
 import { markTutorialSeen } from '../tutorial';
 import { copyText, downloadText, makeButton, type Button } from '../ui';
@@ -55,26 +76,6 @@ interface EdgeIndicator {
     team: 0 | 1;
     ttl: number;
 }
-
-/** Coach-mark script for the spectated tutorial battle (user-paced). */
-const TUTORIAL_STEPS: Array<{ title: string; body: string }> = [
-    {
-        title: 'WATCH',
-        body: 'Two bots fight on their own - you are spectating. Bots only see foes inside the cone their turret points at.',
-    },
-    {
-        title: 'DAMAGE',
-        body: 'Bars show health. A white ring means a full charge is banked: the next shot deals double damage.',
-    },
-    {
-        title: 'CONTROLS',
-        body: 'Space pauses, N steps one tick while paused, 1X cycles speed, M mutes. The minimap tracks every robot.',
-    },
-    {
-        title: 'RECORDS',
-        body: 'Every battle is logged: STATS shows per-robot win rates, and results give a replay code for the exact match.',
-    },
-];
 
 export class BattleScene extends Scene {
     private request!: BattleRequest;
@@ -328,27 +329,25 @@ export class BattleScene extends Scene {
         this.hudPips = this.add.text(AX + 12, 26, '', FONTS.mono).setOrigin(0, 0.5).setDepth(10);
         this.hudTimer = this.add.text(AX + ARENA_WIDTH / 2, 26, '', FONTS.heading).setOrigin(0.5).setDepth(10);
         const tags: string[] = [];
-        if (this.request.pilot === true) tags.push('PILOT');
-        else if (this.request.daily !== undefined) tags.push('DAILY');
-        else if (this.request.replay === true) tags.push('REPLAY');
+        if (this.request.pilot === true) tags.push(BATTLE.tagPilot);
+        else if (this.request.daily !== undefined) tags.push(BATTLE.tagDaily);
+        else if (this.request.replay === true) tags.push(BATTLE.tagReplay);
         if (this.exhibition) {
-            const parts = [...(this.customMatch ? ['CUSTOM'] : []), ...modifierCodes(this.request.modifiers)];
-            tags.push(`EXHIBITION ${parts.join('+')}`);
+            const parts = [...(this.customMatch ? [BATTLE.tagCustom] : []), ...modifierCodes(this.request.modifiers)];
+            tags.push(exhibitionTag(parts));
         }
-        const seedLabel = tags.length > 0 ? `SEED ${this.request.seed} - ${tags.join(' - ')}` : `SEED ${this.request.seed}`;
-        const seedText = this.add.text(AX + ARENA_WIDTH - 12, 26, seedLabel, FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
+        const seedText = this.add.text(AX + ARENA_WIDTH - 12, 26, seedLabel(this.request.seed, tags), FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
         if (this.exhibition) seedText.setColor('#ffd23f');
         if (this.request.pilot === true) {
-            const help = 'WASD DRIVE - MOUSE AIM - SPACE TAP FIRE, HOLD CHARGE - P PAUSE';
             this.add.rectangle(AX + ARENA_WIDTH / 2, AY + 14, 560, 20, 0x000000, 0.6).setDepth(10);
             this.add
-                .text(AX + ARENA_WIDTH / 2, AY + 14, help, FONTS.monoSmall)
+                .text(AX + ARENA_WIDTH / 2, AY + 14, BATTLE.pilotHelp, FONTS.monoSmall)
                 .setOrigin(0.5)
                 .setDepth(10);
         }
         this.banner = this.add.text(AX + ARENA_WIDTH / 2, AY + 56, '', FONTS.heading).setOrigin(0.5).setDepth(10).setAlpha(0);
         if (this.exhibition) {
-            this.queueBanner(this.customMatch ? 'EXHIBITION MATCH - CUSTOM ROBOT' : 'EXHIBITION MATCH');
+            this.queueBanner(this.customMatch ? BATTLE.bannerExhibitionCustom : BATTLE.bannerExhibition);
         }
 
         // Damage-number pool + live minimap (bottom HUD strip).
@@ -374,11 +373,11 @@ export class BattleScene extends Scene {
             .setVisible(false);
         this.debugText.setStroke('#0b0e12', 3);
 
-        this.pauseButton = makeButton(this, 760, 740, 120, 36, 'PAUSE', () => this.togglePause(), 0, 44);
-        this.speedButton = makeButton(this, 890, 740, 100, 36, '1X', () => this.cycleSpeed(), 0, 44);
-        this.stepButton = makeButton(this, 600, 740, 120, 36, 'STEP (N)', () => this.stepOnce(), 0, 44);
+        this.pauseButton = makeButton(this, 760, 740, 120, 36, BATTLE.pause, () => this.togglePause(), 0, 44);
+        this.speedButton = makeButton(this, 890, 740, 100, 36, speedLabel(1), () => this.cycleSpeed(), 0, 44);
+        this.stepButton = makeButton(this, 600, 740, 120, 36, BATTLE.step, () => this.stepOnce(), 0, 44);
         this.stepButton.setEnabled(false);
-        makeButton(this, 134, 740, 120, 36, 'MENU', () => this.scene.start('Menu'), 0, 44);
+        makeButton(this, 134, 740, 120, 36, COMMON.menu, () => this.scene.start('Menu'), 0, 44);
         this.input.on('pointerdown', this.onAnyPointer);
         // Named handlers, removed on shutdown: the keyboard plugin is global
         // and outlives the scene, so anonymous listeners would stack per visit.
@@ -415,19 +414,19 @@ export class BattleScene extends Scene {
         this.tutBody = this.add.text(140, 676, '', FONTS.small).setOrigin(0, 0).setDepth(30);
         this.tutBody.setWordWrapWidth(556);
         this.tutNext = makeButton(this, 768, 682, 120, 36, '', () => this.nextTutorialStep(), 30, 44);
-        makeButton(this, 862, 682, 64, 36, 'SKIP', () => this.skipTutorial(), 30, 44);
+        makeButton(this, 862, 682, 64, 36, COMMON.skip, () => this.skipTutorial(), 30, 44);
         this.refreshTutorialStep();
     }
 
     private refreshTutorialStep(): void {
-        const step = TUTORIAL_STEPS[this.tutStep] as { title: string; body: string };
-        this.tutTitle.setText(`TUTORIAL ${this.tutStep + 1}/${TUTORIAL_STEPS.length} - ${step.title}`);
+        const step = BATTLE_TUTORIAL_STEPS[this.tutStep] as CopyStep;
+        this.tutTitle.setText(battleTutorialTitle(this.tutStep, BATTLE_TUTORIAL_STEPS.length, step.title));
         this.tutBody.setText(step.body);
-        this.tutNext?.setLabel(this.tutStep === TUTORIAL_STEPS.length - 1 ? 'LOADOUT TOUR' : 'NEXT');
+        this.tutNext?.setLabel(this.tutStep === BATTLE_TUTORIAL_STEPS.length - 1 ? BATTLE_TUTORIAL.loadoutTour : COMMON.next);
     }
 
     private nextTutorialStep(): void {
-        if (this.tutStep >= TUTORIAL_STEPS.length - 1) {
+        if (this.tutStep >= BATTLE_TUTORIAL_STEPS.length - 1) {
             // Seen is marked when the loadout tour ends; the tour is next.
             this.scene.start('Menu', { tour: true });
             return;
@@ -581,7 +580,7 @@ export class BattleScene extends Scene {
     private onMuteKey = (): void => {
         unlockAudio();
         const nowMuted = toggleMuted();
-        this.queueBanner(nowMuted ? 'SOUND OFF' : 'SOUND ON');
+        this.queueBanner(nowMuted ? BATTLE.bannerSoundOff : BATTLE.bannerSoundOn);
     };
 
     private onDebugKey = (): void => {
@@ -598,7 +597,7 @@ export class BattleScene extends Scene {
     private togglePause(): void {
         if (this.match.result.over) return;
         this.paused = !this.paused;
-        this.pauseButton.setLabel(this.paused ? 'RESUME' : 'PAUSE');
+        this.pauseButton.setLabel(this.paused ? BATTLE.resume : BATTLE.pause);
         this.stepButton.setEnabled(this.paused);
     }
 
@@ -612,7 +611,7 @@ export class BattleScene extends Scene {
 
     private cycleSpeed(): void {
         this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 4 : 1;
-        this.speedButton.setLabel(`${this.speed}X`);
+        this.speedButton.setLabel(speedLabel(this.speed));
     }
 
     /** Compare fresh snapshots to previous frame: fire flashes, hits, deaths. */
@@ -691,7 +690,7 @@ export class BattleScene extends Scene {
         wreck.setRotation(snap.heading + 0.5);
         wreck.setAlpha(0.95);
         const skin = this.request.skins[i] as SlotSkin;
-        this.queueBanner(`${skin.callsign} DESTROYED`);
+        this.queueBanner(destroyedBanner(skin.callsign));
     }
 
     private queueBanner(text: string): void {
@@ -781,7 +780,7 @@ export class BattleScene extends Scene {
         const text = this.dmgTexts[slot] as Phaser.GameObjects.Text;
         this.dmgCursor = (this.dmgCursor + 1) % this.dmgTexts.length;
         this.tweens.killTweensOf(text);
-        text.setText(`-${dmg}`).setPosition(x, y).setAlpha(1).setVisible(true);
+        text.setText(damageText(dmg)).setPosition(x, y).setAlpha(1).setVisible(true);
         if (this.reducedMotion) {
             // Static show; the token keeps a stale timer from hiding a reuse.
             this.dmgToken[slot] = (this.dmgToken[slot] as number) + 1;
@@ -871,7 +870,7 @@ export class BattleScene extends Scene {
             const pips = this.pipTexts[i] as Phaser.GameObjects.Text;
             pips.setVisible(visible).setPosition(cx, cy + 30);
             if (visible) {
-                const text = `D${s.dashCd <= 0 ? '●' : '○'} E${s.empCd <= 0 ? '●' : '○'}`;
+                const text = cooldownPips(s.dashCd <= 0, s.empCd <= 0);
                 if (text !== this.pipCache[i]) {
                     this.pipCache[i] = text;
                     pips.setText(text);
@@ -987,7 +986,7 @@ export class BattleScene extends Scene {
     private syncHud(snaps: RobotSnapshot[]): void {
         if (this.match.result.suddenDeath && !this.sdAnnounced) {
             this.sdAnnounced = true;
-            this.queueBanner('SUDDEN DEATH');
+            this.queueBanner(BATTLE.bannerSuddenDeath);
         }
         let alive0 = 0;
         let alive1 = 0;
@@ -999,14 +998,11 @@ export class BattleScene extends Scene {
         const second = Math.floor(this.match.result.tick / 60);
         if (alive0 !== this.lastAlive[0] || alive1 !== this.lastAlive[1]) {
             this.lastAlive = [alive0, alive1];
-            const pips = (alive: number, total: number) => '●'.repeat(alive) + '○'.repeat(total - alive);
-            this.hudPips.setText(`T1 ${pips(alive0, this.total0)}   T2 ${pips(alive1, this.total1)}`);
+            this.hudPips.setText(hudTeamPips(alive0, this.total0, alive1, this.total1));
         }
         if (second !== this.lastHudSecond) {
             this.lastHudSecond = second;
-            const mm = Math.floor(second / 60);
-            const ss = (second % 60).toString().padStart(2, '0');
-            this.hudTimer.setText(`${mm}:${ss}`);
+            this.hudTimer.setText(formatClock(this.match.result.tick));
         }
         this.drawMinimap(snaps);
     }
@@ -1065,30 +1061,18 @@ export class BattleScene extends Scene {
             });
         }
         if (result.winner !== -1) playWin();
-        // The pilot always drives slot 0 (team 1), so name the verdict.
-        const title =
-            this.request.pilot === true
-                ? result.winner === -1
-                    ? 'DRAW'
-                    : result.winner === 0
-                      ? 'YOU WIN'
-                      : 'YOU LOSE'
-                : result.winner === -1
-                  ? 'DRAW'
-                  : result.winner === 0
-                    ? 'TEAM 1 WINS'
-                    : 'TEAM 2 WINS';
+        const title = resultsTitle(this.request.pilot === true, result.winner);
         const color = result.winner === -1 ? COLORS.ink : teamCss(result.winner);
         this.add.rectangle(512, 384, 620, 440, 0x0b0e12, 0.94).setStrokeStyle(2, COLORS.panelEdge).setDepth(20);
         this.add.text(512, 196, title, { ...FONTS.banner, color }).setOrigin(0.5).setDepth(20);
         this.add
-            .text(512, 232, `seed ${this.request.seed} - ${(result.tick / 60).toFixed(1)}s`, FONTS.monoSmall)
+            .text(512, 232, resultsSub(this.request.seed, result.tick), FONTS.monoSmall)
             .setOrigin(0.5)
             .setDepth(20);
         if (this.exhibition) {
-            const parts = [...(this.customMatch ? ['CUSTOM ROBOT'] : []), ...modifierCodes(this.request.modifiers)];
+            const parts = [...(this.customMatch ? [BATTLE.customRobotPart] : []), ...modifierCodes(this.request.modifiers)];
             this.add
-                .text(512, 250, `EXHIBITION ${parts.join(' + ')} - NOT RECORDED`, {
+                .text(512, 250, exhibitionResultsLine(parts), {
                     ...FONTS.monoSmall,
                     color: '#ffd23f',
                 })
@@ -1100,7 +1084,7 @@ export class BattleScene extends Scene {
         snaps.forEach((s, i) => {
             const y = 274 + i * 30;
             const skin = this.request.skins[i] as SlotSkin;
-            const row = `${s.alive ? '>' : 'x'} ${skin.callsign} (${s.name})  ${s.kills} KO  ${Math.round(s.damageDealt)} dmg  ${s.shotsFired} shots`;
+            const row = resultRow(s.alive, skin.callsign, s.name, s.kills, Math.round(s.damageDealt), s.shotsFired);
             const code = this.add.text(232, y + 13, s.code, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
             code.setColor('#5d6a78');
             const text = this.add.text(232, y, row, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
@@ -1110,7 +1094,7 @@ export class BattleScene extends Scene {
             hit.on('pointerdown', () => this.exportRobot(s.id));
         });
         const hintY = 274 + snaps.length * 30;
-        this.add.text(512, hintY, 'click a row to download that robot (.ts)', FONTS.small).setOrigin(0.5).setDepth(20);
+        this.add.text(512, hintY, BATTLE.exportHint, FONTS.small).setOrigin(0.5).setDepth(20);
 
         const code = encodeReplay({
             seed: this.request.seed,
@@ -1123,7 +1107,7 @@ export class BattleScene extends Scene {
         if (this.customMatch) {
             // The code can't restore imported robots, so don't show one.
             this.add
-                .text(512, hintY + 26, 'REPLAY UNAVAILABLE FOR CUSTOM ROBOTS', { ...FONTS.monoSmall, color: '#ffd23f' })
+                .text(512, hintY + 26, BATTLE.replayUnavailable, { ...FONTS.monoSmall, color: '#ffd23f' })
                 .setOrigin(0.5)
                 .setDepth(20);
         } else {
@@ -1136,7 +1120,7 @@ export class BattleScene extends Scene {
             566,
             170,
             44,
-            'REMATCH',
+            BATTLE.rematch,
             () => {
                 this.scene.restart({
                     ...this.request,
@@ -1148,12 +1132,12 @@ export class BattleScene extends Scene {
             },
             21,
         );
-        makeButton(this, 612, 566, 170, 44, 'MENU', () => this.scene.start('Menu'), 21);
+        makeButton(this, 612, 566, 170, 44, COMMON.menu, () => this.scene.start('Menu'), 21);
     }
 
     private showReplayCode(code: string, hintY: number): void {
         const copyLabel = this.add
-            .text(512, hintY + 26, 'REPLAY CODE - CLICK CODE TO COPY', FONTS.monoSmall)
+            .text(512, hintY + 26, BATTLE.replayLabel, FONTS.monoSmall)
             .setOrigin(0.5)
             .setDepth(20);
         const codeText = this.add
@@ -1164,9 +1148,9 @@ export class BattleScene extends Scene {
         codeText.setInteractive({ useHandCursor: true });
         codeText.on('pointerdown', () => {
             void copyText(code).then((ok) => {
-                copyLabel.setText(ok ? 'REPLAY CODE - COPIED!' : 'REPLAY CODE - COPY FAILED');
+                copyLabel.setText(ok ? BATTLE.replayCopied : BATTLE.replayCopyFailed);
                 this.time.delayedCall(1500, () => {
-                    copyLabel.setText('REPLAY CODE - CLICK CODE TO COPY');
+                    copyLabel.setText(BATTLE.replayLabel);
                 });
             });
         });
@@ -1176,6 +1160,6 @@ export class BattleScene extends Scene {
         const robotId = this.request.lineupIds[id] as string;
         const source = ROBOT_SOURCES[robotId];
         if (source === undefined) return;
-        downloadText(`${robotId}.ts`, source);
+        downloadText(tsFilename(robotId), source);
     }
 }
