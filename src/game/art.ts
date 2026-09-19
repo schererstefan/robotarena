@@ -47,6 +47,9 @@ const TOWER_FOR_ROBOT: Record<string, string> = {
     turret: 'tower_heavy',
     orbiter: 'tower_light',
     wanderer: 'tower_light',
+    sniper: 'tower_heavy',
+    brawler: 'tower_twin',
+    ghost: 'tower_light',
 };
 
 function bake(scene: Scene, key: string, map: PixelMap): void {

@@ -1,0 +1,63 @@
+// Ghost: a fast hit-and-run scout. Darts into gun range while the gun is
+// ready, fires, then breaks away on the cooldown and circles for the next
+// pass. Never trades shots standing still.
+
+import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
+import { angleDiff, TAU } from '../sim/math';
+import type { SkillLoadout } from '../sim/skills';
+import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
+import { aimed, aimTurret, steerTo } from './common';
+
+export const meta: RobotMeta = {
+    id: 'ghost',
+    name: 'Ghost',
+    author: 'RobotArena',
+    version: '1.0.0',
+    description: 'Fast hit-and-run scout: darts in on a ready gun, vanishes on cooldown.',
+};
+
+export const loadout: SkillLoadout = { overdrive: 2, gyro: 2, wideband: 1, trigger: 1 };
+
+export function create(): RobotController {
+    const orbitDir = 1;
+    let lastX = ARENA_WIDTH / 2;
+    let lastY = ARENA_HEIGHT / 2;
+
+    function update(sense: SenseState): Intent {
+        const self = sense.self;
+        const foe = sense.foes[0];
+        if (foe) {
+            lastX = foe.x;
+            lastY = foe.y;
+        }
+        const goalX = foe ? foe.x : lastX;
+        const goalY = foe ? foe.y : lastY;
+        const toGoal = Math.atan2(goalY - self.y, goalX - self.x);
+
+        // Gun ready: run at the target. Cooling down: break away tangentially
+        // so the pass becomes an orbit, not a retreat into a corner.
+        let drive = toGoal;
+        if (foe) {
+            const tangent = toGoal + (orbitDir * Math.PI) / 2;
+            const strikeRange = self.stats.gunRange * 0.85;
+            if (self.cooldown > 0 || foe.distance < strikeRange * 0.7) {
+                drive = tangent;
+                if (foe.distance < strikeRange * 0.45) drive = toGoal + Math.PI;
+            }
+            drive = ((drive % TAU) + TAU) % TAU;
+        }
+        const turn = steerTo(self.heading, drive);
+        const facing = Math.abs(angleDiff(self.heading, drive)) < 1.1;
+        const towerTurn = foe ? aimTurret(self.tower, foe.bearing) : 1; // wide sweep
+        const fire = foe !== undefined && foe.distance < self.stats.gunRange && aimed(self.tower, foe.bearing);
+        return {
+            throttle: facing ? 1 : 0.4,
+            turn,
+            towerTurn,
+            fire,
+            charge: false,
+        };
+    }
+
+    return { meta, loadout, update };
+}

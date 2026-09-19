@@ -145,6 +145,22 @@ Modded matches replay exactly via the same replay codes.
 `onSpawn(sense)` is optional and runs once at spawn (good for picking anchors or
 initial headings).
 
+## Built-in robots
+
+Eight bots ship in `src/robots/` (registry order is append-only: replay codes
+index into it). Study them before writing your own.
+
+| Bot | Style | Default build |
+| --- | ----- | ------------- |
+| Rusher | Charges the nearest foe head-on, weaving while it closes. | `OVR3 TRG1 PLT2` |
+| Turret | Parks on a defensive anchor, spins its tower, leads shots. | `SRV1 SCN2 TRG2 MRK1` |
+| Orbiter | Circle-strafes at mid range. | `OVR2 GYR2 TRG1 PLT1` |
+| Wanderer | Roams random waypoints, snaps shots at whatever it sees. | `OVR2 SCN2 WND2` |
+| Hunter | Pursues the weakest foe and leads its shots; banks charge at range. | `TRG2 MRK1 CHG2 PLT1` |
+| Sniper | Camps a deep backfield anchor; charged long-range shots, retreats when rushed. | `SCN2 TRG1 MRK2 CHG1` |
+| Brawler | Plated bruiser; walks the gun into the clinch and rams through. | `OVR2 TRG2 PLT2` |
+| Ghost | Hit-and-run scout: strikes on a ready gun, breaks away on cooldown. | `OVR2 GYR2 WND1 TRG1` |
+
 ## Test your robot
 
 ```sh
