@@ -43,6 +43,11 @@ export class MenuScene extends Scene {
 
     create(): void {
         ensureArtTextures(this);
+        // create() re-runs on every visit: drop references to destroyed objects.
+        this.modeButtons = [];
+        this.slotObjects = [];
+        this.editorObjects = [];
+        this.editorSlot = -1;
         this.add.text(CX, 44, 'ROBOTARENA', FONTS.title).setOrigin(0.5);
         this.add
             .text(CX, 86, 'same budget. same catalog. only the code differs.', FONTS.small)
@@ -206,7 +211,8 @@ export class MenuScene extends Scene {
         const id = this.lineupIds[slot] as string;
         const entry = ROBOTS.find((r) => r.meta.id === id) ?? ROBOTS[0]!;
 
-        this.trackEditor(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50));
+        // Backdrop swallows clicks so menu controls beneath can't fire.
+        this.trackEditor(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50).setInteractive());
         this.trackEditor(this.add.rectangle(CX, 384, 740, 560, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
         this.trackEditor(this.add.text(CX, 140, `SLOT ${slot + 1} LOADOUT`, FONTS.heading).setOrigin(0.5).setDepth(50));
         this.trackEditor(this.add.text(CX, 166, `${entry.meta.name} - ${entry.meta.description}`, FONTS.small).setOrigin(0.5).setDepth(50));
