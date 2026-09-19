@@ -6,7 +6,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
 import { angleDiff, TAU } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
-import { aimed, aimTurret, steerTo } from './common';
+import { aimed, aimTurret, createStallTracker, steerTo } from './common';
 
 export const meta: RobotMeta = {
     id: 'ghost',
@@ -16,16 +16,19 @@ export const meta: RobotMeta = {
     description: 'Fast hit-and-run scout: darts in on a ready gun, vanishes on cooldown.',
 };
 
-export const loadout: SkillLoadout = { overdrive: 2, gyro: 2, wideband: 1, trigger: 1 };
+export const loadout: SkillLoadout = { overdrive: 2, gyro: 2, wideband: 1, scout: 1 };
 
 export function create(): RobotController {
     const orbitDir = 1;
     let lastX = ARENA_WIDTH / 2;
     let lastY = ARENA_HEIGHT / 2;
+    const stall = createStallTracker();
 
     function update(sense: SenseState): Intent {
         const self = sense.self;
-        const foe = sense.foes[0];
+        // Scout blips are live positions: chase them like contacts. The tower
+        // swings onto the blip bearing and converts it to a real sighting.
+        const foe = sense.foes[0] ?? sense.scout[0];
         if (foe) {
             lastX = foe.x;
             lastY = foe.y;
@@ -44,8 +47,10 @@ export function create(): RobotController {
                 drive = tangent;
                 if (foe.distance < strikeRange * 0.45) drive = toGoal + Math.PI;
             }
-            drive = ((drive % TAU) + TAU) % TAU;
         }
+        // Pinned on a wall or block (blips lure through cover): sidestep off.
+        if (stall.update(sense.tick, self.x, self.y, true)) drive += Math.PI / 2;
+        drive = ((drive % TAU) + TAU) % TAU;
         const turn = steerTo(self.heading, drive);
         const facing = Math.abs(angleDiff(self.heading, drive)) < 1.1;
         const towerTurn = foe ? aimTurret(self.tower, foe.bearing) : 1; // wide sweep

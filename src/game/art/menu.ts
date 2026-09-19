@@ -1,4 +1,4 @@
-// Menu/UI pixel-art drafts: 9 skill icons (8x8), panel chrome tile (16x16),
+// Menu/UI pixel-art drafts: 13 skill icons (8x8), panel chrome tile (16x16),
 // logo underline bar (32x8). Same string pixel-map format as src/game/art.ts.
 // Palette chars: . = transparent, k d m l w r g y (no additions needed).
 
@@ -104,6 +104,50 @@ export const SKILL_ICONS: Record<string, PixelMap> = {
         '.w.ww.w.',
         '..wwww..',
         '...ww...',
+    ],
+    // Repair cross: bold plus (nanorepair).
+    nanorepair: [
+        '...ww...',
+        '...ww...',
+        '...ww...',
+        'wwwwwwww',
+        'wwwwwwww',
+        '...ww...',
+        '...ww...',
+        '...ww...',
+    ],
+    // Triple speed lines, staggered (slipstream).
+    slipstream: [
+        '........',
+        '.wwww...',
+        '........',
+        '...wwwww',
+        '........',
+        '.wwww...',
+        '........',
+        '........',
+    ],
+    // Diamond reticle with a filled center (deadeye).
+    deadeye: [
+        '...ww...',
+        '..wwww..',
+        '.ww..ww.',
+        'ww.ww.ww',
+        'ww.ww.ww',
+        '.ww..ww.',
+        '..wwww..',
+        '...ww...',
+    ],
+    // Watchful eye: almond with a pupil (scout).
+    scout: [
+        '........',
+        '........',
+        '..wwww..',
+        '.wwwwww.',
+        'ww.ww.ww',
+        '.wwwwww.',
+        '..wwww..',
+        '........',
     ],
 };
 

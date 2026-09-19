@@ -67,6 +67,14 @@ export interface SenseState {
     /** Teammates are always known (radio link). */
     allies: SensedRobot[];
     /**
+     * Out-of-cone foe blips from the scout skill (empty without it).
+     * Position-only: `id`, `team`, `x`, `y`, `distance`, and `bearing` are
+     * valid, but `heading`, `speed`, and `health` are always 0. Covers foes
+     * within 2x your sensor range that your tower cone does not currently
+     * see (never duplicates `foes`). Sorted nearest first.
+     */
+    scout: SensedRobot[];
+    /**
      * Foe sightings shared by allies, delivered 30 ticks late. Position-only:
      * `id`, `team`, `x`, `y`, `distance`, and `bearing` are valid, but
      * `heading`, `speed`, and `health` are always 0 (never shared). Sorted

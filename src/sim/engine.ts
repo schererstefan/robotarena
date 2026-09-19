@@ -1,7 +1,7 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSOR_SHARE_DELAY, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
+import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSOR_SHARE_DELAY, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
 import { angleDiff, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
@@ -272,13 +272,16 @@ export class Match {
             const slow = intent.charge && canCharge ? 0.75 : 1;
             const top = robot.stats.maxSpeed * slow;
             const target = intent.throttle >= 0 ? intent.throttle * top : intent.throttle * top * REVERSE_FACTOR;
-            const dv = clamp(target - robot.speed, -ACCEL * DT, ACCEL * DT);
+            const dv = clamp(target - robot.speed, -robot.stats.accel * DT, robot.stats.accel * DT);
             robot.speed += dv;
             robot.heading = wrapAngle(robot.heading + intent.turn * robot.stats.turnRate * DT);
             robot.tower = wrapAngle(robot.tower + intent.towerTurn * robot.stats.towerRate * DT);
             robot.x += Math.cos(robot.heading) * robot.speed * DT;
             robot.y += Math.sin(robot.heading) * robot.speed * DT;
             if (robot.cooldown > 0) robot.cooldown -= 1;
+            if (robot.stats.regen > 0 && robot.health < robot.stats.maxHealth) {
+                robot.health = Math.min(robot.stats.maxHealth, robot.health + robot.stats.regen * DT);
+            }
         });
         this.collideWalls();
         this.collideRobots();
@@ -369,6 +372,7 @@ export class Match {
     private sense(robot: Robot): SenseState {
         const foes: SensedRobot[] = [];
         const allies: SensedRobot[] = [];
+        const scout: SensedRobot[] = [];
         for (const other of this.robots) {
             if (other.id === robot.id || !other.alive) continue;
             const d = dist(robot.x, robot.y, other.x, other.y);
@@ -388,10 +392,23 @@ export class Match {
                 allies.push(sensed);
             } else if (Match.sees(robot, other)) {
                 foes.push(sensed);
+            } else if (robot.stats.scoutRange > 0 && d <= robot.stats.scoutRange) {
+                scout.push({
+                    id: other.id,
+                    team: other.team,
+                    x: other.x,
+                    y: other.y,
+                    heading: 0,
+                    speed: 0,
+                    health: 0,
+                    distance: d,
+                    bearing,
+                });
             }
         }
         foes.sort((a, b) => a.distance - b.distance);
         allies.sort((a, b) => a.id - b.id);
+        scout.sort((a, b) => a.distance - b.distance);
         this.recordAllySightings(robot);
         const shared = this.sharedSightings(robot, new Set(foes.map((f) => f.id)));
         return {
@@ -415,6 +432,7 @@ export class Match {
             },
             foes,
             allies,
+            scout,
             shared,
             walls: {
                 left: robot.x,

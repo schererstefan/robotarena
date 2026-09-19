@@ -50,6 +50,7 @@ y grows downward). The sim ticks at 60 Hz.
 | `self`         | Your `id`, `team`, `x`, `y`, `heading`, `tower`, `speed`, `health`, gun `cooldown` (ticks until ready, `0` = ready), plus `stats` (effective values after skills), `charge`/`charged` (banked charge), and your `loadout`. |
 | `foes`         | Opponents **inside your sensor cone** this tick, nearest first: position, heading, speed, health, `distance`, absolute `bearing`. Empty when blind. |
 | `allies`       | Teammates, always known (radio link), same fields as foes.               |
+| `scout`        | Out-of-cone foe blips from the scout skill (empty without it), nearest first: live `x`, `y`, `distance`, `bearing`, but `heading`, `speed`, `health` always `0`. Covers foes within 2× your sensor range; never duplicates `foes`. |
 | `shared`       | Foe sightings shared by allies, delivered **30 ticks late**, nearest first. Position-only: `id`, `team`, `x`, `y`, `distance`, `bearing` are valid; `heading`, `speed`, `health` are always `0`. Never includes foes you see yourself, your own sightings echoed back, dead foes, or anything in 1v1 (no allies). |
 | `walls`        | Distance to each arena wall: `left`, `right`, `top`, `bottom`.           |
 | `rand()`       | Deterministic random draw in `[0, 1)`. Use this for any randomness.      |
@@ -58,7 +59,10 @@ Sensor cone: 540 units range, ~63° wide, centered on your `tower` angle. You on
 see foes your tower points at — scanning is part of the game. In team games,
 allies radio you their sightings 30 ticks late via `shared`: stale,
 position-only blips (no health). Treat them as "was there half a second ago,"
-not as targeting data.
+not as targeting data. The scout skill adds a second channel, `scout`: live
+position-only blips (no health) for foes anywhere within 2× your sensor range,
+even behind you. Unlike `shared`, blips are current positions — swinging your
+tower onto a blip bearing converts it into a full sighting.
 
 ## What you return: `Intent`
 
@@ -91,6 +95,10 @@ constants — read your effective values from `sense.self.stats` instead.
 | Marksman (MRK) | 2   | +12% gun range                                               |
 | Charger (CHG)  | 2   | Unlock charge banking; rank 2 banks faster (20 vs 30 ticks)  |
 | Plating (PLT)  | 2   | +15 max health                                               |
+| NanoRepair (NRP)| 2  | +1.5 HP/s health regen                                       |
+| Slipstream (SLP)| 2  | +25% acceleration                                            |
+| Deadeye (DDY)  | 3   | +10% bullet speed                                            |
+| Scout (SCT)    | 1   | Out-of-cone foe blips at 2× sensor range (no health)         |
 
 **Charge mechanic:** with the charger skill, holding `charge` while the gun is
 ready banks up to a full charge. Holding `charge` slows drive to 75% whenever
@@ -103,7 +111,10 @@ stacking; towers pre-aim at the nearest foe on spawn; bullets spawn 18 units
 ahead of center and that head start counts against range; each robot gets an
 independent random stream per tick, so your `rand()` draws never shift another
 robot's; match seeds are coerced with `>>> 0` (fractional/negative/NaN seeds
-alias — use positive integers).
+alias — use positive integers). NanoRepair regen caps at max health and ticks
+every tick, even during sudden death; Slipstream only changes how fast you
+reach top speed, not the top speed itself; Deadeye's faster bullets still die
+at the same gun range; Scout blips never include foes your cone already sees.
 
 **Validation:** ranks clamp to max, unknown ids drop, and over-budget loadouts
 shed ranks from the end of the catalog until legal. Same loadout + same seed
@@ -157,9 +168,9 @@ index into it). Study them before writing your own.
 | Orbiter | Circle-strafes at mid range. | `OVR2 GYR2 TRG1 PLT1` |
 | Wanderer | Roams random waypoints, snaps shots at whatever it sees. | `OVR2 SCN2 WND2` |
 | Hunter | Pursues the weakest foe and leads its shots; banks charge at range. | `TRG2 MRK1 CHG2 PLT1` |
-| Sniper | Camps a deep backfield anchor; charged long-range shots, retreats when rushed. | `SCN2 TRG1 MRK2 CHG1` |
+| Sniper | Camps a deep backfield anchor; charged long-range shots, retreats when rushed. | `SCN2 MRK2 CHG1 DDY1` |
 | Brawler | Plated bruiser; walks the gun into the clinch and rams through. | `OVR2 TRG2 PLT2` |
-| Ghost | Hit-and-run scout: strikes on a ready gun, breaks away on cooldown. | `OVR2 GYR2 WND1 TRG1` |
+| Ghost | Hit-and-run scout: strikes on a ready gun, breaks away on cooldown. | `OVR2 GYR2 WND1 SCT1` |
 
 ## Test your robot
 

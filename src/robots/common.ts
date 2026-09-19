@@ -35,3 +35,35 @@ export function manageCharge(charged: boolean, shotReady: boolean): boolean {
     if (charged) return false; // banked: drive free, fire at will
     return !shotReady; // bank while the gun isn't about to speak
 }
+
+/**
+ * Stall recovery: samples position every 30 ticks and reports a stall when
+ * the drive intends motion but the chassis barely moved (pinned on a wall,
+ * a block, or another robot). While stalled (next 30 ticks), the caller
+ * should sidestep instead of pushing. Deterministic: tick + odometry only.
+ */
+export function createStallTracker(): {
+    update: (tick: number, x: number, y: number, moving: boolean) => boolean;
+} {
+    let sx = 0;
+    let sy = 0;
+    let sampled = -1;
+    let until = -1;
+    return {
+        update(tick: number, x: number, y: number, moving: boolean): boolean {
+            if (sampled < 0) {
+                sx = x;
+                sy = y;
+                sampled = tick;
+            }
+            if (tick - sampled >= 30) {
+                const moved = Math.hypot(x - sx, y - sy);
+                sx = x;
+                sy = y;
+                sampled = tick;
+                if (moving && moved < 10) until = tick + 30;
+            }
+            return tick < until;
+        },
+    };
+}

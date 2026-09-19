@@ -399,7 +399,7 @@ export class MenuScene extends Scene {
         this.editorPoints.setColor(spent >= SKILL_BUDGET ? '#ffd23f' : COLORS.ink);
 
         SKILL_DEFS.forEach((def, row) => {
-            const y = 232 + row * 38;
+            const y = 226 + row * 30;
             const rank = rankOf(loadout, def.id);
             this.trackEditor(this.add.image(152, y + 4, skillIconKey(def.id)).setScale(2).setDepth(50));
             this.trackEditor(this.add.text(180, y, `${def.code}  ${def.name}`, FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(50));
@@ -416,7 +416,7 @@ export class MenuScene extends Scene {
             plus.on('pointerdown', () => this.bumpSkill(def.id, 1));
         });
 
-        const footer = 232 + SKILL_DEFS.length * 38 + 8;
+        const footer = 226 + SKILL_DEFS.length * 30 + 8;
         const random = this.trackEditor(this.add.rectangle(CX - 150, footer, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
         this.trackEditor(this.add.text(CX - 150, footer, 'RANDOM', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         random.setInteractive({ useHandCursor: true });

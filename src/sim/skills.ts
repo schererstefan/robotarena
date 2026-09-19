@@ -11,7 +11,11 @@ export type SkillId =
     | 'trigger'
     | 'marksman'
     | 'charger'
-    | 'plating';
+    | 'plating'
+    | 'nanorepair'
+    | 'slipstream'
+    | 'deadeye'
+    | 'scout';
 
 export interface SkillDef {
     id: SkillId;
@@ -31,6 +35,11 @@ export const SKILL_DEFS: SkillDef[] = [
     { id: 'marksman', code: 'MRK', name: 'Marksman', desc: '+12% gun range per rank', maxRank: 2 },
     { id: 'charger', code: 'CHG', name: 'Charger', desc: 'hold charge: bank bonus damage (rank 2: faster)', maxRank: 2 },
     { id: 'plating', code: 'PLT', name: 'Plating', desc: '+15 max health per rank', maxRank: 2 },
+    // Catalog v2: appended, never reordered (replay codes index into this).
+    { id: 'nanorepair', code: 'NRP', name: 'NanoRepair', desc: '+1.5 HP/s regen per rank', maxRank: 2 },
+    { id: 'slipstream', code: 'SLP', name: 'Slipstream', desc: '+25% acceleration per rank', maxRank: 2 },
+    { id: 'deadeye', code: 'DDY', name: 'Deadeye', desc: '+10% bullet speed per rank', maxRank: 3 },
+    { id: 'scout', code: 'SCT', name: 'Scout', desc: 'sense out-of-cone foe blips at 2x range (no health)', maxRank: 1 },
 ];
 
 export const SKILL_BUDGET = 6;
@@ -94,9 +103,16 @@ export interface RobotStats {
     maxHealth: number;
     chargeTicks: number;
     chargeMult: number;
+    /** Acceleration in units/s^2 (slipstream). */
+    accel: number;
+    /** Health regenerated per second (nanorepair). 0 without the skill. */
+    regen: number;
+    /** Out-of-cone blip range, 2x sensor range (scout). 0 without the skill. */
+    scoutRange: number;
 }
 
 import {
+    ACCEL,
     BULLET_DAMAGE,
     BULLET_SPEED,
     GUN_COOLDOWN_TICKS,
@@ -120,19 +136,27 @@ export function computeStats(loadout: SkillLoadout): RobotStats {
     const marksman = capped('marksman');
     const charger = capped('charger');
     const plating = capped('plating');
+    const nanorepair = capped('nanorepair');
+    const slipstream = capped('slipstream');
+    const deadeye = capped('deadeye');
+    const scout = capped('scout');
+    const sensorRange = SENSOR_RANGE * (1 + 0.15 * longscan);
     return {
         maxSpeed: MAX_SPEED * (1 + 0.08 * overdrive),
         turnRate: TURN_RATE * (1 + 0.12 * gyro),
         towerRate: TOWER_RATE * (1 + 0.12 * servos),
-        sensorRange: SENSOR_RANGE * (1 + 0.15 * longscan),
+        sensorRange,
         sensorFov: SENSOR_FOV + 0.25 * wideband,
         gunRange: GUN_RANGE * (1 + 0.12 * marksman),
         cooldownTicks: Math.max(8, GUN_COOLDOWN_TICKS - 3 * trigger),
-        bulletSpeed: BULLET_SPEED,
+        bulletSpeed: BULLET_SPEED * (1 + 0.1 * deadeye),
         damage: BULLET_DAMAGE,
         maxHealth: START_HEALTH + 15 * plating,
         chargeTicks: charger >= 2 ? 20 : 30,
         chargeMult: charger >= 1 ? 2 : 1,
+        accel: ACCEL * (1 + 0.25 * slipstream),
+        regen: 1.5 * nanorepair,
+        scoutRange: scout >= 1 ? sensorRange * 2 : 0,
     };
 }
 

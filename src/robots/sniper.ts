@@ -5,7 +5,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
 import { dist } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SensedRobot, SenseState } from '../sim/types';
-import { aimed, aimTurret, manageCharge, steerTo } from './common';
+import { aimed, aimTurret, createStallTracker, manageCharge, steerTo } from './common';
 
 export const meta: RobotMeta = {
     id: 'sniper',
@@ -15,7 +15,7 @@ export const meta: RobotMeta = {
     description: 'Camps backfield and lands charged long-range shots. Do not stand still.',
 };
 
-export const loadout: SkillLoadout = { marksman: 2, longscan: 2, charger: 1, trigger: 1 };
+export const loadout: SkillLoadout = { marksman: 2, longscan: 2, charger: 1, deadeye: 1 };
 
 function leadAngle(selfX: number, selfY: number, bulletSpeed: number, foe: SensedRobot): number {
     const flightTime = foe.distance / bulletSpeed;
@@ -28,6 +28,7 @@ export function create(): RobotController {
     let anchorX = 0;
     let anchorY = 0;
     let anchored = false;
+    const stall = createStallTracker();
 
     function onSpawn(sense: SenseState): void {
         // Deeper than the turret: maximum standoff for the long gun.
@@ -45,19 +46,22 @@ export function create(): RobotController {
         // Rushed: kite away at full drive to re-establish standoff range.
         const rushed = foe !== undefined && foe.distance < self.stats.gunRange * 0.5;
         let throttle = 0;
-        let turn = 0;
+        let goal = self.heading;
         if (rushed && foe) {
-            const away = Math.atan2(self.y - foe.y, self.x - foe.x);
+            goal = Math.atan2(self.y - foe.y, self.x - foe.x);
             throttle = 1;
-            turn = steerTo(self.heading, away);
         } else if (!anchored) {
-            const goal = Math.atan2(anchorY - self.y, anchorX - self.x);
+            goal = Math.atan2(anchorY - self.y, anchorX - self.x);
             throttle = 0.8;
-            turn = steerTo(self.heading, goal);
         } else {
-            const mid = Math.atan2(ARENA_HEIGHT / 2 - self.y, ARENA_WIDTH / 2 - self.x);
-            turn = steerTo(self.heading, mid, 1.5);
+            goal = Math.atan2(ARENA_HEIGHT / 2 - self.y, ARENA_WIDTH / 2 - self.x);
         }
+        // Pinned kiting into a wall or block: sidestep along it instead of
+        // pushing, so the kite never degrades into a static trade.
+        if (throttle !== 0 && stall.update(sense.tick, self.x, self.y, true)) {
+            goal += Math.PI / 2;
+        }
+        const turn = steerTo(self.heading, goal, throttle === 0 ? 1.5 : 2.5);
 
         let towerTurn = 0.5; // slow scan while blind
         let fire = false;
@@ -67,11 +71,11 @@ export function create(): RobotController {
             towerTurn = aimTurret(self.tower, shot);
             const inRange = foe.distance < self.stats.gunRange;
             const onTarget = aimed(self.tower, shot, 0.05);
-            // Only the longest shots wait for a full bank; inside 75% of
-            // range the gun speaks whenever it bears, charged or not.
-            const longShot = foe.distance > self.stats.gunRange * 0.75;
-            fire = inRange && onTarget && (!longShot || self.charged);
-            charge = inRange && !fire ? manageCharge(self.charged, onTarget && !longShot) : false;
+            // The longest shots and kiting parting shots wait for a full
+            // bank; otherwise the gun speaks whenever it bears.
+            const holdForBank = foe.distance > self.stats.gunRange * 0.75 || rushed;
+            fire = inRange && onTarget && (!holdForBank || self.charged);
+            charge = inRange && !fire ? manageCharge(self.charged, onTarget && !holdForBank) : false;
         }
         return { throttle, turn, towerTurn, fire, charge };
     }

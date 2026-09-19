@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSOR_RANGE, SENSOR_SHARE_DELAY, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, GUN_RANGE, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSOR_RANGE, SENSOR_SHARE_DELAY, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
@@ -21,7 +21,7 @@ import {
     winRates,
 } from '../src/game/history';
 import { ROBOTS } from '../src/robots/registry';
-import { computeStats, loadoutCost, sanitizeLoadout, type SkillLoadout } from '../src/sim/skills';
+import { computeStats, loadoutCode, loadoutCost, sanitizeLoadout, type SkillLoadout } from '../src/sim/skills';
 import type { Intent, RobotController, SenseState } from '../src/sim/types';
 import { initialRound, nextRound, roundName, tiebreakWinner } from '../src/game/tournament';
 
@@ -211,6 +211,161 @@ console.log('skills');
     );
     for (let i = 0; i < 40 && !fm.result.over; i += 1) fm.step();
     check('charger match completes', fm.result.tick > 0);
+
+    // Catalog v2: appended passives (NanoRepair, Slipstream, Deadeye, Scout).
+    const v2 = computeStats({ nanorepair: 2, slipstream: 2, deadeye: 3, scout: 1 });
+    check('nanorepair 2 = 3 HP/s regen', v2.regen === 3);
+    check('slipstream 2 = +50% accel', Math.abs(v2.accel - ACCEL * 1.5) < 0.001);
+    check('slipstream keeps top speed', computeStats({ slipstream: 2 }).maxSpeed === MAX_SPEED);
+    check('deadeye 3 = +30% bullet speed', Math.abs(v2.bulletSpeed - BULLET_SPEED * 1.3) < 0.001);
+    check('deadeye keeps gun range', computeStats({ deadeye: 3 }).gunRange === GUN_RANGE);
+    check('scout 1 = 2x sensor range blips', v2.scoutRange === v2.sensorRange * 2);
+    check('no scout = zero blip range', computeStats({}).scoutRange === 0);
+    check('scout clamps to max 1', sanitizeLoadout({ scout: 5 }).scout === 1);
+    check('deadeye clamps to max 3', sanitizeLoadout({ deadeye: 9 }).deadeye === 3);
+    const shedV2 = sanitizeLoadout({ overdrive: 3, trigger: 3, scout: 1 });
+    check('over-budget sheds from catalog end first', loadoutCost(shedV2) === 6 && shedV2.scout === undefined);
+    check('new codes render in catalog order', loadoutCode({ scout: 1, deadeye: 2, nanorepair: 1 }) === 'NRP1 DDY2 SCT1');
+
+    const sitter: RobotController = {
+        meta: { id: 'sitter', name: 'Sitter', author: 'test', version: '0', description: '' },
+        update: (): Intent => ({ throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false }),
+    };
+    const gunner: RobotController = {
+        meta: { id: 'gunner', name: 'Gunner', author: 'test', version: '0', description: '' },
+        update: (): Intent => ({ throttle: 1, turn: 0, towerTurn: 0, fire: true, charge: false }),
+    };
+    // Regen: identical damage in both matches, so the gap is pure regen ticks.
+    const regenDuel = (loadout: SkillLoadout): Match =>
+        new Match(
+            [
+                { team: 0, controller: sitter, loadout },
+                { team: 1, controller: gunner },
+            ],
+            3,
+        );
+    const bleed = regenDuel({});
+    let firstBlood = -1;
+    for (let i = 0; i < 2000; i += 1) {
+        bleed.step();
+        if ((bleed.robotSnapshots[0]?.health ?? 100) < 100) {
+            firstBlood = i + 1;
+            break;
+        }
+    }
+    check('regen probe takes a hit', firstBlood > 0);
+    if (firstBlood > 0) {
+        const hpAt = (loadout: SkillLoadout): number => {
+            const m = regenDuel(loadout);
+            for (let i = 0; i < firstBlood + 60; i += 1) m.step();
+            return m.robotSnapshots[0]?.health ?? -1;
+        };
+        const plainHp = hpAt({});
+        const regenHp = hpAt({ nanorepair: 2 });
+        // 60 ticks below max at 3 HP/s = exactly +3 HP of regen.
+        check(
+            'regen heals exactly 3 HP/s in-match',
+            plainHp > 0 && Math.abs(regenHp - plainHp - 3) < 0.01,
+            `plain=${plainHp.toFixed(1)} regen=${regenHp.toFixed(1)}`,
+        );
+    }
+    // Slipstream: same top speed, reached sooner, so further along at tick 45.
+    const dragRacer: RobotController = {
+        meta: { id: 'drag', name: 'Drag', author: 'test', version: '0', description: '' },
+        update: (): Intent => ({ throttle: 1, turn: 0, towerTurn: 0, fire: false, charge: false }),
+    };
+    const distanceAt45 = (loadout: SkillLoadout): number => {
+        const m = new Match(
+            [
+                { team: 0, controller: dragRacer, loadout },
+                { team: 1, controller: sitter },
+            ],
+            3,
+        );
+        for (let i = 0; i < 45; i += 1) m.step();
+        return m.robotSnapshots[0]?.x ?? -1;
+    };
+    check('slipstream out-accelerates stock', distanceAt45({ slipstream: 2 }) > distanceAt45({}));
+    // Deadeye: per-tick bullet displacement matches the faster muzzle velocity.
+    const bulletPace = (loadout: SkillLoadout): number => {
+        const m = new Match(
+            [
+                { team: 0, controller: gunner, loadout },
+                { team: 1, controller: sitter },
+            ],
+            3,
+        );
+        m.step();
+        const before = m.bulletSnapshots[0];
+        for (let i = 0; i < 10; i += 1) m.step();
+        const after = m.bulletSnapshots[0];
+        if (!before || !after) return -1;
+        return Math.hypot(after.x - before.x, after.y - before.y) / 10;
+    };
+    check('stock bullet pace is 430 u/s', Math.abs(bulletPace({}) - BULLET_SPEED * DT) < 0.001);
+    check('deadeye 3 bullet pace is +30%', Math.abs(bulletPace({ deadeye: 3 }) - BULLET_SPEED * 1.3 * DT) < 0.001);
+    // Scout: the spawn gap (700) sits beyond cone range (540) but inside
+    // blip range (1080), so the spy opens on a blip and converts it to a
+    // full sighting (never a duplicate) as it closes in.
+    interface ScoutEntry {
+        foes: number;
+        scout: number;
+        x: number;
+        y: number;
+        health: number;
+        heading: number;
+        speed: number;
+    }
+    const runScoutSpy = (loadout: SkillLoadout): ScoutEntry[] => {
+        const log: ScoutEntry[] = [];
+        const spy: RobotController = {
+            meta: { id: 'spy', name: 'Spy', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                const blip = sense.scout[0];
+                log.push({
+                    foes: sense.foes.length,
+                    scout: sense.scout.length,
+                    x: blip?.x ?? -1,
+                    y: blip?.y ?? -1,
+                    health: blip?.health ?? -1,
+                    heading: blip?.heading ?? -1,
+                    speed: blip?.speed ?? -1,
+                });
+                return { throttle: 1, turn: 0, towerTurn: 0, fire: false, charge: false };
+            },
+        };
+        const m = new Match(
+            [
+                { team: 0, controller: spy, loadout },
+                { team: 1, controller: sitter },
+            ],
+            3,
+        );
+        for (let i = 0; i < 150; i += 1) m.step();
+        return log;
+    };
+    const scoutLog = runScoutSpy({ scout: 1 });
+    const first = scoutLog[0];
+    const closed = scoutLog[120];
+    check(
+        'distant foe opens as a position-only blip',
+        first !== undefined && first.foes === 0 && first.scout === 1,
+        `foes=${first?.foes} scout=${first?.scout}`,
+    );
+    check(
+        'blip is live position, zero health/heading/speed',
+        first !== undefined && first.x === 830 && first.y === 320 && first.health === 0 && first.heading === 0 && first.speed === 0,
+        `x=${first?.x} y=${first?.y} hp=${first?.health}`,
+    );
+    check(
+        'seen foes convert, never duplicate as blips',
+        closed !== undefined && closed.foes === 1 && closed.scout === 0,
+        `foes=${closed?.foes} scout=${closed?.scout}`,
+    );
+    check(
+        'no scout skill means no blips',
+        runScoutSpy({}).every((entry) => entry.scout === 0),
+    );
 }
 
 // --- 5. Soak: 1v1 round-robin, 2v2, 3v3 (every arena) -----------------------
@@ -472,7 +627,8 @@ console.log('replay');
     check('registry lineups use the compact RA2 format', valid.startsWith('RA2-'));
     check('compact 1v1 code fits on one results line', valid.length <= 40);
     const big = encodeReplay(specs[1] as ReplaySpec);
-    check('compact 3v3 code stays short', big.length <= 64);
+    // 65 chars at 13 skills; 72 covers the 15-skill codec ceiling.
+    check('compact 3v3 code stays short', big.length <= 72);
     check('truncated code rejected', decodeReplay(valid.slice(0, -4)) === null);
     {
         // Flip one body character of a compact code: the checksum must catch it.
