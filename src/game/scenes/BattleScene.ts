@@ -7,11 +7,11 @@ import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS, isExhibition, modifierCode
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import { clamp } from '../../sim/math';
 import { encodeReplay } from '../../sim/replay';
-import { ROBOTS } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
 import { chassisKey, ensureArtTextures, towerKey, wreckKey } from '../art';
 import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unlockAudio } from '../audio';
 import { recordDailyResult, recordMatch } from '../history';
+import { displayRobotId, isImportedId, resolveLineupEntry } from '../importRobot';
 import { createPilotController, PilotInput } from '../pilot';
 import { COLORS, FONTS } from '../theme';
 import { markTutorialSeen } from '../tutorial';
@@ -118,6 +118,7 @@ export class BattleScene extends Scene {
     private obstacles: ArenaObstacle[] = [];
     private sdAnnounced = false;
     private exhibition = false;
+    private customMatch = false;
     private tutStep = 0;
     private tutTitle!: Phaser.GameObjects.Text;
     private tutBody!: Phaser.GameObjects.Text;
@@ -162,6 +163,7 @@ export class BattleScene extends Scene {
         this.dmgCursor = 0;
         this.indicators = [];
         this.pilot = null;
+        this.customMatch = false;
         this.tutStep = 0;
         this.tutNext = null;
         this.sdAnnounced = false;
@@ -173,7 +175,7 @@ export class BattleScene extends Scene {
         // input through the same Intent pipeline (no sim changes).
         this.pilot = this.request.pilot === true ? new PilotInput() : null;
         const lineups: LineupEntry[] = this.request.lineupIds.map((id, i) => {
-            const entry = ROBOTS.find((r) => r.meta.id === id) ?? ROBOTS[0]!;
+            const entry = resolveLineupEntry(id);
             const controller =
                 i === 0 && this.pilot
                     ? createPilotController(entry.meta, entry.loadout, this.pilot)
@@ -186,7 +188,9 @@ export class BattleScene extends Scene {
         });
         this.match = new Match(lineups, this.request.seed, { arena: this.request.arena, modifiers: this.request.modifiers });
         this.obstacles = this.match.obstacles;
-        this.exhibition = isExhibition(this.request.modifiers);
+        // Imported robots force exhibition: barred from every board, always.
+        this.customMatch = this.request.lineupIds.some(isImportedId);
+        this.exhibition = isExhibition(this.request.modifiers) || this.customMatch;
         this.prev = this.match.robotSnapshots;
 
         // Static layers: composed floor, wall strips + corners + gates, decals.
@@ -227,7 +231,7 @@ export class BattleScene extends Scene {
         // Robot sprite sets.
         this.match.robotSnapshots.forEach((snap, i) => {
             const skin = this.request.skins[i] as SlotSkin;
-            const robotId = this.request.lineupIds[i] as string;
+            const robotId = displayRobotId(this.request.lineupIds[i] as string);
             const team = COLORS.team[snap.team];
             const body = this.add.image(0, 0, chassisKey(robotId)).setScale(2).setDepth(4);
             body.setTint(team);
@@ -300,7 +304,10 @@ export class BattleScene extends Scene {
         if (this.request.pilot === true) tags.push('PILOT');
         else if (this.request.daily !== undefined) tags.push('DAILY');
         else if (this.request.replay === true) tags.push('REPLAY');
-        if (this.exhibition) tags.push(`EXHIBITION ${modifierCodes(this.request.modifiers).join('+')}`);
+        if (this.exhibition) {
+            const parts = [...(this.customMatch ? ['CUSTOM'] : []), ...modifierCodes(this.request.modifiers)];
+            tags.push(`EXHIBITION ${parts.join('+')}`);
+        }
         const seedLabel = tags.length > 0 ? `SEED ${this.request.seed} - ${tags.join(' - ')}` : `SEED ${this.request.seed}`;
         const seedText = this.add.text(AX + ARENA_WIDTH - 12, 26, seedLabel, FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
         if (this.exhibition) seedText.setColor('#ffd23f');
@@ -313,7 +320,9 @@ export class BattleScene extends Scene {
                 .setDepth(10);
         }
         this.banner = this.add.text(AX + ARENA_WIDTH / 2, AY + 56, '', FONTS.heading).setOrigin(0.5).setDepth(10).setAlpha(0);
-        if (this.exhibition) this.queueBanner('EXHIBITION MATCH');
+        if (this.exhibition) {
+            this.queueBanner(this.customMatch ? 'EXHIBITION MATCH - CUSTOM ROBOT' : 'EXHIBITION MATCH');
+        }
 
         // Damage-number pool + live minimap (bottom HUD strip).
         for (let i = 0; i < DMG_POOL; i += 1) {
@@ -598,7 +607,7 @@ export class BattleScene extends Scene {
 
     private explode(i: number, cx: number, cy: number): void {
         const snap = this.match.robotSnapshots[i] as RobotSnapshot;
-        const robotId = this.request.lineupIds[i] as string;
+        const robotId = displayRobotId(this.request.lineupIds[i] as string);
         this.burst(cx, cy, COLORS.team[snap.team], 22, 260, 200);
         this.burst(cx, cy, 0xffffff, 8, 140, 100);
         this.cameras.main.shake(180, 0.006);
@@ -971,8 +980,9 @@ export class BattleScene extends Scene {
             .setOrigin(0.5)
             .setDepth(20);
         if (this.exhibition) {
+            const parts = [...(this.customMatch ? ['CUSTOM ROBOT'] : []), ...modifierCodes(this.request.modifiers)];
             this.add
-                .text(512, 250, `EXHIBITION ${modifierCodes(this.request.modifiers).join(' + ')} - NOT RECORDED`, {
+                .text(512, 250, `EXHIBITION ${parts.join(' + ')} - NOT RECORDED`, {
                     ...FONTS.monoSmall,
                     color: '#ffd23f',
                 })
@@ -1004,24 +1014,15 @@ export class BattleScene extends Scene {
             arena: this.request.arena,
             modifiers: this.request.modifiers,
         });
-        const copyLabel = this.add
-            .text(512, hintY + 26, 'REPLAY CODE - CLICK CODE TO COPY', FONTS.monoSmall)
-            .setOrigin(0.5)
-            .setDepth(20);
-        const codeText = this.add
-            .text(512, hintY + 40, code, { ...FONTS.monoSmall, color: '#ffd23f' })
-            .setOrigin(0.5, 0)
-            .setDepth(20);
-        codeText.setWordWrapWidth(560);
-        codeText.setInteractive({ useHandCursor: true });
-        codeText.on('pointerdown', () => {
-            void copyText(code).then((ok) => {
-                copyLabel.setText(ok ? 'REPLAY CODE - COPIED!' : 'REPLAY CODE - COPY FAILED');
-                this.time.delayedCall(1500, () => {
-                    copyLabel.setText('REPLAY CODE - CLICK CODE TO COPY');
-                });
-            });
-        });
+        if (this.customMatch) {
+            // The code can't restore imported robots, so don't show one.
+            this.add
+                .text(512, hintY + 26, 'REPLAY UNAVAILABLE FOR CUSTOM ROBOTS', { ...FONTS.monoSmall, color: '#ffd23f' })
+                .setOrigin(0.5)
+                .setDepth(20);
+        } else {
+            this.showReplayCode(code, hintY);
+        }
 
         makeButton(
             this,
@@ -1042,6 +1043,27 @@ export class BattleScene extends Scene {
             21,
         );
         makeButton(this, 612, 566, 170, 44, 'MENU', () => this.scene.start('Menu'), 21);
+    }
+
+    private showReplayCode(code: string, hintY: number): void {
+        const copyLabel = this.add
+            .text(512, hintY + 26, 'REPLAY CODE - CLICK CODE TO COPY', FONTS.monoSmall)
+            .setOrigin(0.5)
+            .setDepth(20);
+        const codeText = this.add
+            .text(512, hintY + 40, code, { ...FONTS.monoSmall, color: '#ffd23f' })
+            .setOrigin(0.5, 0)
+            .setDepth(20);
+        codeText.setWordWrapWidth(560);
+        codeText.setInteractive({ useHandCursor: true });
+        codeText.on('pointerdown', () => {
+            void copyText(code).then((ok) => {
+                copyLabel.setText(ok ? 'REPLAY CODE - COPIED!' : 'REPLAY CODE - COPY FAILED');
+                this.time.delayedCall(1500, () => {
+                    copyLabel.setText('REPLAY CODE - CLICK CODE TO COPY');
+                });
+            });
+        });
     }
 
     private exportRobot(id: number): void {

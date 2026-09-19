@@ -19,6 +19,7 @@ import {
     winRates,
 } from '../history';
 import { COLORS, FONTS } from '../theme';
+import { displayRobotId, getImported, importRobotFromFile, importRobotFromUrl } from '../importRobot';
 import { markTutorialSeen, shouldShowTutorial, TUTORIAL_LINEUP, TUTORIAL_SEED } from '../tutorial';
 import { makeButton, makePanel, type Button } from '../ui';
 import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } from '../customize';
@@ -85,6 +86,7 @@ export class MenuScene extends Scene {
     private muteButton!: { setLabel: (label: string) => void };
     private dailyButton!: { setLabel: (label: string) => void };
     private replayOverlay: HTMLDivElement | null = null;
+    private importOverlay: HTMLDivElement | null = null;
     private tourRequested = false;
     private tourMode: 'prompt' | 'tour' | 'none' = 'none';
     private tourObjects: Phaser.GameObjects.GameObject[] = [];
@@ -151,11 +153,12 @@ export class MenuScene extends Scene {
         this.trailsButton = makeButton(this, CX - 215, 728, 200, 26, '', () => this.toggleTrails());
         this.muteButton = makeButton(this, CX, 728, 200, 26, '', () => this.toggleMute());
         makeButton(this, CX + 215, 728, 200, 26, 'WATCH REPLAY', () => this.openReplayDialog());
-        this.dailyButton = makeButton(this, CX - 340, 754, 150, 24, '', () => this.startDaily());
-        makeButton(this, CX - 170, 754, 150, 24, 'TOURNEY', () => this.scene.start('Tournament'));
-        makeButton(this, CX, 754, 150, 24, 'STATS', () => this.openStats());
-        makeButton(this, CX + 170, 754, 150, 24, 'WORKSHOP', () => this.scene.start('Workshop'));
-        makeButton(this, CX + 340, 754, 150, 24, 'TUTORIAL', () => this.startTutorial());
+        this.dailyButton = makeButton(this, CX - 362, 754, 130, 24, '', () => this.startDaily());
+        makeButton(this, CX - 218, 754, 130, 24, 'TOURNEY', () => this.scene.start('Tournament'));
+        makeButton(this, CX - 74, 754, 130, 24, 'STATS', () => this.openStats());
+        makeButton(this, CX + 74, 754, 130, 24, 'WORKSHOP', () => this.scene.start('Workshop'));
+        makeButton(this, CX + 218, 754, 130, 24, 'IMPORT', () => this.openImportDialog());
+        makeButton(this, CX + 362, 754, 130, 24, 'TUTORIAL', () => this.startTutorial());
         this.refreshTrailsLabel();
         this.refreshMuteLabel();
         this.refreshDailyLabel();
@@ -176,6 +179,7 @@ export class MenuScene extends Scene {
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.closeReplayDialog();
+            this.closeImportDialog();
         });
     }
 
@@ -301,14 +305,15 @@ export class MenuScene extends Scene {
             const team = (i < this.teamSize ? 0 : 1) as 0 | 1;
             const skin = this.skins[i] as SlotSkin;
             const id = this.lineupIds[i] as string;
-            const entry = ROBOTS.find((r) => r.meta.id === id) ?? ROBOTS[0]!;
+            const entry = getRobot(id) ?? getImported(id) ?? ROBOTS[0]!;
             const loadout = this.loadouts[i] as SkillLoadout;
+            const spriteId = displayRobotId(id);
 
             this.track(this.add.rectangle(100, y, 14, 14, COLORS.team[team]));
-            const preview = this.track(this.add.image(152, y, chassisKey(id)).setScale(2));
+            const preview = this.track(this.add.image(152, y, chassisKey(spriteId)).setScale(2));
             preview.setTint(COLORS.team[team]);
             // Live paint preview: tower + hub exactly as the battle renders them.
-            const previewTower = this.track(this.add.image(152, y, towerKey(id)).setScale(2));
+            const previewTower = this.track(this.add.image(152, y, towerKey(spriteId)).setScale(2));
             previewTower.setTint(skin.paint).setRotation(-0.5);
             const previewHub = this.track(this.add.image(152, y, 'hub').setScale(2));
             previewHub.setTint(skin.paint);
@@ -577,7 +582,7 @@ export class MenuScene extends Scene {
 
     private showDescription(i: number): void {
         const id = this.lineupIds[i] as string;
-        const entry = ROBOTS.find((r) => r.meta.id === id) ?? ROBOTS[0]!;
+        const entry = getRobot(id) ?? getImported(id) ?? ROBOTS[0]!;
         this.descText.setText(
             `${entry.meta.name} by ${entry.meta.author} v${entry.meta.version} — ${entry.meta.description}`,
         );
@@ -660,6 +665,101 @@ export class MenuScene extends Scene {
     private closeReplayDialog(): void {
         this.replayOverlay?.remove();
         this.replayOverlay = null;
+    }
+
+    // ---- Import robot dialog (exhibition only) ------------------------------
+    private openImportDialog(): void {
+        if (this.importOverlay) return;
+        const overlay = document.createElement('div');
+        overlay.style.cssText =
+            'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;' +
+            'background:rgba(6,8,11,0.85);z-index:1000;';
+        const panel = document.createElement('div');
+        panel.style.cssText =
+            'background:#141a21;border:2px solid #2b3542;padding:24px;width:460px;max-width:90vw;' +
+            "font-family:Menlo,Consolas,'Courier New',monospace;";
+        const slotOptions = this.lineupIds
+            .map((id, i) => `<option value="${i}">SLOT ${i + 1} (team ${(i < this.teamSize ? 1 : 2)}) — ${(getRobot(id)?.meta.name ?? 'custom').toUpperCase()}</option>`)
+            .join('');
+        panel.innerHTML =
+            '<div style="color:#e8edf2;font-size:14px;margin-bottom:4px;">IMPORT ROBOT — EXHIBITION ONLY</div>' +
+            '<div style="color:#ffd23f;font-size:12px;margin-bottom:12px;">imported bots never touch tournaments or leaderboards</div>' +
+            '<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">load a dependency-free .js/.mjs robot module:</div>' +
+            '<input type="file" accept=".js,.mjs" class="import-file" ' +
+            'style="width:100%;box-sizing:border-box;color:#e8edf2;font-family:inherit;font-size:12px;margin-bottom:8px;" />' +
+            '<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">or fetch from a URL:</div>' +
+            '<input type="text" spellcheck="false" placeholder="https://…/mybot.mjs" class="import-url" ' +
+            'style="width:100%;box-sizing:border-box;background:#0b0e12;border:1px solid #2b3542;' +
+            'color:#e8edf2;padding:8px;font-family:inherit;font-size:12px;margin-bottom:8px;" />' +
+            '<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">assign to:</div>' +
+            `<select class="import-slot" style="width:100%;box-sizing:border-box;background:#0b0e12;border:1px solid #2b3542;` +
+            'color:#e8edf2;padding:8px;font-family:inherit;font-size:12px;margin-bottom:8px;">' +
+            `${slotOptions}</select>` +
+            '<div class="import-status" style="color:#ff5d5d;font-size:12px;min-height:18px;margin-top:6px;"></div>' +
+            '<div style="display:flex;gap:8px;margin-top:8px;">' +
+            '<button class="import-go" style="flex:1;background:#1d2530;border:2px solid #ffb340;' +
+            'color:#e8edf2;padding:10px;font-family:inherit;font-size:12px;cursor:pointer;">IMPORT</button>' +
+            '<button class="import-cancel" style="flex:1;background:#141a21;border:2px solid #2b3542;' +
+            'color:#9aa7b4;padding:10px;font-family:inherit;font-size:12px;cursor:pointer;">CANCEL</button>' +
+            '</div>';
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+        this.importOverlay = overlay;
+
+        const fileInput = panel.querySelector('.import-file') as HTMLInputElement | null;
+        const urlInput = panel.querySelector('.import-url') as HTMLInputElement | null;
+        const slotSelect = panel.querySelector('.import-slot') as HTMLSelectElement | null;
+        const status = panel.querySelector('.import-status') as HTMLDivElement | null;
+        const go = panel.querySelector('.import-go') as HTMLButtonElement | null;
+        const cancel = panel.querySelector('.import-cancel') as HTMLButtonElement | null;
+        if (!fileInput || !urlInput || !slotSelect || !status || !go || !cancel) {
+            this.closeImportDialog();
+            return;
+        }
+        const submit = (): void => {
+            const slot = Math.max(0, Math.min(this.lineupIds.length - 1, Number(slotSelect.value)));
+            const file = fileInput.files?.[0] ?? null;
+            const url = urlInput.value.trim();
+            if (!file && url === '') {
+                status.textContent = 'pick a file or enter a URL';
+                return;
+            }
+            status.style.color = '#9aa7b4';
+            status.textContent = 'loading…';
+            go.disabled = true;
+            const done = file !== null ? importRobotFromFile(file) : importRobotFromUrl(url);
+            void done.then((result) => {
+                go.disabled = false;
+                if (!result.ok) {
+                    status.style.color = '#ff5d5d';
+                    status.textContent = result.error;
+                    return;
+                }
+                this.lineupIds[slot] = result.id;
+                this.loadouts[slot] = { ...result.robot.loadout };
+                this.rebuildSlots();
+                this.showDescription(slot);
+                status.style.color = '#7de08a';
+                status.textContent = `imported ${result.robot.meta.name} into slot ${slot + 1}`;
+                this.time.delayedCall(900, () => this.closeImportDialog());
+            });
+        };
+        go.addEventListener('click', submit);
+        cancel.addEventListener('click', () => this.closeImportDialog());
+        overlay.addEventListener('pointerdown', (event) => {
+            if (event.target === overlay) this.closeImportDialog();
+        });
+        urlInput.addEventListener('keydown', (event) => {
+            event.stopPropagation();
+            if (event.key === 'Enter') submit();
+            if (event.key === 'Escape') this.closeImportDialog();
+        });
+        urlInput.focus();
+    }
+
+    private closeImportDialog(): void {
+        this.importOverlay?.remove();
+        this.importOverlay = null;
     }
 
     // ---- Match history + stats panel --------------------------------------
