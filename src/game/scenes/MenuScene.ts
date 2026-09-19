@@ -7,6 +7,7 @@ import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { chassisKey, ensureArtTextures } from '../art';
 import { isMuted, playClick, toggleMuted, unlockAudio } from '../audio';
+import { clearHistory, loadHistory, winRates } from '../history';
 import { COLORS, FONTS } from '../theme';
 import { makeButton, makePanel } from '../ui';
 import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } from '../customize';
@@ -35,6 +36,7 @@ export class MenuScene extends Scene {
     private trails = true;
     private slotObjects: Phaser.GameObjects.GameObject[] = [];
     private editorObjects: Phaser.GameObjects.GameObject[] = [];
+    private statsObjects: Phaser.GameObjects.GameObject[] = [];
     private editorSlot = -1;
     private editorPoints!: Phaser.GameObjects.Text;
     private descText!: Phaser.GameObjects.Text;
@@ -53,6 +55,7 @@ export class MenuScene extends Scene {
         this.modeButtons = [];
         this.slotObjects = [];
         this.editorObjects = [];
+        this.statsObjects = [];
         this.editorSlot = -1;
         this.add.text(CX, 44, 'ROBOTARENA', FONTS.title).setOrigin(0.5);
         this.add
@@ -79,9 +82,10 @@ export class MenuScene extends Scene {
 
         makeButton(this, CX - 160, 684, 260, 50, 'RANDOMIZE SKINS', () => this.randomizeSkins());
         makeButton(this, CX + 160, 684, 260, 50, 'START BATTLE', () => this.startBattle());
-        this.trailsButton = makeButton(this, CX - 215, 736, 200, 30, '', () => this.toggleTrails());
-        this.muteButton = makeButton(this, CX, 736, 200, 30, '', () => this.toggleMute());
-        makeButton(this, CX + 215, 736, 200, 30, 'WATCH REPLAY', () => this.openReplayDialog());
+        this.trailsButton = makeButton(this, CX - 215, 728, 200, 26, '', () => this.toggleTrails());
+        this.muteButton = makeButton(this, CX, 728, 200, 26, '', () => this.toggleMute());
+        makeButton(this, CX + 215, 728, 200, 26, 'WATCH REPLAY', () => this.openReplayDialog());
+        makeButton(this, CX + 215, 754, 200, 24, 'STATS', () => this.openStats());
         this.refreshTrailsLabel();
         this.refreshMuteLabel();
         // First click creates/resumes the AudioContext (autoplay policy);
@@ -436,6 +440,76 @@ export class MenuScene extends Scene {
     private closeReplayDialog(): void {
         this.replayOverlay?.remove();
         this.replayOverlay = null;
+    }
+
+    // ---- Match history + stats panel --------------------------------------
+    private trackStats<T extends Phaser.GameObjects.GameObject>(obj: T): T {
+        this.statsObjects.push(obj);
+        return obj;
+    }
+
+    private openStats(): void {
+        this.closeStats();
+        // Backdrop swallows clicks so menu controls beneath can't fire.
+        this.trackStats(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50).setInteractive());
+        this.trackStats(this.add.rectangle(CX, 384, 560, 470, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
+        this.trackStats(this.add.text(CX, 178, 'MATCH HISTORY', FONTS.heading).setOrigin(0.5).setDepth(50));
+        this.refreshStatsRows();
+    }
+
+    private refreshStatsRows(): void {
+        // Drop old rows but keep the overlay frame (first 3 objects).
+        const frame = this.statsObjects.slice(0, 3);
+        for (const obj of this.statsObjects.slice(3)) obj.destroy();
+        this.statsObjects = frame;
+
+        const history = loadHistory();
+        const draws = history.filter((r) => r.winner === -1).length;
+        this.trackStats(
+            this.add.text(CX, 208, `MATCHES ${history.length}   DRAWS ${draws}`, FONTS.mono).setOrigin(0.5).setDepth(50),
+        );
+        if (history.length === 0) {
+            this.trackStats(
+                this.add.text(CX, 300, 'no matches recorded yet - go battle!', FONTS.small).setOrigin(0.5).setDepth(50),
+            );
+        } else {
+            const rows = winRates(ROBOTS.map((r) => r.meta.id)).sort(
+                (a, b) => b.rate - a.rate || b.games - a.games,
+            );
+            rows.forEach((row, i) => {
+                const y = 246 + i * 30;
+                const entry = ROBOTS.find((r) => r.meta.id === row.id) ?? ROBOTS[0]!;
+                const pct = row.games > 0 ? `${Math.round(row.rate * 100)}%` : '--';
+                const name = this.trackStats(
+                    this.add.text(CX - 220, y, entry.meta.name.toUpperCase(), FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(50),
+                );
+                name.setColor(COLORS.ink);
+                this.trackStats(
+                    this.add.text(CX + 220, y, `${row.games}G ${row.wins}W ${row.draws}D ${pct}`, FONTS.mono).setOrigin(1, 0.5).setDepth(50),
+                );
+            });
+        }
+
+        const clear = this.trackStats(
+            this.add.rectangle(CX - 120, 570, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50),
+        );
+        this.trackStats(this.add.text(CX - 120, 570, 'CLEAR', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        clear.setInteractive({ useHandCursor: true });
+        clear.on('pointerdown', () => {
+            clearHistory();
+            this.refreshStatsRows();
+        });
+        const close = this.trackStats(
+            this.add.rectangle(CX + 120, 570, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50),
+        );
+        this.trackStats(this.add.text(CX + 120, 570, 'CLOSE', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        close.setInteractive({ useHandCursor: true });
+        close.on('pointerdown', () => this.closeStats());
+    }
+
+    private closeStats(): void {
+        for (const obj of this.statsObjects) obj.destroy();
+        this.statsObjects = [];
     }
 
     private startBattle(): void {

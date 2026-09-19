@@ -6,6 +6,7 @@ import { MAX_SPEED, MAX_TICKS } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, type ReplaySpec } from '../src/sim/replay';
+import { clearHistory, loadHistory, recordMatch, winRates } from '../src/game/history';
 import { ROBOTS } from '../src/robots/registry';
 import { computeStats, loadoutCost, sanitizeLoadout, type SkillLoadout } from '../src/sim/skills';
 import type { Intent, RobotController, SenseState } from '../src/sim/types';
@@ -281,6 +282,42 @@ console.log('replay');
     const valid = encodeReplay(specs[0] as ReplaySpec);
     check('truncated code rejected', decodeReplay(valid.slice(0, -4)) === null);
     check('overlong code rejected', decodeReplay(`RA1.${'A'.repeat(3000)}`) === null);
+}
+
+// --- 7. Match history: record/load/aggregate over a storage stub ----------
+console.log('history');
+{
+    const store = new Map<string, string>();
+    (globalThis as unknown as { localStorage: Storage }).localStorage = {
+        getItem: (key: string) => (store.has(key) ? (store.get(key) as string) : null),
+        setItem: (key: string, value: string) => {
+            store.set(key, value);
+        },
+        removeItem: (key: string) => {
+            store.delete(key);
+        },
+    } as Storage;
+    clearHistory();
+    check('history starts empty', loadHistory().length === 0);
+    recordMatch({ teamSize: 1, lineupIds: ['hunter', 'orbiter'], loadouts: [{}, {}], winner: 0, ticks: 600, seed: 1 });
+    recordMatch({ teamSize: 1, lineupIds: ['hunter', 'orbiter'], loadouts: [{}, {}], winner: -1, ticks: 9000, seed: 2 });
+    const loaded = loadHistory();
+    check('two matches persist', loaded.length === 2);
+    check('chronological order', (loaded[0]?.seed ?? -1) === 1 && (loaded[1]?.seed ?? -1) === 2);
+    const rates = new Map(winRates(['hunter', 'orbiter', 'rusher']).map((r) => [r.id, r]));
+    check('hunter 2 games 1 win 1 draw', rates.get('hunter')?.games === 2 && rates.get('hunter')?.wins === 1 && rates.get('hunter')?.draws === 1);
+    check('orbiter winless', rates.get('orbiter')?.games === 2 && rates.get('orbiter')?.wins === 0);
+    check('idle robot zero rate', rates.get('rusher')?.games === 0 && rates.get('rusher')?.rate === 0);
+    for (let i = 0; i < 205; i += 1) {
+        recordMatch({ teamSize: 1, lineupIds: ['rusher', 'turret'], loadouts: [{}, {}], winner: 1, ticks: 100, seed: 100 + i });
+    }
+    const capped = loadHistory();
+    check('log capped at 200, newest kept', capped.length === 200 && capped[199]?.seed === 304);
+    store.set('robotarena.history.v1', 'not-json{{{');
+    check('corrupt storage loads as empty', loadHistory().length === 0);
+    clearHistory();
+    check('clear empties the log', loadHistory().length === 0);
+    delete (globalThis as unknown as { localStorage?: Storage }).localStorage;
 }
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);

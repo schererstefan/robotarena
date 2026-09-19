@@ -10,6 +10,7 @@ import { ROBOTS } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
 import { chassisKey, ensureArtTextures } from '../art';
 import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unlockAudio } from '../audio';
+import { recordMatch } from '../history';
 import { COLORS, FONTS } from '../theme';
 import { copyText, downloadText, makeButton } from '../ui';
 import type { SlotSkin } from '../customize';
@@ -657,6 +658,17 @@ export class BattleScene extends Scene {
     private showResults(): void {
         const result = this.match.result;
         this.stepButton.setEnabled(false);
+        // Replays re-watch history; only live battles append to it.
+        if (this.request.replay !== true) {
+            recordMatch({
+                teamSize: this.request.teamSize,
+                lineupIds: [...this.request.lineupIds],
+                loadouts: this.request.loadouts.map((l) => ({ ...l })),
+                winner: result.winner,
+                ticks: result.tick,
+                seed: this.request.seed,
+            });
+        }
         if (result.winner !== -1) playWin();
         const title = result.winner === -1 ? 'DRAW' : result.winner === 0 ? 'TEAM 1 WINS' : 'TEAM 2 WINS';
         const color = result.winner === -1 ? COLORS.ink : COLORS.teamCss[result.winner];
