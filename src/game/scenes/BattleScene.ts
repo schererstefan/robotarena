@@ -55,6 +55,8 @@ export class BattleScene extends Scene {
     private pauseButton!: { setLabel: (label: string) => void };
     private resultsShown = false;
     private trails: Array<Array<{ x: number; y: number }>> = [];
+    private lastTrailTick = -1;
+    private stripes: Phaser.GameObjects.Rectangle[] = [];
     private lastHudSecond = -1;
     private lastAlive: [number, number] = [-1, -1];
 
@@ -80,6 +82,8 @@ export class BattleScene extends Scene {
         this.recoil = [];
         this.muzzleLife = [];
         this.trails = [];
+        this.lastTrailTick = -1;
+        this.stripes = [];
         this.bannerQueue = [];
         this.bannerBusy = false;
         this.lastHudSecond = -1;
@@ -129,6 +133,9 @@ export class BattleScene extends Scene {
                 ring.setPosition(0, 0);
                 (body as Phaser.GameObjects.Image & { ring?: Phaser.GameObjects.Graphics }).ring = ring;
             }
+            const stripe = this.add.rectangle(0, 0, 26, 5, skin.paint).setDepth(4);
+            stripe.setVisible(skin.finish === 'Stripe');
+            this.stripes.push(stripe);
             this.chassis.push(body);
             this.towers.push(tower);
             this.hubs.push(hub);
@@ -145,7 +152,9 @@ export class BattleScene extends Scene {
             this.trails.push([]);
             // Spawn-in pop.
             body.setScale(0.5).setAlpha(0);
+            stripe.setAlpha(0);
             this.tweens.add({ targets: body, scale: 2, alpha: 1, duration: 350, delay: i * 90, ease: 'Back.easeOut' });
+            this.tweens.add({ targets: stripe, alpha: 1, duration: 350, delay: i * 90 });
         });
 
         // Bullet + particle pools.
@@ -187,7 +196,9 @@ export class BattleScene extends Scene {
             if (steps === 12) this.acc = 0;
             this.diffSnapshots();
         }
-        if (this.request.trails && this.match.result.tick % 3 === 0 && !this.match.result.over) {
+        const tick = this.match.result.tick;
+        if (this.request.trails && tick % 3 === 0 && tick !== this.lastTrailTick && !this.match.result.over) {
+            this.lastTrailTick = tick;
             this.match.robotSnapshots.forEach((s, i) => {
                 const trail = this.trails[i] as Array<{ x: number; y: number }>;
                 if (s.alive) {
@@ -334,8 +345,11 @@ export class BattleScene extends Scene {
             const tower = this.towers[i] as Phaser.GameObjects.Image;
             const hub = this.hubs[i] as Phaser.GameObjects.Image;
             const ring = (body as Phaser.GameObjects.Image & { ring?: Phaser.GameObjects.Graphics }).ring;
+            const stripe = this.stripes[i] as Phaser.GameObjects.Rectangle;
+            const skin = this.request.skins[i] as SlotSkin;
             const visible = s.alive;
             body.setVisible(visible).setPosition(cx, cy).setRotation(s.heading);
+            stripe.setVisible(visible && skin.finish === 'Stripe').setPosition(cx, cy).setRotation(s.heading);
             const rec = this.recoil[i] as number;
             const tx = cx - Math.cos(s.tower) * rec;
             const ty = cy - Math.sin(s.tower) * rec;
