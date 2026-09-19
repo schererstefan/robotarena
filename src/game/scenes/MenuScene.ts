@@ -23,7 +23,7 @@ import { isColorblind, isReducedMotion, setColorblind, setReducedMotion, teamCol
 import { displayRobotId, getImported, importRobotFromFile, importRobotFromUrl } from '../importRobot';
 import { FocusNav, type NavTarget } from '../nav';
 import { markTutorialSeen, shouldShowTutorial, TUTORIAL_LINEUP, TUTORIAL_SEED } from '../tutorial';
-import { makeButton, makePanel, type Button } from '../ui';
+import { addTouchHit, makeButton, makePanel, type Button } from '../ui';
 import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } from '../customize';
 
 export interface BattleRequest {
@@ -137,13 +137,13 @@ export class MenuScene extends Scene {
             .setOrigin(0.5);
 
         [1, 2, 3].forEach((size, i) => {
-            const btn = this.navButton(CX - 150 + i * 150, 136, 130, 42, '', () => this.setMode(size));
+            const btn = this.navButton(CX - 150 + i * 150, 136, 130, 42, '', () => this.setMode(size), 0, 44);
             this.modeButtons.push(btn);
         });
         this.refreshModeLabels();
-        this.arenaButton = this.navButton(CX + 323, 136, 200, 42, '', () => this.cycleArena());
+        this.arenaButton = this.navButton(CX + 323, 136, 200, 42, '', () => this.cycleArena(), 0, 44);
         this.refreshArenaLabel();
-        this.modsButton = this.navButton(CX - 350, 136, 200, 42, '', () => this.openMods());
+        this.modsButton = this.navButton(CX - 350, 136, 200, 42, '', () => this.openMods(), 0, 44);
         this.refreshModsLabel();
 
         this.add.text(92, 176, 'SLOT', FONTS.monoSmall).setOrigin(0, 0.5);
@@ -218,9 +218,18 @@ export class MenuScene extends Scene {
 
     // ---- Keyboard navigation ----------------------------------------------
     /** makeButton plus a keyboard-focus target at the same bounds. */
-    private navButton(x: number, y: number, w: number, h: number, label: string, onClick: () => void, depth = 0): Button {
+    private navButton(
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        label: string,
+        onClick: () => void,
+        depth = 0,
+        minTouch = 0,
+    ): Button {
         this.navBase.push({ x, y, w, h, activate: onClick });
-        return makeButton(this, x, y, w, h, label, onClick, depth);
+        return makeButton(this, x, y, w, h, label, onClick, depth, minTouch);
     }
 
     private overlayOpen(): boolean {
@@ -366,8 +375,8 @@ export class MenuScene extends Scene {
     }
 
     private cycler(x: number, w: number, y: number, label: string, onClick: () => void, color = COLORS.ink): void {
-        this.navSlots.push({ x, y, w, h: 40, activate: onClick });
-        const bg = this.track(this.add.rectangle(x, y, w, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge));
+        this.navSlots.push({ x, y, w, h: 44, activate: onClick });
+        const bg = this.track(this.add.rectangle(x, y, w, 44, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge));
         const text = this.track(this.add.text(x, y, label, FONTS.buttonSmall).setOrigin(0.5));
         text.setColor(color);
         bg.setInteractive({ useHandCursor: true });
@@ -405,10 +414,10 @@ export class MenuScene extends Scene {
             this.cycler(285, 150, y, `${skin.callsign} >`, () => this.cycleCallsign(i), skin.paintCss);
             this.cycler(490, 200, y, `${entry.meta.name} >`, () => this.cycleRobot(i));
 
-            const paintBg = this.track(this.add.rectangle(646, y, 56, 40, skin.paint).setStrokeStyle(2, 0x0b0e12));
+            const paintBg = this.track(this.add.rectangle(646, y, 56, 44, skin.paint).setStrokeStyle(2, 0x0b0e12));
             paintBg.setInteractive({ useHandCursor: true });
             paintBg.on('pointerdown', () => this.cyclePaint(i));
-            this.navSlots.push({ x: 646, y, w: 56, h: 40, activate: () => this.cyclePaint(i) });
+            this.navSlots.push({ x: 646, y, w: 56, h: 44, activate: () => this.cyclePaint(i) });
 
             this.cycler(748, 110, y, `${skin.finish} >`, () => this.cycleFinish(i));
             this.cycler(885, 100, y, `SKL ${loadoutCost(loadout)}`, () => this.openEditor(i), '#7de08a');
@@ -501,6 +510,7 @@ export class MenuScene extends Scene {
             this.trackEditor(this.add.text(640, y + 4, '-', FONTS.button).setOrigin(0.5).setDepth(50));
             minus.setInteractive({ useHandCursor: true });
             minus.on('pointerdown', () => this.bumpSkill(def.id, -1));
+            this.trackEditor(addTouchHit(this, 640, y + 4, 52, 36, () => this.bumpSkill(def.id, -1), 50));
             targets.push({ x: 640, y: y + 4, w: 36, h: 30, activate: () => this.bumpSkill(def.id, -1) });
             const rankText = this.trackEditor(this.add.text(684, y + 4, `${rank}/${def.maxRank}`, FONTS.mono).setOrigin(0.5).setDepth(50));
             rankText.setColor(rank > 0 ? '#7de08a' : COLORS.dim);
@@ -508,6 +518,7 @@ export class MenuScene extends Scene {
             this.trackEditor(this.add.text(740, y + 4, '+', FONTS.button).setOrigin(0.5).setDepth(50));
             plus.setInteractive({ useHandCursor: true });
             plus.on('pointerdown', () => this.bumpSkill(def.id, 1));
+            this.trackEditor(addTouchHit(this, 740, y + 4, 52, 36, () => this.bumpSkill(def.id, 1), 50));
             targets.push({ x: 740, y: y + 4, w: 36, h: 30, activate: () => this.bumpSkill(def.id, 1) });
         });
 
@@ -752,9 +763,9 @@ export class MenuScene extends Scene {
             '<div class="replay-error" style="color:#ff5d5d;font-size:12px;min-height:18px;margin-top:6px;"></div>' +
             '<div style="display:flex;gap:8px;margin-top:8px;">' +
             '<button class="replay-watch" style="flex:1;background:#1d2530;border:2px solid #ffb340;' +
-            'color:#e8edf2;padding:10px;font-family:inherit;font-size:12px;cursor:pointer;">WATCH</button>' +
+            'color:#e8edf2;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">WATCH</button>' +
             '<button class="replay-cancel" style="flex:1;background:#141a21;border:2px solid #2b3542;' +
-            'color:#9aa7b4;padding:10px;font-family:inherit;font-size:12px;cursor:pointer;">CANCEL</button>' +
+            'color:#9aa7b4;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">CANCEL</button>' +
             '</div>';
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
@@ -842,9 +853,9 @@ export class MenuScene extends Scene {
             '<div class="import-status" style="color:#ff5d5d;font-size:12px;min-height:18px;margin-top:6px;"></div>' +
             '<div style="display:flex;gap:8px;margin-top:8px;">' +
             '<button class="import-go" style="flex:1;background:#1d2530;border:2px solid #ffb340;' +
-            'color:#e8edf2;padding:10px;font-family:inherit;font-size:12px;cursor:pointer;">IMPORT</button>' +
+            'color:#e8edf2;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">IMPORT</button>' +
             '<button class="import-cancel" style="flex:1;background:#141a21;border:2px solid #2b3542;' +
-            'color:#9aa7b4;padding:10px;font-family:inherit;font-size:12px;cursor:pointer;">CANCEL</button>' +
+            'color:#9aa7b4;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">CANCEL</button>' +
             '</div>';
         overlay.appendChild(panel);
         document.body.appendChild(overlay);

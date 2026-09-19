@@ -13,9 +13,16 @@ const config: Phaser.Types.Core.GameConfig = {
     pixelArt: true,
     roundPixels: true,
     antialias: false,
+    // Touch: long-press must not summon the context menu over the canvas.
+    disableContextMenu: true,
+    // FIT-scaling audit (Phase 18): FIT + CENTER_BOTH keeps the 4:3 canvas
+    // fully visible on any viewport (letterboxed in portrait via CSS below);
+    // autoRound snaps the canvas to whole CSS pixels for crisp pixel art.
+    // Do not constrain the canvas size in CSS — that would distort aspect.
     scale: {
         mode: Scale.FIT,
         autoCenter: Scale.CENTER_BOTH,
+        autoRound: true,
     },
     fps: {
         target: 60,

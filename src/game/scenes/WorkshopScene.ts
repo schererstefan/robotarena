@@ -71,7 +71,7 @@ export class WorkshopScene extends Scene {
         area.spellcheck = false;
         area.style.cssText =
             'width:100%;box-sizing:border-box;height:300px;background:#0b0e12;border:1px solid #2b3542;' +
-            `color:#e8edf2;padding:10px;font-family:${MONO};font-size:12px;line-height:1.5;` +
+            `color:#e8edf2;padding:12px;font-family:${MONO};font-size:12px;line-height:1.5;` +
             'white-space:pre;tab-size:4;resize:vertical;';
         // Keep keystrokes (including ESC) inside the editor.
         area.addEventListener('keydown', (event) => event.stopPropagation());
@@ -121,7 +121,7 @@ export class WorkshopScene extends Scene {
         button.textContent = label;
         button.style.cssText =
             `flex:1;background:${accent ? '#1d2530' : '#141a21'};` +
-            `border:2px solid ${accent ? '#ffb340' : '#2b3542'};color:#e8edf2;padding:10px;` +
+            `border:2px solid ${accent ? '#ffb340' : '#2b3542'};color:#e8edf2;padding:12px;` +
             'font-family:inherit;font-size:12px;cursor:pointer;';
         button.addEventListener('click', () => {
             unlockAudio();

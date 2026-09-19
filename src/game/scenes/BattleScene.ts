@@ -346,11 +346,11 @@ export class BattleScene extends Scene {
             .setDepth(10);
         this.mapG = this.add.graphics().setDepth(10);
 
-        this.pauseButton = makeButton(this, 760, 740, 120, 36, 'PAUSE', () => this.togglePause());
-        this.speedButton = makeButton(this, 890, 740, 100, 36, '1X', () => this.cycleSpeed());
-        this.stepButton = makeButton(this, 600, 740, 120, 36, 'STEP (N)', () => this.stepOnce());
+        this.pauseButton = makeButton(this, 760, 740, 120, 36, 'PAUSE', () => this.togglePause(), 0, 44);
+        this.speedButton = makeButton(this, 890, 740, 100, 36, '1X', () => this.cycleSpeed(), 0, 44);
+        this.stepButton = makeButton(this, 600, 740, 120, 36, 'STEP (N)', () => this.stepOnce(), 0, 44);
         this.stepButton.setEnabled(false);
-        makeButton(this, 134, 740, 120, 36, 'MENU', () => this.scene.start('Menu'));
+        makeButton(this, 134, 740, 120, 36, 'MENU', () => this.scene.start('Menu'), 0, 44);
         this.input.on('pointerdown', this.onAnyPointer);
         // Named handlers, removed on shutdown: the keyboard plugin is global
         // and outlives the scene, so anonymous listeners would stack per visit.
@@ -384,8 +384,8 @@ export class BattleScene extends Scene {
         this.tutTitle = this.add.text(140, 660, '', FONTS.monoSmall).setOrigin(0, 0.5).setDepth(30);
         this.tutBody = this.add.text(140, 676, '', FONTS.small).setOrigin(0, 0).setDepth(30);
         this.tutBody.setWordWrapWidth(556);
-        this.tutNext = makeButton(this, 768, 682, 120, 36, '', () => this.nextTutorialStep(), 30);
-        makeButton(this, 862, 682, 64, 36, 'SKIP', () => this.skipTutorial(), 30);
+        this.tutNext = makeButton(this, 768, 682, 120, 36, '', () => this.nextTutorialStep(), 30, 44);
+        makeButton(this, 862, 682, 64, 36, 'SKIP', () => this.skipTutorial(), 30, 44);
         this.refreshTutorialStep();
     }
 
