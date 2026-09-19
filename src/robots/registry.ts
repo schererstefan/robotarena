@@ -15,6 +15,8 @@ export interface RobotEntry {
     create: RobotFactory;
 }
 
+// Order is append-only: compact replay codes store registry indices, so
+// existing entries must never be reordered or removed.
 export const ROBOTS: RobotEntry[] = [
     { meta: rusherMeta, loadout: rusherLoadout, create: createRusher },
     { meta: turretMeta, loadout: turretLoadout, create: createTurret },

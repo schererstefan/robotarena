@@ -5,7 +5,7 @@
 import { ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSOR_RANGE, SENSOR_SHARE_DELAY, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
-import { decodeReplay, encodeReplay, type ReplaySpec } from '../src/sim/replay';
+import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
 import { checkRobotSource, suggestFilename, WORKSHOP_TEMPLATE, workshopPassed } from '../src/game/workshop';
 import { markTutorialSeen, resetTutorialFlag, shouldShowTutorial } from '../src/game/tutorial';
 import {
@@ -469,10 +469,35 @@ console.log('replay');
     check('wrong prefix rejected', decodeReplay('XX1.abcdef') === null);
     check('bad base64 rejected', decodeReplay('RA1.!!!not-base64!!!') === null);
     const valid = encodeReplay(specs[0] as ReplaySpec);
+    check('registry lineups use the compact RA2 format', valid.startsWith('RA2-'));
+    check('compact 1v1 code fits on one results line', valid.length <= 40);
+    const big = encodeReplay(specs[1] as ReplaySpec);
+    check('compact 3v3 code stays short', big.length <= 64);
     check('truncated code rejected', decodeReplay(valid.slice(0, -4)) === null);
     {
-        // Tamper the arena field inside an otherwise valid code.
-        const payload = valid.slice(valid.indexOf('.') + 1);
+        // Flip one body character of a compact code: the checksum must catch it.
+        const chars = valid.split('');
+        const flipAt = valid.lastIndexOf('-') + 2;
+        chars[flipAt] = chars[flipAt] === '0' ? '1' : '0';
+        check('tampered compact code rejected', decodeReplay(chars.join('')) === null);
+        // Forgiving input: lowercase + spaces still decode.
+        check('lowercase compact code accepted', decodeReplay(valid.toLowerCase()) !== null);
+        check('spaced compact code accepted', decodeReplay(valid.replace(/-/g, '  ')) !== null);
+        // Custom-robot lineups fall back to the legacy format and round-trip.
+        const custom: ReplaySpec = { ...(specs[0] as ReplaySpec), lineupIds: ['hunter', 'my-custom-bot'] };
+        const legacy = encodeReplay(custom);
+        check('custom lineup falls back to RA1', legacy.startsWith('RA1.'));
+        const legacyBack = decodeReplay(legacy);
+        check(
+            'legacy fallback round-trips',
+            legacyBack !== null && JSON.stringify(legacyBack.lineupIds) === JSON.stringify(custom.lineupIds),
+        );
+        // Legacy codes from older builds still decode.
+        const oldCode = encodeReplayLegacy(specs[0] as ReplaySpec);
+        const oldBack = decodeReplay(oldCode);
+        check('legacy RA1 code still decodes', oldBack !== null && oldBack.seed === (specs[0] as ReplaySpec).seed);
+        // Tamper the arena field inside an otherwise valid legacy code.
+        const payload = oldCode.slice(oldCode.indexOf('.') + 1);
         const json = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
         const tampered = `RA1.${Buffer.from(json.replace('"blocks"', '"void"'), 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
         check('bad arena rejected', decodeReplay(tampered) === null);

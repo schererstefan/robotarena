@@ -597,7 +597,7 @@ export class MenuScene extends Scene {
         panel.innerHTML =
             '<div style="color:#e8edf2;font-size:14px;margin-bottom:12px;">WATCH REPLAY</div>' +
             '<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">paste a replay code:</div>' +
-            '<input type="text" spellcheck="false" placeholder="RA1.…" ' +
+            '<input type="text" spellcheck="false" placeholder="RA2-XXXX-…" ' +
             'style="width:100%;box-sizing:border-box;background:#0b0e12;border:1px solid #2b3542;' +
             'color:#e8edf2;padding:8px;font-family:inherit;font-size:12px;" />' +
             '<div class="replay-error" style="color:#ff5d5d;font-size:12px;min-height:18px;margin-top:6px;"></div>' +
