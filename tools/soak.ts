@@ -5,8 +5,9 @@
 import { MAX_SPEED, MAX_TICKS } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry } from '../src/sim/engine';
+import { decodeReplay, encodeReplay, type ReplaySpec } from '../src/sim/replay';
 import { ROBOTS } from '../src/robots/registry';
-import { computeStats, loadoutCost, sanitizeLoadout } from '../src/sim/skills';
+import { computeStats, loadoutCost, sanitizeLoadout, type SkillLoadout } from '../src/sim/skills';
 import type { Intent, RobotController, SenseState } from '../src/sim/types';
 
 let failures = 0;
@@ -20,11 +21,12 @@ function check(name: string, condition: boolean, detail = ''): void {
     }
 }
 
-function runMatch(ids: string[], teams: Array<0 | 1>, seed: number): Match {
+function runMatch(ids: string[], teams: Array<0 | 1>, seed: number, loadouts?: SkillLoadout[]): Match {
     const lineups: LineupEntry[] = ids.map((id, i) => {
         const entry = ROBOTS.find((r) => r.meta.id === id);
         if (!entry) throw new Error(`unknown robot ${id}`);
-        return { team: teams[i] as 0 | 1, controller: entry.create(), loadout: { ...entry.loadout } };
+        const loadout = loadouts?.[i] ?? entry.loadout;
+        return { team: teams[i] as 0 | 1, controller: entry.create(), loadout: { ...loadout } };
     });
     const match = new Match(lineups, seed);
     let guard = 0;
@@ -233,6 +235,52 @@ console.log('soak');
         6,
     );
     check('3v3 completes', m3.result.over);
+}
+
+// --- 6. Replay codes: round-trip + same code => identical fingerprint ------
+console.log('replay');
+{
+    const specs: ReplaySpec[] = [
+        {
+            seed: 4242,
+            teamSize: 1,
+            lineupIds: ['hunter', 'orbiter'],
+            loadouts: [{ overdrive: 2, trigger: 3 }, { plating: 2, charger: 1, wideband: 1 }],
+        },
+        {
+            seed: 7,
+            teamSize: 3,
+            lineupIds: ['rusher', 'hunter', 'orbiter', 'turret', 'wanderer', 'hunter'],
+            loadouts: [{}, {}, {}, {}, {}, {}],
+        },
+    ];
+    for (const spec of specs) {
+        const code = encodeReplay(spec);
+        const back = decodeReplay(code);
+        check(`replay round-trips (${spec.teamSize}v${spec.teamSize})`, back !== null);
+        if (back) {
+            const sameSetup =
+                back.seed === spec.seed &&
+                back.teamSize === spec.teamSize &&
+                JSON.stringify(back.lineupIds) === JSON.stringify(spec.lineupIds) &&
+                JSON.stringify(back.loadouts) === JSON.stringify(spec.loadouts.map((l) => sanitizeLoadout(l)));
+            check(`replay preserves seed+lineups+loadouts (${spec.teamSize}v${spec.teamSize})`, sameSetup);
+            const teams = spec.lineupIds.map((_, i) => (i < spec.teamSize ? 0 : 1) as 0 | 1);
+            const direct = runMatch(spec.lineupIds, teams, spec.seed, spec.loadouts);
+            // Re-run purely from the decoded code, as Watch Replay does.
+            const replayed = runMatch(back.lineupIds, teams, back.seed, back.loadouts);
+            check(
+                `same code => identical fingerprint (${spec.teamSize}v${spec.teamSize})`,
+                fingerprint(direct) === fingerprint(replayed),
+            );
+        }
+    }
+    check('empty string rejected', decodeReplay('') === null);
+    check('wrong prefix rejected', decodeReplay('XX1.abcdef') === null);
+    check('bad base64 rejected', decodeReplay('RA1.!!!not-base64!!!') === null);
+    const valid = encodeReplay(specs[0] as ReplaySpec);
+    check('truncated code rejected', decodeReplay(valid.slice(0, -4)) === null);
+    check('overlong code rejected', decodeReplay(`RA1.${'A'.repeat(3000)}`) === null);
 }
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);

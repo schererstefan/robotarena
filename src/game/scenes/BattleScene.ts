@@ -5,12 +5,13 @@
 import { Scene } from 'phaser';
 import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
+import { encodeReplay } from '../../sim/replay';
 import { ROBOTS } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
 import { chassisKey, ensureArtTextures } from '../art';
 import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unlockAudio } from '../audio';
 import { COLORS, FONTS } from '../theme';
-import { downloadText, makeButton } from '../ui';
+import { copyText, downloadText, makeButton } from '../ui';
 import type { SlotSkin } from '../customize';
 import type { BattleRequest } from './MenuScene';
 
@@ -71,6 +72,7 @@ export class BattleScene extends Scene {
     private speed = 1;
     private speedButton!: { setLabel: (label: string) => void };
     private pauseButton!: { setLabel: (label: string) => void };
+    private stepButton!: { setLabel: (label: string) => void; setEnabled: (enabled: boolean) => void };
     private resultsShown = false;
     private trails: Array<Array<{ x: number; y: number }>> = [];
     private lastTrailTick = -1;
@@ -209,7 +211,8 @@ export class BattleScene extends Scene {
         this.add.rectangle(AX + ARENA_WIDTH / 2, 26, ARENA_WIDTH + 32, 40, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(10);
         this.hudPips = this.add.text(AX + 12, 26, '', FONTS.mono).setOrigin(0, 0.5).setDepth(10);
         this.hudTimer = this.add.text(AX + ARENA_WIDTH / 2, 26, '', FONTS.heading).setOrigin(0.5).setDepth(10);
-        this.add.text(AX + ARENA_WIDTH - 12, 26, `SEED ${this.request.seed}`, FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
+        const seedLabel = this.request.replay === true ? `SEED ${this.request.seed} - REPLAY` : `SEED ${this.request.seed}`;
+        this.add.text(AX + ARENA_WIDTH - 12, 26, seedLabel, FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
         this.banner = this.add.text(AX + ARENA_WIDTH / 2, AY + 56, '', FONTS.heading).setOrigin(0.5).setDepth(10).setAlpha(0);
 
         // Damage-number pool + live minimap (bottom HUD strip).
@@ -227,15 +230,19 @@ export class BattleScene extends Scene {
 
         this.pauseButton = makeButton(this, 760, 740, 120, 36, 'PAUSE', () => this.togglePause());
         this.speedButton = makeButton(this, 890, 740, 100, 36, '1X', () => this.cycleSpeed());
+        this.stepButton = makeButton(this, 600, 740, 120, 36, 'STEP (N)', () => this.stepOnce());
+        this.stepButton.setEnabled(false);
         makeButton(this, 134, 740, 120, 36, 'MENU', () => this.scene.start('Menu'));
         this.input.on('pointerdown', this.onAnyPointer);
         // Named handlers, removed on shutdown: the keyboard plugin is global
         // and outlives the scene, so anonymous listeners would stack per visit.
         this.input.keyboard?.on('keydown-SPACE', this.onSpaceKey);
         this.input.keyboard?.on('keydown-M', this.onMuteKey);
+        this.input.keyboard?.on('keydown-N', this.onStepKey);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-SPACE', this.onSpaceKey);
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
+            this.input.keyboard?.off('keydown-N', this.onStepKey);
         });
 
         this.syncSprites(this.match.robotSnapshots, this.match.bulletSnapshots);
@@ -289,6 +296,10 @@ export class BattleScene extends Scene {
         this.togglePause();
     };
 
+    private onStepKey = (): void => {
+        this.stepOnce();
+    };
+
     private onAnyPointer = (): void => {
         unlockAudio();
         playClick();
@@ -304,6 +315,15 @@ export class BattleScene extends Scene {
         if (this.match.result.over) return;
         this.paused = !this.paused;
         this.pauseButton.setLabel(this.paused ? 'RESUME' : 'PAUSE');
+        this.stepButton.setEnabled(this.paused);
+    }
+
+    /** Replay viewer: advance exactly one sim tick while paused. */
+    private stepOnce(): void {
+        if (!this.paused || this.match.result.over) return;
+        this.match.step();
+        this.acc = 0;
+        this.diffSnapshots(this.match.robotSnapshots);
     }
 
     private cycleSpeed(): void {
@@ -636,6 +656,7 @@ export class BattleScene extends Scene {
 
     private showResults(): void {
         const result = this.match.result;
+        this.stepButton.setEnabled(false);
         if (result.winner !== -1) playWin();
         const title = result.winner === -1 ? 'DRAW' : result.winner === 0 ? 'TEAM 1 WINS' : 'TEAM 2 WINS';
         const color = result.winner === -1 ? COLORS.ink : COLORS.teamCss[result.winner];
@@ -659,10 +680,33 @@ export class BattleScene extends Scene {
             hit.setInteractive({ useHandCursor: true });
             hit.on('pointerdown', () => this.exportRobot(s.id));
         });
-        this.add
-            .text(512, 274 + snaps.length * 30, 'click a row to download that robot (.ts)', FONTS.small)
+        const hintY = 274 + snaps.length * 30;
+        this.add.text(512, hintY, 'click a row to download that robot (.ts)', FONTS.small).setOrigin(0.5).setDepth(20);
+
+        const code = encodeReplay({
+            seed: this.request.seed,
+            teamSize: this.request.teamSize,
+            lineupIds: this.request.lineupIds,
+            loadouts: this.request.loadouts,
+        });
+        const copyLabel = this.add
+            .text(512, hintY + 26, 'REPLAY CODE - CLICK CODE TO COPY', FONTS.monoSmall)
             .setOrigin(0.5)
             .setDepth(20);
+        const codeText = this.add
+            .text(512, hintY + 40, code, { ...FONTS.monoSmall, color: '#ffd23f' })
+            .setOrigin(0.5, 0)
+            .setDepth(20);
+        codeText.setWordWrapWidth(560);
+        codeText.setInteractive({ useHandCursor: true });
+        codeText.on('pointerdown', () => {
+            void copyText(code).then((ok) => {
+                copyLabel.setText(ok ? 'REPLAY CODE - COPIED!' : 'REPLAY CODE - COPY FAILED');
+                this.time.delayedCall(1500, () => {
+                    copyLabel.setText('REPLAY CODE - CLICK CODE TO COPY');
+                });
+            });
+        });
 
         makeButton(
             this,
@@ -672,7 +716,7 @@ export class BattleScene extends Scene {
             44,
             'REMATCH',
             () => {
-                this.scene.restart({ ...this.request, seed: (Math.random() * 0x7fffffff) | 0 });
+                this.scene.restart({ ...this.request, seed: (Math.random() * 0x7fffffff) | 0, replay: false });
             },
             21,
         );

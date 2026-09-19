@@ -54,6 +54,29 @@ export function makePanel(scene: Scene, x: number, y: number, w: number, h: numb
     scene.add.rectangle(x, y, w - 8, h - 8, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge);
 }
 
+/** Best-effort clipboard copy with a legacy execCommand fallback. */
+export function copyText(text: string): Promise<boolean> {
+    if (navigator.clipboard?.writeText !== undefined) {
+        return navigator.clipboard.writeText(text).then(
+            () => true,
+            () => false,
+        );
+    }
+    try {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.style.position = 'fixed';
+        area.style.opacity = '0';
+        document.body.appendChild(area);
+        area.select();
+        const ok = document.execCommand('copy');
+        area.remove();
+        return Promise.resolve(ok);
+    } catch {
+        return Promise.resolve(false);
+    }
+}
+
 /** Trigger a browser download of a text file (used for robot export). */
 export function downloadText(filename: string, content: string): void {
     const blob = new Blob([content], { type: 'text/plain' });

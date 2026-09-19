@@ -3,6 +3,7 @@
 
 import { Scene } from 'phaser';
 import { getRobot, ROBOTS } from '../../robots/registry';
+import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { chassisKey, ensureArtTextures } from '../art';
 import { isMuted, playClick, toggleMuted, unlockAudio } from '../audio';
@@ -17,6 +18,8 @@ export interface BattleRequest {
     skins: SlotSkin[];
     trails: boolean;
     seed: number;
+    /** True when this battle replays a shared code (HUD tag only). */
+    replay?: boolean;
 }
 
 const CX = 512;
@@ -38,6 +41,7 @@ export class MenuScene extends Scene {
     private modeButtons: Array<{ setLabel: (label: string) => void }> = [];
     private trailsButton!: { setLabel: (label: string) => void };
     private muteButton!: { setLabel: (label: string) => void };
+    private replayOverlay: HTMLDivElement | null = null;
 
     constructor() {
         super('Menu');
@@ -75,15 +79,19 @@ export class MenuScene extends Scene {
 
         makeButton(this, CX - 160, 684, 260, 50, 'RANDOMIZE SKINS', () => this.randomizeSkins());
         makeButton(this, CX + 160, 684, 260, 50, 'START BATTLE', () => this.startBattle());
-        this.trailsButton = makeButton(this, CX - 125, 736, 220, 30, '', () => this.toggleTrails());
-        this.muteButton = makeButton(this, CX + 125, 736, 220, 30, '', () => this.toggleMute());
+        this.trailsButton = makeButton(this, CX - 215, 736, 200, 30, '', () => this.toggleTrails());
+        this.muteButton = makeButton(this, CX, 736, 200, 30, '', () => this.toggleMute());
+        makeButton(this, CX + 215, 736, 200, 30, 'WATCH REPLAY', () => this.openReplayDialog());
         this.refreshTrailsLabel();
         this.refreshMuteLabel();
         // First click creates/resumes the AudioContext (autoplay policy);
         // every click gets a UI blip.
         this.input.on('pointerdown', this.onAnyPointer);
         this.input.keyboard?.on('keydown-M', this.onMuteKey);
-        this.events.once('shutdown', () => this.input.keyboard?.off('keydown-M', this.onMuteKey));
+        this.events.once('shutdown', () => {
+            this.input.keyboard?.off('keydown-M', this.onMuteKey);
+            this.closeReplayDialog();
+        });
     }
 
     private onAnyPointer = (): void => {
@@ -92,6 +100,8 @@ export class MenuScene extends Scene {
     };
 
     private onMuteKey = (): void => {
+        // Typing in the replay-code input must not flip the mute toggle.
+        if (document.activeElement instanceof HTMLInputElement) return;
         unlockAudio();
         this.toggleMute();
     };
@@ -349,6 +359,83 @@ export class MenuScene extends Scene {
         this.descText.setText(
             `${entry.meta.name} by ${entry.meta.author} v${entry.meta.version} — ${entry.meta.description}`,
         );
+    }
+
+    // ---- Watch-replay dialog (DOM overlay for real text input) ---------------
+    private openReplayDialog(): void {
+        if (this.replayOverlay) return;
+        const overlay = document.createElement('div');
+        overlay.style.cssText =
+            'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;' +
+            'background:rgba(6,8,11,0.85);z-index:1000;';
+        const panel = document.createElement('div');
+        panel.style.cssText =
+            'background:#141a21;border:2px solid #2b3542;padding:24px;width:440px;max-width:90vw;' +
+            "font-family:Menlo,Consolas,'Courier New',monospace;";
+        panel.innerHTML =
+            '<div style="color:#e8edf2;font-size:14px;margin-bottom:12px;">WATCH REPLAY</div>' +
+            '<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">paste a replay code:</div>' +
+            '<input type="text" spellcheck="false" placeholder="RA1.…" ' +
+            'style="width:100%;box-sizing:border-box;background:#0b0e12;border:1px solid #2b3542;' +
+            'color:#e8edf2;padding:8px;font-family:inherit;font-size:12px;" />' +
+            '<div class="replay-error" style="color:#ff5d5d;font-size:12px;min-height:18px;margin-top:6px;"></div>' +
+            '<div style="display:flex;gap:8px;margin-top:8px;">' +
+            '<button class="replay-watch" style="flex:1;background:#1d2530;border:2px solid #ffb340;' +
+            'color:#e8edf2;padding:10px;font-family:inherit;font-size:12px;cursor:pointer;">WATCH</button>' +
+            '<button class="replay-cancel" style="flex:1;background:#141a21;border:2px solid #2b3542;' +
+            'color:#9aa7b4;padding:10px;font-family:inherit;font-size:12px;cursor:pointer;">CANCEL</button>' +
+            '</div>';
+        overlay.appendChild(panel);
+        document.body.appendChild(overlay);
+        this.replayOverlay = overlay;
+
+        const input = panel.querySelector('input');
+        const error = panel.querySelector('.replay-error');
+        const watch = panel.querySelector('.replay-watch');
+        const cancel = panel.querySelector('.replay-cancel');
+        if (!input || !error || !watch || !cancel) {
+            this.closeReplayDialog();
+            return;
+        }
+        const submit = (): void => {
+            const data = decodeReplay(input.value);
+            if (!data) {
+                error.textContent = 'invalid replay code';
+                return;
+            }
+            for (const id of data.lineupIds) {
+                if (!getRobot(id)) {
+                    error.textContent = `unknown robot in code: ${id}`;
+                    return;
+                }
+            }
+            this.closeReplayDialog();
+            this.scene.start('Battle', {
+                teamSize: data.teamSize,
+                lineupIds: [...data.lineupIds],
+                loadouts: data.loadouts.map((l) => ({ ...l })),
+                skins: data.lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
+                trails: this.trails,
+                seed: data.seed,
+                replay: true,
+            } satisfies BattleRequest);
+        };
+        watch.addEventListener('click', submit);
+        cancel.addEventListener('click', () => this.closeReplayDialog());
+        overlay.addEventListener('pointerdown', (event) => {
+            if (event.target === overlay) this.closeReplayDialog();
+        });
+        input.addEventListener('keydown', (event) => {
+            event.stopPropagation();
+            if (event.key === 'Enter') submit();
+            if (event.key === 'Escape') this.closeReplayDialog();
+        });
+        input.focus();
+    }
+
+    private closeReplayDialog(): void {
+        this.replayOverlay?.remove();
+        this.replayOverlay = null;
     }
 
     private startBattle(): void {
