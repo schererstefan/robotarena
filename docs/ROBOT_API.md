@@ -89,9 +89,17 @@ constants — read your effective values from `sense.self.stats` instead.
 | Plating (PLT)  | 2   | +15 max health                                               |
 
 **Charge mechanic:** with the charger skill, holding `charge` while the gun is
-ready banks up to a full charge (drive slowed to 75%). Firing consumes the bank
+ready banks up to a full charge. Holding `charge` slows drive to 75% whenever
+held (even while cooling down, when nothing banks). Firing consumes the bank
 for `damage × (1 + charge × (mult − 1))` with mult 2. The bank decays over ~4 s
-when not held. Without the skill, `charge` does nothing.
+when not banking. Without the skill, `charge` does nothing.
+
+**Edges worth knowing:** cooldown bottoms out at 8 ticks regardless of Trigger
+stacking; towers pre-aim at the nearest foe on spawn; bullets spawn 18 units
+ahead of center and that head start counts against range; each robot gets an
+independent random stream per tick, so your `rand()` draws never shift another
+robot's; match seeds are coerced with `>>> 0` (fractional/negative/NaN seeds
+alias — use positive integers).
 
 **Validation:** ranks clamp to max, unknown ids drop, and over-budget loadouts
 shed ranks from the end of the catalog until legal. Same loadout + same seed

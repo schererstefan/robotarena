@@ -3,7 +3,7 @@
 
 import { ACCEL, ARENA_HEIGHT, ARENA_WIDTH, BULLET_RADIUS, DT, MAX_TICKS, REVERSE_FACTOR, ROBOT_RADIUS } from './constants';
 import { angleDiff, clamp, dist, toNumber, wrapAngle } from './math';
-import { createRng, type Rand } from './rng';
+import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
 import { IDLE_INTENT, type Intent, type RobotController, type SensedRobot, type SenseState } from './types';
 
@@ -27,6 +27,7 @@ export interface RobotSnapshot {
     code: string;
     scan: number;
     fov: number;
+    errors: number;
 }
 
 export interface BulletSnapshot {
@@ -100,13 +101,20 @@ export class Match {
     private tick = 0;
     private over = false;
     private winner: -1 | 0 | 1 = -1;
-    private readonly rand: Rand;
+    private readonly seed: number;
 
     constructor(lineups: LineupEntry[], seed: number) {
-        this.rand = createRng(seed);
+        this.seed = seed;
         lineups.forEach((entry, index) => {
             const spawn = Match.spawnFor(entry.team, Match.teamIndex(lineups, index), Match.teamSize(lineups, entry.team));
-            const loadout = sanitizeLoadout(entry.loadout ?? entry.controller.loadout ?? {});
+            // Guarded: hostile getters on the entry/controller must not kill setup.
+            let loadout: SkillLoadout = {};
+            let setupErrors = 0;
+            try {
+                loadout = sanitizeLoadout(entry.loadout ?? entry.controller.loadout ?? {});
+            } catch {
+                setupErrors = 1;
+            }
             const stats = computeStats(loadout);
             this.robots.push({
                 id: index,
@@ -126,7 +134,7 @@ export class Match {
                 kills: 0,
                 damageDealt: 0,
                 shotsFired: 0,
-                errors: 0,
+                errors: setupErrors,
             });
         });
         // Aim towers at the nearest foe and fire spawn hooks in fixed order.
@@ -151,7 +159,7 @@ export class Match {
         return this.robots.map((r) => ({
             id: r.id,
             team: r.team,
-            name: r.controller.meta.name,
+            name: r.controller.meta?.name ?? `robot-${r.id}`,
             x: r.x,
             y: r.y,
             heading: r.heading,
@@ -168,6 +176,7 @@ export class Match {
             code: loadoutCode(r.loadout),
             scan: r.stats.sensorRange,
             fov: r.stats.sensorFov,
+            errors: r.errors,
         }));
     }
 
@@ -195,7 +204,7 @@ export class Match {
             const charging = intent.charge && canCharge && robot.cooldown <= 0;
             if (charging) {
                 robot.charge = Math.min(1, robot.charge + 1 / robot.stats.chargeTicks);
-            } else if (!intent.fire) {
+            } else {
                 robot.charge = Math.max(0, robot.charge - DT / 4); // bank decays in ~4s
             }
             const slow = intent.charge && canCharge ? 0.75 : 1;
@@ -211,6 +220,7 @@ export class Match {
         });
         this.collideWalls();
         this.collideRobots();
+        this.collideWalls(); // separation can shove robots past the walls
         // 3. Fire guns.
         this.robots.forEach((robot, i) => {
             if (!robot.alive) return;
@@ -227,7 +237,7 @@ export class Match {
                     vy: Math.sin(robot.tower) * robot.stats.bulletSpeed,
                     team: robot.team,
                     owner: robot.id,
-                    travelled: 0,
+                    travelled: ROBOT_RADIUS + 4, // muzzle starts ahead of center
                     range: robot.stats.gunRange,
                     damage,
                     speed: robot.stats.bulletSpeed,
@@ -293,7 +303,10 @@ export class Match {
                 top: robot.y,
                 bottom: ARENA_HEIGHT - robot.y,
             },
-            rand: this.rand,
+            // Per-(robot,tick) stream: one robot's draws never shift another's.
+            rand: createRng(
+                (this.seed ^ Math.imul(robot.id + 1, 2654435761) ^ Math.imul(this.tick + 1, 40503)) >>> 0,
+            ),
         };
     }
 
@@ -354,6 +367,16 @@ export class Match {
                     ra.y -= ny * push;
                     rb.x += nx * push;
                     rb.y += ny * push;
+                } else if (d === 0) {
+                    // Exact overlap: deterministic id-ordered split along x.
+                    const push = minDist / 2;
+                    if (ra.id < rb.id) {
+                        ra.x -= push;
+                        rb.x += push;
+                    } else {
+                        ra.x += push;
+                        rb.x -= push;
+                    }
                 }
             }
         }
@@ -422,7 +445,11 @@ export class Match {
     private static spawnFor(team: 0 | 1, index: number, size: number): { x: number; y: number; heading: number } {
         const x = team === 0 ? 130 : ARENA_WIDTH - 130;
         const spread = 150;
-        const y = ARENA_HEIGHT / 2 + (index - (size - 1) / 2) * spread;
+        const y = clamp(
+            ARENA_HEIGHT / 2 + (index - (size - 1) / 2) * spread,
+            ROBOT_RADIUS * 2,
+            ARENA_HEIGHT - ROBOT_RADIUS * 2,
+        );
         return { x, y, heading: team === 0 ? 0 : Math.PI };
     }
 }

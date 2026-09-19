@@ -168,9 +168,16 @@ export class MenuScene extends Scene {
 
     private cycleCallsign(i: number): void {
         const skin = this.skins[i] as SlotSkin;
-        const idx = CALLSIGNS.indexOf(skin.callsign);
-        const next = CALLSIGNS[(idx + 1) % CALLSIGNS.length] as string;
-        this.skins[i] = { ...skin, callsign: next };
+        const taken = new Set(this.skins.map((s, k) => (k === i ? '' : s.callsign)));
+        let idx = CALLSIGNS.indexOf(skin.callsign);
+        for (let n = 0; n < CALLSIGNS.length; n += 1) {
+            idx = (idx + 1) % CALLSIGNS.length;
+            const candidate = CALLSIGNS[idx] as string;
+            if (!taken.has(candidate)) {
+                this.skins[i] = { ...skin, callsign: candidate };
+                break;
+            }
+        }
         this.rebuildSlots();
     }
 

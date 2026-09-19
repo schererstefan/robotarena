@@ -41,7 +41,7 @@ export function create(): RobotController {
         return {
             throttle: throttleFor(self.heading, goalAngle),
             turn: steerTo(self.heading, goalAngle),
-            towerTurn: foe ? aimTurret(self.tower, foe.bearing) : clamp(2.4 / 3.6, -1, 1),
+            towerTurn: foe ? aimTurret(self.tower, foe.bearing) : clamp(2.4 / self.stats.towerRate, -1, 1),
             fire,
             charge: false,
         };

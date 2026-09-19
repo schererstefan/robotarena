@@ -4,7 +4,7 @@
 
 import { Scene } from 'phaser';
 import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS } from '../../sim/constants';
-import { Match, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
+import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import { ROBOTS } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
 import { chassisKey, ensureArtTextures } from '../art';
@@ -57,6 +57,10 @@ export class BattleScene extends Scene {
     private trails: Array<Array<{ x: number; y: number }>> = [];
     private lastTrailTick = -1;
     private stripes: Phaser.GameObjects.Rectangle[] = [];
+    private barBand: number[] = [];
+    private bulletTeam: Array<0 | 1 | null> = [];
+    private total0 = 0;
+    private total1 = 0;
     private lastHudSecond = -1;
     private lastAlive: [number, number] = [-1, -1];
 
@@ -84,6 +88,10 @@ export class BattleScene extends Scene {
         this.trails = [];
         this.lastTrailTick = -1;
         this.stripes = [];
+        this.barBand = [];
+        this.bulletTeam = [];
+        this.total0 = 0;
+        this.total1 = 0;
         this.bannerQueue = [];
         this.bannerBusy = false;
         this.lastHudSecond = -1;
@@ -150,16 +158,22 @@ export class BattleScene extends Scene {
             this.recoil.push(0);
             this.muzzleLife.push(0);
             this.trails.push([]);
-            // Spawn-in pop.
+            this.barBand.push(-1);
+            if (snap.team === 0) this.total0 += 1;
+            else this.total1 += 1;
+            // Spawn-in pop (chassis + tower + hub scale together).
             body.setScale(0.5).setAlpha(0);
+            tower.setScale(0.5).setAlpha(0);
+            hub.setScale(0.5).setAlpha(0);
             stripe.setAlpha(0);
-            this.tweens.add({ targets: body, scale: 2, alpha: 1, duration: 350, delay: i * 90, ease: 'Back.easeOut' });
+            this.tweens.add({ targets: [body, tower, hub], scale: 2, alpha: 1, duration: 350, delay: i * 90, ease: 'Back.easeOut' });
             this.tweens.add({ targets: stripe, alpha: 1, duration: 350, delay: i * 90 });
         });
 
         // Bullet + particle pools.
         for (let i = 0; i < BULLET_POOL; i += 1) {
             this.bullets.push(this.add.image(-50, -50, 'bullet').setScale(2).setDepth(7).setVisible(false));
+            this.bulletTeam.push(null);
         }
         for (let i = 0; i < PARTICLE_POOL; i += 1) {
             const img = this.add.image(-50, -50, 'spark').setScale(2).setDepth(8).setVisible(false);
@@ -176,15 +190,19 @@ export class BattleScene extends Scene {
         this.pauseButton = makeButton(this, 760, 740, 120, 36, 'PAUSE', () => this.togglePause());
         this.speedButton = makeButton(this, 890, 740, 100, 36, '1X', () => this.cycleSpeed());
         makeButton(this, 134, 740, 120, 36, 'MENU', () => this.scene.start('Menu'));
-        this.input.keyboard?.on('keydown-SPACE', () => this.togglePause());
+        // Named handler, removed on shutdown: the keyboard plugin is global and
+        // outlives the scene, so anonymous listeners would stack per visit.
+        this.input.keyboard?.on('keydown-SPACE', this.onSpaceKey);
+        this.events.once('shutdown', () => this.input.keyboard?.off('keydown-SPACE', this.onSpaceKey));
 
-        this.syncSprites();
-        this.drawDynamic();
+        this.syncSprites(this.match.robotSnapshots, this.match.bulletSnapshots);
+        this.drawDynamic(this.match.robotSnapshots);
     }
 
     update(_time: number, delta: number): void {
         void _time;
         const dt = Math.min(delta / 1000, 0.1);
+        let stepped = false;
         if (!this.paused && !this.match.result.over) {
             this.acc += dt * this.speed;
             let steps = 0;
@@ -194,12 +212,16 @@ export class BattleScene extends Scene {
                 steps += 1;
             }
             if (steps === 12) this.acc = 0;
-            this.diffSnapshots();
+            stepped = steps > 0;
         }
+        // Snapshot once per frame; every helper below reuses these.
+        const snaps = this.match.robotSnapshots;
+        const bullets = this.match.bulletSnapshots;
+        if (stepped) this.diffSnapshots(snaps);
         const tick = this.match.result.tick;
         if (this.request.trails && tick % 3 === 0 && tick !== this.lastTrailTick && !this.match.result.over) {
             this.lastTrailTick = tick;
-            this.match.robotSnapshots.forEach((s, i) => {
+            snaps.forEach((s, i) => {
                 const trail = this.trails[i] as Array<{ x: number; y: number }>;
                 if (s.alive) {
                     trail.push({ x: s.x, y: s.y });
@@ -211,14 +233,18 @@ export class BattleScene extends Scene {
         }
         this.updateParticles(dt);
         this.decayEffects(dt);
-        this.syncSprites();
-        this.drawDynamic();
-        this.syncHud();
+        this.syncSprites(snaps, bullets);
+        this.drawDynamic(snaps);
+        this.syncHud(snaps);
         if (this.match.result.over && !this.resultsShown) {
             this.resultsShown = true;
             this.showResults();
         }
     }
+
+    private onSpaceKey = (): void => {
+        this.togglePause();
+    };
 
     private togglePause(): void {
         if (this.match.result.over) return;
@@ -232,8 +258,7 @@ export class BattleScene extends Scene {
     }
 
     /** Compare fresh snapshots to previous frame: fire flashes, hits, deaths. */
-    private diffSnapshots(): void {
-        const snaps = this.match.robotSnapshots;
+    private diffSnapshots(snaps: RobotSnapshot[]): void {
         snaps.forEach((s, i) => {
             const p = this.prev[i] as RobotSnapshot;
             const cx = AX + s.x;
@@ -241,6 +266,7 @@ export class BattleScene extends Scene {
             if (s.shotsFired > p.shotsFired && s.alive) {
                 this.muzzleLife[i] = 0.09;
                 this.recoil[i] = 5;
+                (this.muzzles[i] as Phaser.GameObjects.Image).setScale(2 + Math.random() * 0.8);
                 this.burst(cx + Math.cos(s.tower) * 26, cy + Math.sin(s.tower) * 26, 0xffe28a, 4, 120, 0);
             }
             if (s.health < p.health && s.alive) {
@@ -336,8 +362,7 @@ export class BattleScene extends Scene {
         }
     }
 
-    private syncSprites(): void {
-        const snaps = this.match.robotSnapshots;
+    private syncSprites(snaps: RobotSnapshot[], bullets: BulletSnapshot[]): void {
         snaps.forEach((s, i) => {
             const cx = AX + s.x;
             const cy = AY + s.y;
@@ -363,7 +388,6 @@ export class BattleScene extends Scene {
             if (show) {
                 muzzle.setPosition(cx + Math.cos(s.tower) * 30, cy + Math.sin(s.tower) * 30);
                 muzzle.setRotation(s.tower);
-                muzzle.setScale(2 + Math.random() * 0.8);
             }
             // Health bar + name.
             const frac = Math.max(s.health, 0) / s.maxHealth;
@@ -372,28 +396,34 @@ export class BattleScene extends Scene {
             bg.setVisible(visible).setPosition(cx, cy - 28);
             fg.setVisible(visible).setPosition(cx - 22 + (44 * frac) / 2, cy - 28);
             fg.setSize(44 * frac, 4);
-            fg.setFillStyle(frac > 0.5 ? COLORS.accent : frac > 0.25 ? COLORS.team[0] : COLORS.danger);
+            const band = frac > 0.5 ? 2 : frac > 0.25 ? 1 : 0;
+            if (band !== this.barBand[i]) {
+                this.barBand[i] = band;
+                fg.setFillStyle(band === 2 ? COLORS.accent : band === 1 ? COLORS.team[0] : COLORS.danger);
+            }
             const label = this.nameTexts[i] as Phaser.GameObjects.Text;
             label.setVisible(true).setPosition(cx, cy - 40);
             if (!s.alive) label.setColor('#5d6a78');
         });
-        // Bullets from pool.
-        const bullets = this.match.bulletSnapshots;
+        // Bullets from pool (tint only when the slot's team changes).
         this.bullets.forEach((img, i) => {
             const b = bullets[i];
             if (b === undefined) {
                 img.setVisible(false);
+                this.bulletTeam[i] = null;
                 return;
             }
             img.setVisible(true).setPosition(AX + b.x, AY + b.y);
-            img.setTint(COLORS.bullet[b.team]);
+            if (this.bulletTeam[i] !== b.team) {
+                this.bulletTeam[i] = b.team;
+                img.setTint(COLORS.bullet[b.team]);
+            }
         });
     }
 
-    private drawDynamic(): void {
+    private drawDynamic(snaps: RobotSnapshot[]): void {
         const g = this.dyn;
         g.clear();
-        const snaps = this.match.robotSnapshots;
         if (this.request.trails) {
             snaps.forEach((_ignored, i) => {
                 const skin = this.request.skins[i] as SlotSkin;
@@ -431,17 +461,19 @@ export class BattleScene extends Scene {
         }
     }
 
-    private syncHud(): void {
-        const snaps = this.match.robotSnapshots;
-        const alive0 = snaps.filter((s) => s.alive && s.team === 0).length;
-        const alive1 = snaps.filter((s) => s.alive && s.team === 1).length;
-        const total0 = snaps.filter((s) => s.team === 0).length;
-        const total1 = snaps.filter((s) => s.team === 1).length;
+    private syncHud(snaps: RobotSnapshot[]): void {
+        let alive0 = 0;
+        let alive1 = 0;
+        for (const s of snaps) {
+            if (!s.alive) continue;
+            if (s.team === 0) alive0 += 1;
+            else alive1 += 1;
+        }
         const second = Math.floor(this.match.result.tick / 60);
         if (alive0 !== this.lastAlive[0] || alive1 !== this.lastAlive[1]) {
             this.lastAlive = [alive0, alive1];
             const pips = (alive: number, total: number) => '●'.repeat(alive) + '○'.repeat(total - alive);
-            this.hudPips.setText(`T1 ${pips(alive0, total0)}   T2 ${pips(alive1, total1)}`);
+            this.hudPips.setText(`T1 ${pips(alive0, this.total0)}   T2 ${pips(alive1, this.total1)}`);
         }
         if (second !== this.lastHudSecond) {
             this.lastHudSecond = second;
@@ -480,10 +512,19 @@ export class BattleScene extends Scene {
             .setOrigin(0.5)
             .setDepth(20);
 
-        makeButton(this, 412, 566, 170, 44, 'REMATCH', () => {
-            this.scene.restart({ ...this.request, seed: (Math.random() * 0x7fffffff) | 0 });
-        });
-        makeButton(this, 612, 566, 170, 44, 'MENU', () => this.scene.start('Menu'));
+        makeButton(
+            this,
+            412,
+            566,
+            170,
+            44,
+            'REMATCH',
+            () => {
+                this.scene.restart({ ...this.request, seed: (Math.random() * 0x7fffffff) | 0 });
+            },
+            21,
+        );
+        makeButton(this, 612, 566, 170, 44, 'MENU', () => this.scene.start('Menu'), 21);
     }
 
     private exportRobot(id: number): void {

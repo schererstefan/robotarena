@@ -38,9 +38,10 @@ function runMatch(ids: string[], teams: Array<0 | 1>, seed: number): Match {
 function fingerprint(match: Match): string {
     // Full precision: any divergence, however small, must show.
     const snaps = match.robotSnapshots.map((s) =>
-        [s.code, s.maxHealth, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired].join(','),
+        [s.code, s.maxHealth, s.alive ? 1 : 0, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired, s.cooldown, s.charge].join(','),
     );
-    return `${match.result.winner}@${match.result.tick}|${snaps.join('|')}`;
+    const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team].join(',')).join(';');
+    return `${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}`;
 }
 
 // --- 1. Determinism: same seed, same everything ------------------------------
@@ -60,11 +61,11 @@ console.log('clamping');
 {
     const cheater: RobotController = {
         meta: { id: 'cheater', name: 'Cheater', author: 'test', version: '0', description: '' },
-        update: (): Intent => ({ throttle: 99, turn: -99, towerTurn: 99, fire: true }),
+        update: (): Intent => ({ throttle: 99, turn: -99, towerTurn: 99, fire: true, charge: true }),
     };
     const garbage: RobotController = {
         meta: { id: 'garbage', name: 'Garbage', author: 'test', version: '0', description: '' },
-        update: () => ({ throttle: NaN, turn: Infinity, towerTurn: -Infinity, fire: 'yes' }) as unknown as Intent,
+        update: () => ({ throttle: NaN, turn: Infinity, towerTurn: -Infinity, fire: 'yes', charge: 1 }) as unknown as Intent,
     };
     const match = new Match(
         [
@@ -107,7 +108,11 @@ console.log('isolation');
         ],
         42,
     );
-    while (!match.result.over) match.step();
+    let guard = 0;
+    while (!match.result.over && guard <= MAX_TICKS + 10) {
+        match.step();
+        guard += 1;
+    }
     check('match completes despite throwing robot', match.result.over);
 
     // A robot that mutates its sensed stats must not alter real physics.
@@ -195,6 +200,7 @@ console.log('soak');
     const wins = new Map<string, number>(ids.map((id) => [id, 0]));
     let draws = 0;
     let games = 0;
+    let totalErrors = 0;
     const seeds = [11, 22, 33];
     for (const a of ids) {
         for (const b of ids) {
@@ -202,6 +208,7 @@ console.log('soak');
             for (const seed of seeds) {
                 const match = runMatch([a, b], [0, 1], seed);
                 games += 1;
+                totalErrors += match.robotSnapshots.reduce((sum, s) => sum + s.errors, 0);
                 if (!match.result.over) {
                     check(`1v1 ${a} vs ${b} seed ${seed} finishes`, false);
                     continue;
@@ -213,6 +220,7 @@ console.log('soak');
         }
     }
     check(`all ${games} 1v1 games finished`, games === ids.length * (ids.length - 1) * seeds.length);
+    check('built-in robots run error-free', totalErrors === 0, `errors=${totalErrors}`);
     console.log(`       record: ${ids.map((id) => `${id}=${wins.get(id)}`).join(' ')} draws=${draws}`);
     const maxWins = Math.max(...[...wins.values()]);
     check('no robot wins every matchup (balance smell)', maxWins < games);

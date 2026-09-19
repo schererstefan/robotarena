@@ -41,8 +41,12 @@ export type SkillLoadout = Partial<Record<SkillId, number>>;
 
 export function rankOf(loadout: SkillLoadout, id: SkillId): number {
     const rank = loadout[id] ?? 0;
-    return Number.isInteger(rank) && rank > 0 ? rank : 0;
+    return typeof rank === 'number' && Number.isFinite(rank) ? Math.max(0, Math.floor(rank)) : 0;
 }
+
+const MAX_RANKS: Record<SkillId, number> = Object.fromEntries(
+    SKILL_DEFS.map((def) => [def.id, def.maxRank]),
+) as Record<SkillId, number>;
 
 export function loadoutCost(loadout: SkillLoadout): number {
     return SKILL_DEFS.reduce((sum, def) => sum + Math.min(rankOf(loadout, def.id), def.maxRank) * RANK_COST, 0);
@@ -106,15 +110,16 @@ import {
 } from './constants';
 
 export function computeStats(loadout: SkillLoadout): RobotStats {
-    const overdrive = Math.min(rankOf(loadout, 'overdrive'), 3);
-    const gyro = Math.min(rankOf(loadout, 'gyro'), 3);
-    const servos = Math.min(rankOf(loadout, 'servos'), 3);
-    const longscan = Math.min(rankOf(loadout, 'longscan'), 3);
-    const wideband = Math.min(rankOf(loadout, 'wideband'), 2);
-    const trigger = Math.min(rankOf(loadout, 'trigger'), 3);
-    const marksman = Math.min(rankOf(loadout, 'marksman'), 2);
-    const charger = Math.min(rankOf(loadout, 'charger'), 2);
-    const plating = Math.min(rankOf(loadout, 'plating'), 2);
+    const capped = (id: SkillId): number => Math.min(rankOf(loadout, id), MAX_RANKS[id]);
+    const overdrive = capped('overdrive');
+    const gyro = capped('gyro');
+    const servos = capped('servos');
+    const longscan = capped('longscan');
+    const wideband = capped('wideband');
+    const trigger = capped('trigger');
+    const marksman = capped('marksman');
+    const charger = capped('charger');
+    const plating = capped('plating');
     return {
         maxSpeed: MAX_SPEED * (1 + 0.08 * overdrive),
         turnRate: TURN_RATE * (1 + 0.12 * gyro),

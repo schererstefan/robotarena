@@ -17,9 +17,10 @@ export function makeButton(
     h: number,
     label: string,
     onClick: () => void,
+    depth = 0,
 ): Button {
-    const bg = scene.add.rectangle(x, y, w, h, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge);
-    const text = scene.add.text(x, y, label, FONTS.button).setOrigin(0.5);
+    const bg = scene.add.rectangle(x, y, w, h, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(depth);
+    const text = scene.add.text(x, y, label, FONTS.button).setOrigin(0.5).setDepth(depth);
     bg.setInteractive({ useHandCursor: true });
     bg.on('pointerover', () => {
         bg.setFillStyle(0x1d2530);

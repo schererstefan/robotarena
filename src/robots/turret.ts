@@ -37,7 +37,9 @@ export function create(): RobotController {
     function update(sense: SenseState): Intent {
         const self = sense.self;
         const foe = sense.foes[0];
-        if (dist(self.x, self.y, anchorX, anchorY) < 24) anchored = true;
+        const anchorDist = dist(self.x, self.y, anchorX, anchorY);
+        if (anchorDist < 24) anchored = true;
+        else if (anchorDist > 60) anchored = false; // shoved off: re-drive in
 
         let throttle = 0;
         let turn = 0;
