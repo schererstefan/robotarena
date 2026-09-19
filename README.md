@@ -1,5 +1,7 @@
 # RobotArena
 
+**Play it live: https://robotarena.vercel.app**
+
 2D robot battles in the browser. Every robot runs on the **identical platform** — same
 chassis speed, same sensor tower, same gun. The only thing that differs is the code:
 you write the strategy, the arena settles the rest.
