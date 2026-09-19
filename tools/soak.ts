@@ -6,6 +6,7 @@ import { MAX_SPEED, MAX_TICKS } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, type ReplaySpec } from '../src/sim/replay';
+import { checkRobotSource, suggestFilename, WORKSHOP_TEMPLATE, workshopPassed } from '../src/game/workshop';
 import {
     clearDailyBoard,
     clearHistory,
@@ -406,6 +407,36 @@ console.log('tournament');
     check('every bracket match finishes', unfinished === 0);
     check('8-bot bracket yields a champion in 7 matches', champion !== null && matches === 7);
     check(`8-bot tournament under 30s (${(elapsed / 1000).toFixed(1)}s)`, elapsed < 30000);
+}
+
+// --- Workshop: template passes, violations fail, comments don't count -----
+console.log('workshop');
+{
+    const failed = (source: string, id: string): boolean =>
+        checkRobotSource(source).some((check) => check.id === id && !check.pass);
+    check('template passes every check', workshopPassed(checkRobotSource(WORKSHOP_TEMPLATE)));
+    check('template suggests mybot.ts', suggestFilename(WORKSHOP_TEMPLATE) === 'mybot.ts');
+    check('empty draft fails meta-shape', failed('', 'meta-shape'));
+    check('empty draft fails create-export', failed('', 'create-export'));
+    check('uppercase id fails meta-id', failed(WORKSHOP_TEMPLATE.replace("id: 'mybot'", "id: 'MyBot'"), 'meta-id'));
+    check(
+        'over-budget loadout fails loadout-budget',
+        failed(WORKSHOP_TEMPLATE.replace('{ overdrive: 2, trigger: 2, plating: 2 }', '{ overdrive: 3, trigger: 3, plating: 3 }'), 'loadout-budget'),
+    );
+    check(
+        'unknown skill fails loadout-skills',
+        failed(WORKSHOP_TEMPLATE.replace('{ overdrive: 2, trigger: 2, plating: 2 }', '{ overdrive: 2, warpdrive: 2 }'), 'loadout-skills'),
+    );
+    check('Math.random in code fails no-nondeterminism', failed(`${WORKSHOP_TEMPLATE}\nconst r = Math.random();`, 'no-nondeterminism'));
+    check('fetch in code fails no-io', failed(`${WORKSHOP_TEMPLATE}\nvoid fetch("/x");`, 'no-io'));
+    check('document in code fails no-host', failed(`${WORKSHOP_TEMPLATE}\nvoid document.title;`, 'no-host'));
+    check('dynamic import fails no-host', failed(`${WORKSHOP_TEMPLATE}\nvoid import("./evil");`, 'no-host'));
+    check('phaser import fails imports', failed(`import "phaser";\n${WORKSHOP_TEMPLATE}`, 'imports'));
+    check(
+        'banned words in comments still pass',
+        workshopPassed(checkRobotSource(`${WORKSHOP_TEMPLATE}\n// Math.random fetch document are all banned\n/* eval("x") */`)),
+    );
+    check('unusable id falls back to my-robot.ts', suggestFilename('export const meta = { id: "Nope!" };') === 'my-robot.ts');
 }
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);
