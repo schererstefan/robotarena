@@ -18,11 +18,17 @@ export function makeButton(
     label: string,
     onClick: () => void,
 ): Button {
-    const bg = scene.add.rectangle(x, y, w, h, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge);
+    const bg = scene.add.rectangle(x, y, w, h, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge);
     const text = scene.add.text(x, y, label, FONTS.button).setOrigin(0.5);
     bg.setInteractive({ useHandCursor: true });
-    bg.on('pointerover', () => bg.setFillStyle(0x1d2530));
-    bg.on('pointerout', () => bg.setFillStyle(COLORS.panel));
+    bg.on('pointerover', () => {
+        bg.setFillStyle(0x1d2530);
+        bg.setStrokeStyle(2, COLORS.team[0]);
+    });
+    bg.on('pointerout', () => {
+        bg.setFillStyle(COLORS.panel);
+        bg.setStrokeStyle(2, COLORS.panelEdge);
+    });
     bg.on('pointerdown', onClick);
     return {
         setLabel: (next: string) => text.setText(next),
@@ -43,7 +49,8 @@ export function makeButton(
 }
 
 export function makePanel(scene: Scene, x: number, y: number, w: number, h: number): void {
-    scene.add.rectangle(x, y, w, h, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge);
+    scene.add.rectangle(x, y, w, h, 0x0b0e12).setStrokeStyle(4, 0x0b0e12);
+    scene.add.rectangle(x, y, w - 8, h - 8, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge);
 }
 
 /** Trigger a browser download of a text file (used for robot export). */

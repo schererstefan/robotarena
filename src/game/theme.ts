@@ -19,12 +19,18 @@ export const COLORS = {
     danger: 0xff5d5d,
 };
 
+const PIXEL = "'Press Start 2P', 'Courier New', monospace";
+const SANS = "'Trebuchet MS', Verdana, sans-serif";
+const MONO = "Menlo, Consolas, 'Courier New', monospace";
+
 export const FONTS = {
-    title: { fontFamily: "'Trebuchet MS', Verdana, sans-serif", fontSize: '44px', color: COLORS.ink },
-    heading: { fontFamily: "'Trebuchet MS', Verdana, sans-serif", fontSize: '22px', color: COLORS.ink },
-    body: { fontFamily: "'Trebuchet MS', Verdana, sans-serif", fontSize: '16px', color: COLORS.ink },
-    small: { fontFamily: "'Trebuchet MS', Verdana, sans-serif", fontSize: '13px', color: COLORS.dim },
-    mono: { fontFamily: "Menlo, Consolas, 'Courier New', monospace", fontSize: '14px', color: COLORS.ink },
-    monoSmall: { fontFamily: "Menlo, Consolas, 'Courier New', monospace", fontSize: '12px', color: COLORS.dim },
-    button: { fontFamily: "'Trebuchet MS', Verdana, sans-serif", fontSize: '17px', color: COLORS.ink },
+    title: { fontFamily: PIXEL, fontSize: '40px', color: COLORS.ink },
+    heading: { fontFamily: PIXEL, fontSize: '16px', color: COLORS.ink },
+    banner: { fontFamily: PIXEL, fontSize: '28px', color: COLORS.ink },
+    body: { fontFamily: SANS, fontSize: '16px', color: COLORS.ink },
+    small: { fontFamily: SANS, fontSize: '13px', color: COLORS.dim },
+    mono: { fontFamily: MONO, fontSize: '14px', color: COLORS.ink },
+    monoSmall: { fontFamily: MONO, fontSize: '12px', color: COLORS.dim },
+    button: { fontFamily: PIXEL, fontSize: '11px', color: COLORS.ink },
+    buttonSmall: { fontFamily: PIXEL, fontSize: '9px', color: COLORS.ink },
 };

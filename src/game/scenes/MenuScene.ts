@@ -1,8 +1,10 @@
-// Main menu: mode select (1v1 / 2v2 / 3v3), per-slot robot picker plus
-// cosmetic-only customization (callsign, paint, finish, trails).
+// Main menu: mode select, per-slot robot picker with sprite previews,
+// cosmetic skins, and per-slot skill loadouts (symmetric point budgets).
 
 import { Scene } from 'phaser';
 import { ROBOTS } from '../../robots/registry';
+import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
+import { chassisKey, ensureArtTextures } from '../art';
 import { COLORS, FONTS } from '../theme';
 import { makeButton, makePanel } from '../ui';
 import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } from '../customize';
@@ -10,6 +12,7 @@ import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } f
 export interface BattleRequest {
     teamSize: number;
     lineupIds: string[];
+    loadouts: SkillLoadout[];
     skins: SlotSkin[];
     trails: boolean;
     seed: number;
@@ -20,9 +23,13 @@ const CX = 512;
 export class MenuScene extends Scene {
     private teamSize = 1;
     private lineupIds: string[] = ['hunter', 'orbiter'];
+    private loadouts: SkillLoadout[] = [{ ...ROBOTS[3]!.loadout }, { ...ROBOTS[2]!.loadout }];
     private skins: SlotSkin[] = [defaultSkin('HUNTER', 0), defaultSkin('ORBITER', 1)];
     private trails = true;
     private slotObjects: Phaser.GameObjects.GameObject[] = [];
+    private editorObjects: Phaser.GameObjects.GameObject[] = [];
+    private editorSlot = -1;
+    private editorPoints!: Phaser.GameObjects.Text;
     private descText!: Phaser.GameObjects.Text;
     private modeButtons: Array<{ setLabel: (label: string) => void }> = [];
     private trailsButton!: { setLabel: (label: string) => void };
@@ -32,22 +39,24 @@ export class MenuScene extends Scene {
     }
 
     create(): void {
-        this.add.text(CX, 46, 'ROBOTARENA', FONTS.title).setOrigin(0.5);
+        ensureArtTextures(this);
+        this.add.text(CX, 44, 'ROBOTARENA', FONTS.title).setOrigin(0.5);
         this.add
-            .text(CX, 84, 'identical machines. only the code differs. (paint is free)', FONTS.small)
+            .text(CX, 86, 'same budget. same catalog. only the code differs.', FONTS.small)
             .setOrigin(0.5);
 
         [1, 2, 3].forEach((size, i) => {
-            const btn = makeButton(this, CX - 150 + i * 150, 138, 130, 42, '', () => this.setMode(size));
+            const btn = makeButton(this, CX - 150 + i * 150, 136, 130, 42, '', () => this.setMode(size));
             this.modeButtons.push(btn);
         });
         this.refreshModeLabels();
 
-        this.add.text(92, 178, 'SLOT', FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(200, 178, 'CALLSIGN', FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(400, 178, 'ROBOT', FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(640, 178, 'PAINT', FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(742, 178, 'FINISH', FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(92, 176, 'SLOT', FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(208, 176, 'CALLSIGN', FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(392, 176, 'ROBOT', FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(618, 176, 'PAINT', FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(694, 176, 'FINISH', FONTS.monoSmall).setOrigin(0, 0.5);
+        this.add.text(836, 176, 'SKILLS', FONTS.monoSmall).setOrigin(0, 0.5);
         this.rebuildSlots();
 
         makePanel(this, CX, 592, 880, 76);
@@ -56,7 +65,7 @@ export class MenuScene extends Scene {
 
         makeButton(this, CX - 160, 684, 260, 50, 'RANDOMIZE SKINS', () => this.randomizeSkins());
         makeButton(this, CX + 160, 684, 260, 50, 'START BATTLE', () => this.startBattle());
-        this.trailsButton = makeButton(this, CX, 736, 200, 30, '', () => this.toggleTrails());
+        this.trailsButton = makeButton(this, CX, 736, 220, 30, '', () => this.toggleTrails());
         this.refreshTrailsLabel();
     }
 
@@ -65,15 +74,17 @@ export class MenuScene extends Scene {
         const defaults = ['hunter', 'orbiter', 'rusher', 'turret', 'wanderer', 'hunter'];
         const nextIds: string[] = [];
         const nextSkins: SlotSkin[] = [];
+        const nextLoadouts: SkillLoadout[] = [];
         for (let i = 0; i < size * 2; i += 1) {
             const id = this.lineupIds[i] ?? (defaults[i] as string);
             nextIds.push(id);
             const entry = ROBOTS.find((r) => r.meta.id === id) ?? ROBOTS[0]!;
-            const old = this.skins[i];
-            nextSkins.push(old ?? defaultSkin(entry.meta.name.toUpperCase(), i));
+            nextSkins.push(this.skins[i] ?? defaultSkin(entry.meta.name.toUpperCase(), i));
+            nextLoadouts.push(this.loadouts[i] ?? { ...entry.loadout });
         }
         this.lineupIds = nextIds;
         this.skins = nextSkins;
+        this.loadouts = nextLoadouts;
         this.refreshModeLabels();
         this.rebuildSlots();
         this.showDescription(0);
@@ -83,7 +94,7 @@ export class MenuScene extends Scene {
         const labels = ['1 v 1', '2 v 2', '3 v 3'];
         this.modeButtons.forEach((btn, i) => {
             const active = i + 1 === this.teamSize;
-            btn.setLabel(`${active ? '[ ' : ''}${labels[i]}${active ? ' ]' : ''}`);
+            btn.setLabel(`${active ? '> ' : ''}${labels[i]}${active ? ' <' : ''}`);
         });
     }
 
@@ -106,6 +117,16 @@ export class MenuScene extends Scene {
         return obj;
     }
 
+    private cycler(x: number, w: number, y: number, label: string, onClick: () => void, color = COLORS.ink): void {
+        const bg = this.track(this.add.rectangle(x, y, w, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge));
+        const text = this.track(this.add.text(x, y, label, FONTS.buttonSmall).setOrigin(0.5));
+        text.setColor(color);
+        bg.setInteractive({ useHandCursor: true });
+        bg.on('pointerover', () => bg.setStrokeStyle(2, COLORS.team[0]));
+        bg.on('pointerout', () => bg.setStrokeStyle(2, COLORS.panelEdge));
+        bg.on('pointerdown', onClick);
+    }
+
     private rebuildSlots(): void {
         for (const obj of this.slotObjects) obj.destroy();
         this.slotObjects = [];
@@ -117,34 +138,23 @@ export class MenuScene extends Scene {
             const y = startY + i * step;
             const team = (i < this.teamSize ? 0 : 1) as 0 | 1;
             const skin = this.skins[i] as SlotSkin;
-            const entry = ROBOTS.find((r) => r.meta.id === this.lineupIds[i]) ?? ROBOTS[0]!;
+            const id = this.lineupIds[i] as string;
+            const entry = ROBOTS.find((r) => r.meta.id === id) ?? ROBOTS[0]!;
+            const loadout = this.loadouts[i] as SkillLoadout;
 
-            this.track(this.add.rectangle(100, y, 18, 18, COLORS.team[team]));
-            this.track(this.add.text(118, y, `T${team + 1}·${i + 1}`, FONTS.monoSmall).setOrigin(0, 0.5));
+            this.track(this.add.rectangle(100, y, 14, 14, COLORS.team[team]));
+            const preview = this.track(this.add.image(152, y, chassisKey(id)).setScale(2));
+            preview.setTint(COLORS.team[team]);
 
-            // Callsign cycler.
-            const signBg = this.track(this.add.rectangle(285, y, 150, 40, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge));
-            const signText = this.track(this.add.text(285, y, `${skin.callsign}  ▸`, FONTS.button).setOrigin(0.5));
-            signText.setColor(skin.paintCss);
-            signBg.setInteractive({ useHandCursor: true });
-            signBg.on('pointerdown', () => this.cycleCallsign(i));
+            this.cycler(285, 150, y, `${skin.callsign} >`, () => this.cycleCallsign(i), skin.paintCss);
+            this.cycler(490, 200, y, `${entry.meta.name} >`, () => this.cycleRobot(i));
 
-            // Robot cycler.
-            const robotBg = this.track(this.add.rectangle(500, y, 200, 40, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge));
-            this.track(this.add.text(500, y, `${entry.meta.name}  ▸`, FONTS.button).setOrigin(0.5));
-            robotBg.setInteractive({ useHandCursor: true });
-            robotBg.on('pointerdown', () => this.cycleRobot(i));
-
-            // Paint swatch cycler.
-            const paintBg = this.track(this.add.rectangle(672, y, 64, 40, skin.paint).setStrokeStyle(2, COLORS.panelEdge));
+            const paintBg = this.track(this.add.rectangle(646, y, 56, 40, skin.paint).setStrokeStyle(2, 0x0b0e12));
             paintBg.setInteractive({ useHandCursor: true });
             paintBg.on('pointerdown', () => this.cyclePaint(i));
 
-            // Finish cycler.
-            const finishBg = this.track(this.add.rectangle(792, y, 130, 40, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge));
-            this.track(this.add.text(792, y, `${skin.finish}  ▸`, FONTS.button).setOrigin(0.5));
-            finishBg.setInteractive({ useHandCursor: true });
-            finishBg.on('pointerdown', () => this.cycleFinish(i));
+            this.cycler(748, 110, y, `${skin.finish} >`, () => this.cycleFinish(i));
+            this.cycler(885, 100, y, `SKL ${loadoutCost(loadout)}`, () => this.openEditor(i), '#7de08a');
         }
     }
 
@@ -181,11 +191,119 @@ export class MenuScene extends Scene {
         this.rebuildSlots();
     }
 
+    // ---- Loadout editor overlay -------------------------------------------
+    private trackEditor<T extends Phaser.GameObjects.GameObject>(obj: T): T {
+        this.editorObjects.push(obj);
+        return obj;
+    }
+
+    private openEditor(slot: number): void {
+        this.closeEditor();
+        this.editorSlot = slot;
+        const id = this.lineupIds[slot] as string;
+        const entry = ROBOTS.find((r) => r.meta.id === id) ?? ROBOTS[0]!;
+
+        this.trackEditor(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50));
+        this.trackEditor(this.add.rectangle(CX, 384, 740, 560, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
+        this.trackEditor(this.add.text(CX, 140, `SLOT ${slot + 1} LOADOUT`, FONTS.heading).setOrigin(0.5).setDepth(50));
+        this.trackEditor(this.add.text(CX, 166, `${entry.meta.name} - ${entry.meta.description}`, FONTS.small).setOrigin(0.5).setDepth(50));
+        this.editorPoints = this.trackEditor(this.add.text(CX, 196, '', FONTS.mono).setOrigin(0.5).setDepth(50));
+        this.refreshEditorRows();
+    }
+
+    private refreshEditorRows(): void {
+        // Drop old rows but keep the overlay frame (first 5 objects).
+        const frame = this.editorObjects.slice(0, 5);
+        for (const obj of this.editorObjects.slice(5)) obj.destroy();
+        this.editorObjects = frame;
+
+        const slot = this.editorSlot;
+        const loadout = this.loadouts[slot] as SkillLoadout;
+        const spent = loadoutCost(loadout);
+        this.editorPoints.setText(`POINTS  ${spent} / ${SKILL_BUDGET}`);
+        this.editorPoints.setColor(spent >= SKILL_BUDGET ? '#ffd23f' : COLORS.ink);
+
+        SKILL_DEFS.forEach((def, row) => {
+            const y = 232 + row * 38;
+            const rank = rankOf(loadout, def.id);
+            this.trackEditor(this.add.text(180, y, `${def.code}  ${def.name}`, FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(50));
+            this.trackEditor(this.add.text(180, y + 14, def.desc, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(50));
+            const minus = this.trackEditor(this.add.rectangle(640, y + 4, 36, 30, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
+            this.trackEditor(this.add.text(640, y + 4, '-', FONTS.button).setOrigin(0.5).setDepth(50));
+            minus.setInteractive({ useHandCursor: true });
+            minus.on('pointerdown', () => this.bumpSkill(def.id, -1));
+            const rankText = this.trackEditor(this.add.text(684, y + 4, `${rank}/${def.maxRank}`, FONTS.mono).setOrigin(0.5).setDepth(50));
+            rankText.setColor(rank > 0 ? '#7de08a' : COLORS.dim);
+            const plus = this.trackEditor(this.add.rectangle(740, y + 4, 36, 30, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
+            this.trackEditor(this.add.text(740, y + 4, '+', FONTS.button).setOrigin(0.5).setDepth(50));
+            plus.setInteractive({ useHandCursor: true });
+            plus.on('pointerdown', () => this.bumpSkill(def.id, 1));
+        });
+
+        const footer = 232 + SKILL_DEFS.length * 38 + 8;
+        const random = this.trackEditor(this.add.rectangle(CX - 150, footer, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
+        this.trackEditor(this.add.text(CX - 150, footer, 'RANDOM', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        random.setInteractive({ useHandCursor: true });
+        random.on('pointerdown', () => this.randomLoadout());
+        const clear = this.trackEditor(this.add.rectangle(CX + 20, footer, 130, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
+        this.trackEditor(this.add.text(CX + 20, footer, 'CLEAR', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        clear.setInteractive({ useHandCursor: true });
+        clear.on('pointerdown', () => {
+            this.loadouts[slot] = {};
+            this.refreshEditorRows();
+        });
+        const done = this.trackEditor(this.add.rectangle(CX + 190, footer, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50));
+        this.trackEditor(this.add.text(CX + 190, footer, 'DONE', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        done.setInteractive({ useHandCursor: true });
+        done.on('pointerdown', () => {
+            this.closeEditor();
+            this.rebuildSlots();
+        });
+    }
+
+    private bumpSkill(id: SkillId, delta: number): void {
+        const loadout = { ...(this.loadouts[this.editorSlot] as SkillLoadout) };
+        const def = SKILL_DEFS.find((d) => d.id === id)!;
+        const rank = rankOf(loadout, id);
+        if (delta > 0) {
+            if (rank >= def.maxRank || loadoutCost(loadout) >= SKILL_BUDGET) return;
+            loadout[id] = rank + 1;
+        } else {
+            if (rank <= 0) return;
+            if (rank === 1) delete loadout[id];
+            else loadout[id] = rank - 1;
+        }
+        this.loadouts[this.editorSlot] = loadout;
+        this.refreshEditorRows();
+    }
+
+    private randomLoadout(): void {
+        const loadout: SkillLoadout = {};
+        let points = SKILL_BUDGET;
+        const order = [...SKILL_DEFS].sort(() => Math.random() - 0.5);
+        for (const def of order) {
+            if (points <= 0) break;
+            const take = Math.min(def.maxRank, points, 1 + ((Math.random() * def.maxRank) | 0));
+            if (take > 0) {
+                loadout[def.id] = take;
+                points -= take;
+            }
+        }
+        this.loadouts[this.editorSlot] = loadout;
+        this.refreshEditorRows();
+    }
+
+    private closeEditor(): void {
+        for (const obj of this.editorObjects) obj.destroy();
+        this.editorObjects = [];
+        this.editorSlot = -1;
+    }
+
     private showDescription(i: number): void {
         const id = this.lineupIds[i] as string;
         const entry = ROBOTS.find((r) => r.meta.id === id) ?? ROBOTS[0]!;
         this.descText.setText(
-            `${entry.meta.name} by ${entry.meta.author} · v${entry.meta.version} — ${entry.meta.description}`,
+            `${entry.meta.name} by ${entry.meta.author} v${entry.meta.version} — ${entry.meta.description}`,
         );
     }
 
@@ -193,6 +311,7 @@ export class MenuScene extends Scene {
         this.scene.start('Battle', {
             teamSize: this.teamSize,
             lineupIds: [...this.lineupIds],
+            loadouts: this.loadouts.map((l) => ({ ...l })),
             skins: this.skins.map((s) => ({ ...s })),
             trails: this.trails,
             seed: (Math.random() * 0x7fffffff) | 0,

@@ -21,6 +21,8 @@ By submitting, you agree your robot is accepted under the repo's MIT license.
 ## Robot review checklist (for authors and reviewers)
 
 - [ ] Single file in `src/robots/`, id matches filename, meta filled in.
+- [ ] Default `loadout` totals ≤ 6 points and suits the strategy.
+- [ ] Reads ranges/cooldowns from `sense.self.stats`, never hardcoded constants.
 - [ ] Registered in `registry.ts` and `sources.ts`.
 - [ ] No `Math.random`/`Date`/network/storage/Phaser/DOM imports.
 - [ ] No per-tick errors or exceptions in a 1v1 soak.

@@ -1,8 +1,9 @@
 // Wanderer: drifts between random waypoints and shoots at anything its
 // sweeping tower happens to catch. Unpredictable by design.
 
-import { ARENA_HEIGHT, ARENA_WIDTH, GUN_RANGE, ROBOT_RADIUS } from '../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, ROBOT_RADIUS } from '../sim/constants';
 import { dist } from '../sim/math';
+import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 import { aimed, aimTurret, steerTo, throttleFor } from './common';
 
@@ -10,9 +11,11 @@ export const meta: RobotMeta = {
     id: 'wanderer',
     name: 'Wanderer',
     author: 'RobotArena',
-    version: '1.0.0',
+    version: '2.0.0',
     description: 'Roams on random waypoints and snaps shots at whatever it sees.',
 };
+
+export const loadout: SkillLoadout = { longscan: 2, wideband: 2, overdrive: 2 };
 
 export function create(): RobotController {
     let wx = ARENA_WIDTH / 2;
@@ -38,14 +41,15 @@ export function create(): RobotController {
         const foe = sense.foes[0];
         const goal = Math.atan2(wy - self.y, wx - self.x);
         const towerTurn = foe ? aimTurret(self.tower, foe.bearing) : 1; // full sweep
-        const fire = foe !== undefined && foe.distance < GUN_RANGE && aimed(self.tower, foe.bearing);
+        const fire = foe !== undefined && foe.distance < self.stats.gunRange && aimed(self.tower, foe.bearing);
         return {
             throttle: foe ? 0.5 : throttleFor(self.heading, goal),
             turn: steerTo(self.heading, goal),
             towerTurn,
             fire,
+            charge: false,
         };
     }
 
-    return { meta, update };
+    return { meta, loadout, update };
 }

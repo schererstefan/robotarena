@@ -25,3 +25,13 @@ export function throttleFor(heading: number, target: number): number {
 export function aimed(current: number, target: number, tolerance = 0.07): boolean {
     return Math.abs(angleDiff(current, target)) < tolerance;
 }
+
+/**
+ * Charge discipline for charger builds: bank while closing or re-aiming,
+ * release (stop charging) once a shot is imminent so full drive returns.
+ * Returns the charge flag to send; firing consumes the bank automatically.
+ */
+export function manageCharge(charged: boolean, shotReady: boolean): boolean {
+    if (charged) return false; // banked: drive free, fire at will
+    return !shotReady; // bank while the gun isn't about to speak
+}

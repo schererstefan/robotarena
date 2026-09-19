@@ -1,6 +1,6 @@
 {
   "name": "robotarena",
-  "description": "RobotArena: 2D Phaser robot battles where identical robots differ only in player-written AI.",
+  "description": "RobotArena: 2D pixel-art Phaser robot battles. Same skill budget, same catalog — only the code differs.",
   "version": "0.1.0",
   "license": "MIT",
   "scripts": {

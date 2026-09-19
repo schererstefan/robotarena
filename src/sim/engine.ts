@@ -1,28 +1,10 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import {
-    ACCEL,
-    ARENA_HEIGHT,
-    ARENA_WIDTH,
-    BULLET_DAMAGE,
-    BULLET_RADIUS,
-    BULLET_SPEED,
-    DT,
-    GUN_COOLDOWN_TICKS,
-    GUN_RANGE,
-    MAX_SPEED,
-    MAX_TICKS,
-    REVERSE_FACTOR,
-    ROBOT_RADIUS,
-    SENSOR_FOV,
-    SENSOR_RANGE,
-    START_HEALTH,
-    TOWER_RATE,
-    TURN_RATE,
-} from './constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_WIDTH, BULLET_RADIUS, DT, MAX_TICKS, REVERSE_FACTOR, ROBOT_RADIUS } from './constants';
 import { angleDiff, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng, type Rand } from './rng';
+import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
 import { IDLE_INTENT, type Intent, type RobotController, type SensedRobot, type SenseState } from './types';
 
 export interface RobotSnapshot {
@@ -34,11 +16,17 @@ export interface RobotSnapshot {
     heading: number;
     tower: number;
     health: number;
+    maxHealth: number;
     alive: boolean;
     cooldown: number;
     kills: number;
     damageDealt: number;
     shotsFired: number;
+    charge: number;
+    charged: boolean;
+    code: string;
+    scan: number;
+    fov: number;
 }
 
 export interface BulletSnapshot {
@@ -58,6 +46,8 @@ interface Robot {
     id: number;
     team: 0 | 1;
     controller: RobotController;
+    loadout: SkillLoadout;
+    stats: RobotStats;
     x: number;
     y: number;
     heading: number;
@@ -65,6 +55,7 @@ interface Robot {
     speed: number;
     health: number;
     cooldown: number;
+    charge: number;
     alive: boolean;
     kills: number;
     damageDealt: number;
@@ -80,11 +71,15 @@ interface Bullet {
     team: 0 | 1;
     owner: number;
     travelled: number;
+    range: number;
+    damage: number;
+    speed: number;
 }
 
 export interface LineupEntry {
     team: 0 | 1;
     controller: RobotController;
+    loadout?: SkillLoadout;
 }
 
 function sanitizeIntent(raw: unknown): Intent {
@@ -95,6 +90,7 @@ function sanitizeIntent(raw: unknown): Intent {
         turn: clamp(toNumber(r.turn), -1, 1),
         towerTurn: clamp(toNumber(r.towerTurn), -1, 1),
         fire: r.fire === true,
+        charge: r.charge === true,
     };
 }
 
@@ -110,17 +106,22 @@ export class Match {
         this.rand = createRng(seed);
         lineups.forEach((entry, index) => {
             const spawn = Match.spawnFor(entry.team, Match.teamIndex(lineups, index), Match.teamSize(lineups, entry.team));
+            const loadout = sanitizeLoadout(entry.loadout ?? entry.controller.loadout ?? {});
+            const stats = computeStats(loadout);
             this.robots.push({
                 id: index,
                 team: entry.team,
                 controller: entry.controller,
+                loadout,
+                stats,
                 x: spawn.x,
                 y: spawn.y,
                 heading: spawn.heading,
                 tower: spawn.heading,
                 speed: 0,
-                health: START_HEALTH,
+                health: stats.maxHealth,
                 cooldown: 0,
+                charge: 0,
                 alive: true,
                 kills: 0,
                 damageDealt: 0,
@@ -156,11 +157,17 @@ export class Match {
             heading: r.heading,
             tower: r.tower,
             health: r.health,
+            maxHealth: r.stats.maxHealth,
             alive: r.alive,
             cooldown: r.cooldown,
             kills: r.kills,
             damageDealt: r.damageDealt,
             shotsFired: r.shotsFired,
+            charge: r.charge,
+            charged: r.charge >= 1,
+            code: loadoutCode(r.loadout),
+            scan: r.stats.sensorRange,
+            fov: r.stats.sensorFov,
         }));
     }
 
@@ -180,15 +187,24 @@ export class Match {
                 return { ...IDLE_INTENT };
             }
         });
-        // 2. Drive + towers.
+        // 2. Drive + towers + charge.
         this.robots.forEach((robot, i) => {
             if (!robot.alive) return;
             const intent = intents[i] as Intent;
-            const target = intent.throttle >= 0 ? intent.throttle * MAX_SPEED : intent.throttle * MAX_SPEED * REVERSE_FACTOR;
+            const canCharge = robot.stats.chargeMult > 1;
+            const charging = intent.charge && canCharge && robot.cooldown <= 0;
+            if (charging) {
+                robot.charge = Math.min(1, robot.charge + 1 / robot.stats.chargeTicks);
+            } else if (!intent.fire) {
+                robot.charge = Math.max(0, robot.charge - DT / 4); // bank decays in ~4s
+            }
+            const slow = intent.charge && canCharge ? 0.75 : 1;
+            const top = robot.stats.maxSpeed * slow;
+            const target = intent.throttle >= 0 ? intent.throttle * top : intent.throttle * top * REVERSE_FACTOR;
             const dv = clamp(target - robot.speed, -ACCEL * DT, ACCEL * DT);
             robot.speed += dv;
-            robot.heading = wrapAngle(robot.heading + intent.turn * TURN_RATE * DT);
-            robot.tower = wrapAngle(robot.tower + intent.towerTurn * TOWER_RATE * DT);
+            robot.heading = wrapAngle(robot.heading + intent.turn * robot.stats.turnRate * DT);
+            robot.tower = wrapAngle(robot.tower + intent.towerTurn * robot.stats.towerRate * DT);
             robot.x += Math.cos(robot.heading) * robot.speed * DT;
             robot.y += Math.sin(robot.heading) * robot.speed * DT;
             if (robot.cooldown > 0) robot.cooldown -= 1;
@@ -200,16 +216,21 @@ export class Match {
             if (!robot.alive) return;
             const intent = intents[i] as Intent;
             if (intent.fire && robot.cooldown <= 0) {
-                robot.cooldown = GUN_COOLDOWN_TICKS;
+                robot.cooldown = robot.stats.cooldownTicks;
                 robot.shotsFired += 1;
+                const damage = robot.stats.damage * (1 + robot.charge * (robot.stats.chargeMult - 1));
+                robot.charge = 0;
                 this.bullets.push({
                     x: robot.x + Math.cos(robot.tower) * (ROBOT_RADIUS + 4),
                     y: robot.y + Math.sin(robot.tower) * (ROBOT_RADIUS + 4),
-                    vx: Math.cos(robot.tower) * BULLET_SPEED,
-                    vy: Math.sin(robot.tower) * BULLET_SPEED,
+                    vx: Math.cos(robot.tower) * robot.stats.bulletSpeed,
+                    vy: Math.sin(robot.tower) * robot.stats.bulletSpeed,
                     team: robot.team,
                     owner: robot.id,
                     travelled: 0,
+                    range: robot.stats.gunRange,
+                    damage,
+                    speed: robot.stats.bulletSpeed,
                 });
             }
         });
@@ -239,7 +260,7 @@ export class Match {
             };
             if (other.team === robot.team) {
                 allies.push(sensed);
-            } else if (d <= SENSOR_RANGE && Math.abs(angleDiff(robot.tower, bearing)) <= SENSOR_FOV / 2) {
+            } else if (d <= robot.stats.sensorRange && Math.abs(angleDiff(robot.tower, bearing)) <= robot.stats.sensorFov / 2) {
                 foes.push(sensed);
             }
         }
@@ -258,6 +279,10 @@ export class Match {
                 speed: robot.speed,
                 health: robot.health,
                 cooldown: robot.cooldown,
+                stats: robot.stats,
+                charge: robot.charge,
+                charged: robot.charge >= 1,
+                loadout: { ...robot.loadout },
             },
             foes,
             allies,
@@ -338,16 +363,16 @@ export class Match {
         for (const bullet of this.bullets) {
             bullet.x += bullet.vx * DT;
             bullet.y += bullet.vy * DT;
-            bullet.travelled += BULLET_SPEED * DT;
-            if (bullet.travelled > GUN_RANGE) continue;
+            bullet.travelled += bullet.speed * DT;
+            if (bullet.travelled > bullet.range) continue;
             if (bullet.x < 0 || bullet.x > ARENA_WIDTH || bullet.y < 0 || bullet.y > ARENA_HEIGHT) continue;
             let hit = false;
             for (const robot of this.robots) {
                 if (!robot.alive || robot.team === bullet.team) continue; // no friendly fire
                 if (dist(bullet.x, bullet.y, robot.x, robot.y) < ROBOT_RADIUS + BULLET_RADIUS) {
-                    robot.health -= BULLET_DAMAGE;
+                    robot.health -= bullet.damage;
                     const owner = this.robots[bullet.owner] as Robot;
-                    owner.damageDealt += BULLET_DAMAGE;
+                    owner.damageDealt += bullet.damage;
                     if (robot.health <= 0) {
                         robot.health = 0;
                         robot.alive = false;

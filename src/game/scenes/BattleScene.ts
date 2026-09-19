@@ -1,11 +1,13 @@
-// Battle scene: owns the Match, steps the fixed-tick sim, renders the
-// arena procedurally, and shows results with per-robot source export.
+// Battle scene: owns the Match, steps the fixed-tick sim, and renders the
+// arena with pixel-art sprites. Static layers are built once; per-frame work
+// is sprite transforms plus one small dynamic Graphics (cones + trails).
 
 import { Scene } from 'phaser';
-import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS, SENSOR_FOV, SENSOR_RANGE } from '../../sim/constants';
-import { Match, type LineupEntry } from '../../sim/engine';
+import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS } from '../../sim/constants';
+import { Match, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import { ROBOTS } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
+import { chassisKey, ensureArtTextures } from '../art';
 import { COLORS, FONTS } from '../theme';
 import { downloadText, makeButton } from '../ui';
 import type { SlotSkin } from '../customize';
@@ -13,13 +15,39 @@ import type { BattleRequest } from './MenuScene';
 
 const AX = 32;
 const AY = 72;
+const BULLET_POOL = 24;
+const PARTICLE_POOL = 128;
+
+interface Particle {
+    img: Phaser.GameObjects.Image;
+    vx: number;
+    vy: number;
+    life: number;
+    maxLife: number;
+    gravity: number;
+}
 
 export class BattleScene extends Scene {
     private request!: BattleRequest;
     private match!: Match;
-    private gfx!: Phaser.GameObjects.Graphics;
+    private dyn!: Phaser.GameObjects.Graphics;
+    private chassis: Phaser.GameObjects.Image[] = [];
+    private towers: Phaser.GameObjects.Image[] = [];
+    private hubs: Phaser.GameObjects.Image[] = [];
+    private barBg: Phaser.GameObjects.Rectangle[] = [];
+    private barFg: Phaser.GameObjects.Rectangle[] = [];
     private nameTexts: Phaser.GameObjects.Text[] = [];
-    private hudText!: Phaser.GameObjects.Text;
+    private bullets: Phaser.GameObjects.Image[] = [];
+    private muzzles: Phaser.GameObjects.Image[] = [];
+    private particles: Particle[] = [];
+    private recoil: number[] = [];
+    private muzzleLife: number[] = [];
+    private hudPips!: Phaser.GameObjects.Text;
+    private hudTimer!: Phaser.GameObjects.Text;
+    private banner!: Phaser.GameObjects.Text;
+    private bannerQueue: string[] = [];
+    private bannerBusy = false;
+    private prev!: RobotSnapshot[];
     private acc = 0;
     private paused = false;
     private speed = 1;
@@ -27,6 +55,8 @@ export class BattleScene extends Scene {
     private pauseButton!: { setLabel: (label: string) => void };
     private resultsShown = false;
     private trails: Array<Array<{ x: number; y: number }>> = [];
+    private lastHudSecond = -1;
+    private lastAlive: [number, number] = [-1, -1];
 
     constructor() {
         super('Battle');
@@ -38,41 +68,116 @@ export class BattleScene extends Scene {
         this.paused = false;
         this.speed = 1;
         this.resultsShown = false;
+        this.chassis = [];
+        this.towers = [];
+        this.hubs = [];
+        this.barBg = [];
+        this.barFg = [];
         this.nameTexts = [];
+        this.bullets = [];
+        this.muzzles = [];
+        this.particles = [];
+        this.recoil = [];
+        this.muzzleLife = [];
         this.trails = [];
+        this.bannerQueue = [];
+        this.bannerBusy = false;
+        this.lastHudSecond = -1;
+        this.lastAlive = [-1, -1];
     }
 
     create(): void {
+        ensureArtTextures(this);
         const lineups: LineupEntry[] = this.request.lineupIds.map((id, i) => {
             const entry = ROBOTS.find((r) => r.meta.id === id) ?? ROBOTS[0]!;
-            return { team: (i < this.request.teamSize ? 0 : 1) as 0 | 1, controller: entry.create() };
+            return {
+                team: (i < this.request.teamSize ? 0 : 1) as 0 | 1,
+                controller: entry.create(),
+                loadout: { ...(this.request.loadouts[i] ?? {}) },
+            };
         });
         this.match = new Match(lineups, this.request.seed);
+        this.prev = this.match.robotSnapshots;
 
-        this.gfx = this.add.graphics();
-        this.match.robotSnapshots.forEach((_snap, i) => {
+        // Static layers: floor + wall strips.
+        this.add.tileSprite(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT / 2, ARENA_WIDTH, ARENA_HEIGHT, 'tile_floor').setDepth(0);
+        const wall = (x: number, y: number, w: number, h: number) => {
+            this.add.tileSprite(x, y, w, h, 'tile_wall').setDepth(1);
+        };
+        wall(AX + ARENA_WIDTH / 2, AY - 8, ARENA_WIDTH + 32, 16);
+        wall(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT + 8, ARENA_WIDTH + 32, 16);
+        wall(AX - 8, AY + ARENA_HEIGHT / 2, 16, ARENA_HEIGHT + 32);
+        wall(AX + ARENA_WIDTH + 8, AY + ARENA_HEIGHT / 2, 16, ARENA_HEIGHT + 32);
+
+        this.dyn = this.add.graphics().setDepth(2);
+
+        // Robot sprite sets.
+        this.match.robotSnapshots.forEach((snap, i) => {
             const skin = this.request.skins[i] as SlotSkin;
-            const text = this.add.text(0, 0, skin.callsign, FONTS.monoSmall).setOrigin(0.5);
-            this.nameTexts.push(text);
+            const robotId = this.request.lineupIds[i] as string;
+            const team = COLORS.team[snap.team];
+            const body = this.add.image(0, 0, chassisKey(robotId)).setScale(2).setDepth(4);
+            body.setTint(team);
+            const tower = this.add.image(0, 0, 'tower').setScale(2).setDepth(5);
+            tower.setTint(skin.paint);
+            const hub = this.add.image(0, 0, 'hub').setScale(2).setDepth(6);
+            hub.setTint(skin.paint);
+            if (skin.finish === 'Ring') {
+                const ring = this.add.graphics().setDepth(3);
+                ring.lineStyle(2, skin.paint, 0.85);
+                ring.strokeCircle(0, 0, (ROBOT_RADIUS + 6) * 1);
+                ring.setPosition(0, 0);
+                (body as Phaser.GameObjects.Image & { ring?: Phaser.GameObjects.Graphics }).ring = ring;
+            }
+            this.chassis.push(body);
+            this.towers.push(tower);
+            this.hubs.push(hub);
+            this.barBg.push(this.add.rectangle(0, 0, 46, 6, 0x000000, 0.7).setDepth(9));
+            this.barFg.push(this.add.rectangle(0, 0, 44, 4, COLORS.accent).setDepth(9));
+            const name = this.add.text(0, 0, skin.callsign, FONTS.monoSmall).setOrigin(0.5).setDepth(9);
+            name.setColor(COLORS.teamCss[snap.team]);
+            this.nameTexts.push(name);
+            const muzzle = this.add.image(0, 0, 'muzzle').setScale(2).setDepth(8).setVisible(false);
+            muzzle.setTint(skin.paint);
+            this.muzzles.push(muzzle);
+            this.recoil.push(0);
+            this.muzzleLife.push(0);
             this.trails.push([]);
+            // Spawn-in pop.
+            body.setScale(0.5).setAlpha(0);
+            this.tweens.add({ targets: body, scale: 2, alpha: 1, duration: 350, delay: i * 90, ease: 'Back.easeOut' });
         });
-        this.hudText = this.add.text(AX, 20, '', FONTS.mono).setOrigin(0, 0.5);
 
-        this.pauseButton = makeButton(this, 760, 740, 120, 36, 'Pause', () => this.togglePause());
-        this.speedButton = makeButton(this, 890, 740, 100, 36, '1x', () => this.cycleSpeed());
-        makeButton(this, 134, 740, 120, 36, 'Menu', () => this.scene.start('Menu'));
-        this.add
-            .text(512, 740, `seed ${this.request.seed}`, FONTS.monoSmall)
-            .setOrigin(0.5);
+        // Bullet + particle pools.
+        for (let i = 0; i < BULLET_POOL; i += 1) {
+            this.bullets.push(this.add.image(-50, -50, 'bullet').setScale(2).setDepth(7).setVisible(false));
+        }
+        for (let i = 0; i < PARTICLE_POOL; i += 1) {
+            const img = this.add.image(-50, -50, 'spark').setScale(2).setDepth(8).setVisible(false);
+            this.particles.push({ img, vx: 0, vy: 0, life: 0, maxLife: 1, gravity: 0 });
+        }
+
+        // HUD.
+        this.add.rectangle(AX + ARENA_WIDTH / 2, 26, ARENA_WIDTH + 32, 40, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(10);
+        this.hudPips = this.add.text(AX + 12, 26, '', FONTS.mono).setOrigin(0, 0.5).setDepth(10);
+        this.hudTimer = this.add.text(AX + ARENA_WIDTH / 2, 26, '', FONTS.heading).setOrigin(0.5).setDepth(10);
+        this.add.text(AX + ARENA_WIDTH - 12, 26, `SEED ${this.request.seed}`, FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
+        this.banner = this.add.text(AX + ARENA_WIDTH / 2, AY + 56, '', FONTS.heading).setOrigin(0.5).setDepth(10).setAlpha(0);
+
+        this.pauseButton = makeButton(this, 760, 740, 120, 36, 'PAUSE', () => this.togglePause());
+        this.speedButton = makeButton(this, 890, 740, 100, 36, '1X', () => this.cycleSpeed());
+        makeButton(this, 134, 740, 120, 36, 'MENU', () => this.scene.start('Menu'));
         this.input.keyboard?.on('keydown-SPACE', () => this.togglePause());
 
-        this.draw();
+        this.syncSprites();
+        this.drawDynamic();
     }
 
     update(_time: number, delta: number): void {
         void _time;
+        const dt = Math.min(delta / 1000, 0.1);
         if (!this.paused && !this.match.result.over) {
-            this.acc += Math.min(delta / 1000, 0.1) * this.speed;
+            this.acc += dt * this.speed;
             let steps = 0;
             while (this.acc >= DT && steps < 12 && !this.match.result.over) {
                 this.match.step();
@@ -80,19 +185,24 @@ export class BattleScene extends Scene {
                 steps += 1;
             }
             if (steps === 12) this.acc = 0;
+            this.diffSnapshots();
         }
         if (this.request.trails && this.match.result.tick % 3 === 0 && !this.match.result.over) {
             this.match.robotSnapshots.forEach((s, i) => {
                 const trail = this.trails[i] as Array<{ x: number; y: number }>;
                 if (s.alive) {
                     trail.push({ x: s.x, y: s.y });
-                    if (trail.length > 18) trail.shift();
+                    if (trail.length > 14) trail.shift();
                 } else if (trail.length > 0) {
                     trail.shift();
                 }
             });
         }
-        this.draw();
+        this.updateParticles(dt);
+        this.decayEffects(dt);
+        this.syncSprites();
+        this.drawDynamic();
+        this.syncHud();
         if (this.match.result.over && !this.resultsShown) {
             this.resultsShown = true;
             this.showResults();
@@ -102,162 +212,264 @@ export class BattleScene extends Scene {
     private togglePause(): void {
         if (this.match.result.over) return;
         this.paused = !this.paused;
-        this.pauseButton.setLabel(this.paused ? 'Resume' : 'Pause');
+        this.pauseButton.setLabel(this.paused ? 'RESUME' : 'PAUSE');
     }
 
     private cycleSpeed(): void {
         this.speed = this.speed === 1 ? 2 : this.speed === 2 ? 4 : 1;
-        this.speedButton.setLabel(`${this.speed}x`);
+        this.speedButton.setLabel(`${this.speed}X`);
     }
 
-    private draw(): void {
-        const g = this.gfx;
-        g.clear();
-        // Floor + grid + border.
-        g.fillStyle(COLORS.arenaFloor, 1);
-        g.fillRect(AX, AY, ARENA_WIDTH, ARENA_HEIGHT);
-        g.lineStyle(1, COLORS.arenaGrid, 1);
-        for (let x = 80; x < ARENA_WIDTH; x += 80) g.lineBetween(AX + x, AY, AX + x, AY + ARENA_HEIGHT);
-        for (let y = 80; y < ARENA_HEIGHT; y += 80) g.lineBetween(AX, AY + y, AX + ARENA_WIDTH, AY + y);
-        g.lineStyle(2, COLORS.arenaEdge, 1);
-        g.strokeRect(AX, AY, ARENA_WIDTH, ARENA_HEIGHT);
-
+    /** Compare fresh snapshots to previous frame: fire flashes, hits, deaths. */
+    private diffSnapshots(): void {
         const snaps = this.match.robotSnapshots;
-        // Motion trails (cosmetic).
+        snaps.forEach((s, i) => {
+            const p = this.prev[i] as RobotSnapshot;
+            const cx = AX + s.x;
+            const cy = AY + s.y;
+            if (s.shotsFired > p.shotsFired && s.alive) {
+                this.muzzleLife[i] = 0.09;
+                this.recoil[i] = 5;
+                this.burst(cx + Math.cos(s.tower) * 26, cy + Math.sin(s.tower) * 26, 0xffe28a, 4, 120, 0);
+            }
+            if (s.health < p.health && s.alive) {
+                this.burst(cx, cy, 0xff5d5d, 6, 170, 300);
+            }
+            if (p.alive && !s.alive) {
+                this.explode(i, cx, cy);
+            }
+            if (s.alive && s.health <= 30 && s.health > 0 && this.match.result.tick % 12 === 0) {
+                this.burst(cx, cy - 10, 0x5d6a78, 1, 30, -60);
+            }
+        });
+        this.prev = snaps;
+    }
+
+    private explode(i: number, cx: number, cy: number): void {
+        const snap = this.match.robotSnapshots[i] as RobotSnapshot;
+        const robotId = this.request.lineupIds[i] as string;
+        this.burst(cx, cy, COLORS.team[snap.team], 22, 260, 200);
+        this.burst(cx, cy, 0xffffff, 8, 140, 100);
+        this.cameras.main.shake(180, 0.006);
+        // Persistent wreck.
+        const wreck = this.add.image(cx, cy, chassisKey(robotId)).setScale(2).setDepth(3);
+        wreck.setTint(0x1c222a);
+        wreck.setRotation(snap.heading + 0.5);
+        wreck.setAlpha(0.9);
+        const skin = this.request.skins[i] as SlotSkin;
+        this.queueBanner(`${skin.callsign} DESTROYED`);
+    }
+
+    private queueBanner(text: string): void {
+        this.bannerQueue.push(text);
+        if (!this.bannerBusy) this.nextBanner();
+    }
+
+    private nextBanner(): void {
+        const text = this.bannerQueue.shift();
+        if (text === undefined) {
+            this.bannerBusy = false;
+            return;
+        }
+        this.bannerBusy = true;
+        this.banner.setText(text).setAlpha(1).setY(AY + 56);
+        this.tweens.add({
+            targets: this.banner,
+            y: AY + 34,
+            alpha: 0,
+            duration: 1300,
+            ease: 'Cubic.easeOut',
+            onComplete: () => this.nextBanner(),
+        });
+    }
+
+    private burst(x: number, y: number, color: number, n: number, speed: number, gravity: number): void {
+        let spawned = 0;
+        for (const p of this.particles) {
+            if (p.life > 0) continue;
+            const angle = Math.random() * Math.PI * 2;
+            const v = speed * (0.4 + Math.random() * 0.8);
+            p.img.setPosition(x, y).setVisible(true).setAlpha(1);
+            p.img.setTint(color);
+            p.vx = Math.cos(angle) * v;
+            p.vy = Math.sin(angle) * v;
+            p.maxLife = 0.35 + Math.random() * 0.35;
+            p.life = p.maxLife;
+            p.gravity = gravity;
+            spawned += 1;
+            if (spawned >= n) break;
+        }
+    }
+
+    private updateParticles(dt: number): void {
+        for (const p of this.particles) {
+            if (p.life <= 0) continue;
+            p.life -= dt;
+            if (p.life <= 0) {
+                p.img.setVisible(false);
+                continue;
+            }
+            p.vy += p.gravity * dt;
+            p.img.x += p.vx * dt;
+            p.img.y += p.vy * dt;
+            p.img.setAlpha(Math.max(p.life / p.maxLife, 0));
+        }
+    }
+
+    private decayEffects(dt: number): void {
+        for (let i = 0; i < this.muzzleLife.length; i += 1) {
+            if ((this.muzzleLife[i] as number) > 0) this.muzzleLife[i] = (this.muzzleLife[i] as number) - dt;
+            if ((this.recoil[i] as number) > 0) {
+                this.recoil[i] = Math.max((this.recoil[i] as number) - dt * 60, 0);
+            }
+        }
+    }
+
+    private syncSprites(): void {
+        const snaps = this.match.robotSnapshots;
+        snaps.forEach((s, i) => {
+            const cx = AX + s.x;
+            const cy = AY + s.y;
+            const body = this.chassis[i] as Phaser.GameObjects.Image;
+            const tower = this.towers[i] as Phaser.GameObjects.Image;
+            const hub = this.hubs[i] as Phaser.GameObjects.Image;
+            const ring = (body as Phaser.GameObjects.Image & { ring?: Phaser.GameObjects.Graphics }).ring;
+            const visible = s.alive;
+            body.setVisible(visible).setPosition(cx, cy).setRotation(s.heading);
+            const rec = this.recoil[i] as number;
+            const tx = cx - Math.cos(s.tower) * rec;
+            const ty = cy - Math.sin(s.tower) * rec;
+            tower.setVisible(visible).setPosition(tx, ty).setRotation(s.tower);
+            hub.setVisible(visible).setPosition(tx, ty).setRotation(0);
+            if (ring) ring.setVisible(visible).setPosition(cx, cy);
+            // Muzzle flash.
+            const muzzle = this.muzzles[i] as Phaser.GameObjects.Image;
+            const show = visible && (this.muzzleLife[i] as number) > 0;
+            muzzle.setVisible(show);
+            if (show) {
+                muzzle.setPosition(cx + Math.cos(s.tower) * 30, cy + Math.sin(s.tower) * 30);
+                muzzle.setRotation(s.tower);
+                muzzle.setScale(2 + Math.random() * 0.8);
+            }
+            // Health bar + name.
+            const frac = Math.max(s.health, 0) / s.maxHealth;
+            const bg = this.barBg[i] as Phaser.GameObjects.Rectangle;
+            const fg = this.barFg[i] as Phaser.GameObjects.Rectangle;
+            bg.setVisible(visible).setPosition(cx, cy - 28);
+            fg.setVisible(visible).setPosition(cx - 22 + (44 * frac) / 2, cy - 28);
+            fg.setSize(44 * frac, 4);
+            fg.setFillStyle(frac > 0.5 ? COLORS.accent : frac > 0.25 ? COLORS.team[0] : COLORS.danger);
+            const label = this.nameTexts[i] as Phaser.GameObjects.Text;
+            label.setVisible(true).setPosition(cx, cy - 40);
+            if (!s.alive) label.setColor('#5d6a78');
+        });
+        // Bullets from pool.
+        const bullets = this.match.bulletSnapshots;
+        this.bullets.forEach((img, i) => {
+            const b = bullets[i];
+            if (b === undefined) {
+                img.setVisible(false);
+                return;
+            }
+            img.setVisible(true).setPosition(AX + b.x, AY + b.y);
+            img.setTint(COLORS.bullet[b.team]);
+        });
+    }
+
+    private drawDynamic(): void {
+        const g = this.dyn;
+        g.clear();
+        const snaps = this.match.robotSnapshots;
         if (this.request.trails) {
             snaps.forEach((_ignored, i) => {
                 const skin = this.request.skins[i] as SlotSkin;
                 const trail = this.trails[i] as Array<{ x: number; y: number }>;
                 trail.forEach((point, k) => {
                     const frac = (k + 1) / trail.length;
-                    g.fillStyle(skin.paint, 0.05 + frac * 0.22);
-                    g.fillCircle(AX + point.x, AY + point.y, 2 + frac * 3);
+                    g.fillStyle(skin.paint, 0.05 + frac * 0.2);
+                    g.fillRect(AX + point.x - 2, AY + point.y - 2, 4, 4);
                 });
             });
         }
-        // Sensor cones (alive only).
         for (const s of snaps) {
             if (!s.alive) continue;
             const cx = AX + s.x;
             const cy = AY + s.y;
-            const a0 = s.tower - SENSOR_FOV / 2;
-            const a1 = s.tower + SENSOR_FOV / 2;
+            const a0 = s.tower - s.fov / 2;
+            const a1 = s.tower + s.fov / 2;
             g.fillStyle(COLORS.team[s.team], 0.07);
             g.fillTriangle(
                 cx,
                 cy,
-                cx + Math.cos(a0) * SENSOR_RANGE,
-                cy + Math.sin(a0) * SENSOR_RANGE,
-                cx + Math.cos(a1) * SENSOR_RANGE,
-                cy + Math.sin(a1) * SENSOR_RANGE,
+                cx + Math.cos(a0) * s.scan,
+                cy + Math.sin(a0) * s.scan,
+                cx + Math.cos(a1) * s.scan,
+                cy + Math.sin(a1) * s.scan,
             );
+            if (s.charged) {
+                const pulse = 0.45 + 0.3 * Math.sin(this.match.result.tick / 6);
+                g.lineStyle(2, 0xffffff, pulse);
+                g.strokeCircle(cx, cy, ROBOT_RADIUS + 9);
+            } else if (s.charge > 0.05) {
+                g.lineStyle(2, 0xffe28a, 0.35);
+                g.strokeCircle(cx, cy, ROBOT_RADIUS + 9);
+            }
         }
-        // Robots.
-        snaps.forEach((s, i) => {
-            const cx = AX + s.x;
-            const cy = AY + s.y;
-            const label = this.nameTexts[i] as Phaser.GameObjects.Text;
-            if (!s.alive) {
-                g.lineStyle(2, COLORS.dead, 1);
-                g.strokeCircle(cx, cy, ROBOT_RADIUS);
-                g.lineBetween(cx - 8, cy - 8, cx + 8, cy + 8);
-                g.lineBetween(cx - 8, cy + 8, cx + 8, cy - 8);
-                label.setPosition(cx, cy - 30).setColor('#5d6a78');
-                return;
-            }
-            const color = COLORS.team[s.team];
-            const skin = this.request.skins[i] as SlotSkin;
-            if (skin.finish === 'Ring') {
-                g.lineStyle(2, skin.paint, 0.85);
-                g.strokeCircle(cx, cy, ROBOT_RADIUS + 6);
-            }
-            // Chassis: rotated rect as two triangles + team outline + nose tick.
-            const cos = Math.cos(s.heading);
-            const sin = Math.sin(s.heading);
-            const fx = cos;
-            const fy = sin;
-            const sx = -sin;
-            const sy = cos;
-            const hl = ROBOT_RADIUS;
-            const hw = ROBOT_RADIUS * 0.72;
-            const p1 = { x: cx + fx * hl + sx * hw, y: cy + fy * hl + sy * hw };
-            const p2 = { x: cx + fx * hl - sx * hw, y: cy + fy * hl - sy * hw };
-            const p3 = { x: cx - fx * hl - sx * hw, y: cy - fy * hl - sy * hw };
-            const p4 = { x: cx - fx * hl + sx * hw, y: cy - fy * hl + sy * hw };
-            g.fillStyle(0x222b35, 1);
-            g.fillTriangle(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
-            g.fillTriangle(p1.x, p1.y, p3.x, p3.y, p4.x, p4.y);
-            g.lineStyle(2, color, 1);
-            g.lineBetween(p1.x, p1.y, p2.x, p2.y);
-            g.lineBetween(p2.x, p2.y, p3.x, p3.y);
-            g.lineBetween(p3.x, p3.y, p4.x, p4.y);
-            g.lineBetween(p4.x, p4.y, p1.x, p1.y);
-            // Finish: racing stripe along the chassis spine.
-            if (skin.finish === 'Stripe') {
-                g.lineStyle(3, skin.paint, 1);
-                g.lineBetween(cx - fx * hl, cy - fy * hl, cx + fx * hl, cy + fy * hl);
-            }
-            // Tower: barrel line + hub in the player's paint.
-            const tx = Math.cos(s.tower);
-            const ty = Math.sin(s.tower);
-            g.lineStyle(4, skin.paint, 1);
-            g.lineBetween(cx, cy, cx + tx * (ROBOT_RADIUS + 10), cy + ty * (ROBOT_RADIUS + 10));
-            g.fillStyle(0x0b0e12, 1);
-            g.fillCircle(cx, cy, 5);
-            g.lineStyle(2, skin.paint, 1);
-            g.strokeCircle(cx, cy, 5);
-            // Health bar + name.
-            const frac = Math.max(s.health, 0) / 100;
-            g.fillStyle(0x000000, 0.7);
-            g.fillRect(cx - 22, cy - 28, 44, 5);
-            g.fillStyle(frac > 0.5 ? COLORS.accent : frac > 0.25 ? COLORS.team[0] : COLORS.danger, 1);
-            g.fillRect(cx - 22, cy - 28, 44 * frac, 5);
-            label.setPosition(cx, cy - 38).setColor(COLORS.teamCss[s.team]);
-        });
-        // Bullets.
-        for (const b of this.match.bulletSnapshots) {
-            g.fillStyle(COLORS.bullet[b.team], 1);
-            g.fillCircle(AX + b.x, AY + b.y, 3);
-        }
-        // HUD.
+    }
+
+    private syncHud(): void {
+        const snaps = this.match.robotSnapshots;
         const alive0 = snaps.filter((s) => s.alive && s.team === 0).length;
         const alive1 = snaps.filter((s) => s.alive && s.team === 1).length;
-        const t = this.match.result.tick / 60;
-        const mm = Math.floor(t / 60);
-        const ss = Math.floor(t % 60)
-            .toString()
-            .padStart(2, '0');
-        this.hudText.setText(`T1 ${alive0} alive      T2 ${alive1} alive      ${mm}:${ss}`);
+        const total0 = snaps.filter((s) => s.team === 0).length;
+        const total1 = snaps.filter((s) => s.team === 1).length;
+        const second = Math.floor(this.match.result.tick / 60);
+        if (alive0 !== this.lastAlive[0] || alive1 !== this.lastAlive[1]) {
+            this.lastAlive = [alive0, alive1];
+            const pips = (alive: number, total: number) => '●'.repeat(alive) + '○'.repeat(total - alive);
+            this.hudPips.setText(`T1 ${pips(alive0, total0)}   T2 ${pips(alive1, total1)}`);
+        }
+        if (second !== this.lastHudSecond) {
+            this.lastHudSecond = second;
+            const mm = Math.floor(second / 60);
+            const ss = (second % 60).toString().padStart(2, '0');
+            this.hudTimer.setText(`${mm}:${ss}`);
+        }
     }
 
     private showResults(): void {
         const result = this.match.result;
-        const title =
-            result.winner === -1 ? 'DRAW' : result.winner === 0 ? 'TEAM 1 WINS' : 'TEAM 2 WINS';
+        const title = result.winner === -1 ? 'DRAW' : result.winner === 0 ? 'TEAM 1 WINS' : 'TEAM 2 WINS';
         const color = result.winner === -1 ? COLORS.ink : COLORS.teamCss[result.winner];
-        this.add.rectangle(512, 384, 560, 420, 0x0b0e12, 0.92).setStrokeStyle(1, COLORS.panelEdge);
-        this.add.text(512, 210, title, { ...FONTS.title, fontSize: '36px', color }).setOrigin(0.5);
+        this.add.rectangle(512, 384, 620, 440, 0x0b0e12, 0.94).setStrokeStyle(2, COLORS.panelEdge).setDepth(20);
+        this.add.text(512, 196, title, { ...FONTS.banner, color }).setOrigin(0.5).setDepth(20);
         this.add
-            .text(512, 248, `seed ${this.request.seed} · ${(result.tick / 60).toFixed(1)}s`, FONTS.monoSmall)
-            .setOrigin(0.5);
+            .text(512, 232, `seed ${this.request.seed} - ${(result.tick / 60).toFixed(1)}s`, FONTS.monoSmall)
+            .setOrigin(0.5)
+            .setDepth(20);
 
         const snaps = this.match.robotSnapshots;
         snaps.forEach((s, i) => {
-            const y = 292 + i * 30;
+            const y = 274 + i * 30;
             const skin = this.request.skins[i] as SlotSkin;
-            const row = `${s.alive ? '●' : '○'} ${skin.callsign} (${s.name})   ${s.kills} KO   ${Math.round(s.damageDealt)} dmg   ${s.shotsFired} shots`;
-            const text = this.add.text(272, y, row, FONTS.monoSmall).setOrigin(0, 0.5);
+            const row = `${s.alive ? '>' : 'x'} ${skin.callsign} (${s.name})  ${s.kills} KO  ${Math.round(s.damageDealt)} dmg  ${s.shotsFired} shots`;
+            const code = this.add.text(232, y + 13, s.code, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
+            code.setColor('#5d6a78');
+            const text = this.add.text(232, y, row, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
             text.setColor(s.alive ? COLORS.teamCss[s.team] : '#5d6a78');
-            const hit = this.add.rectangle(512, y, 500, 26);
+            const hit = this.add.rectangle(512, y, 560, 26).setDepth(20);
             hit.setInteractive({ useHandCursor: true });
             hit.on('pointerdown', () => this.exportRobot(s.id));
         });
-        this.add.text(512, 292 + snaps.length * 30, 'click a row to download that robot (.ts)', FONTS.small).setOrigin(0.5);
+        this.add
+            .text(512, 274 + snaps.length * 30, 'click a row to download that robot (.ts)', FONTS.small)
+            .setOrigin(0.5)
+            .setDepth(20);
 
-        makeButton(this, 412, 560, 170, 44, 'REMATCH', () => {
+        makeButton(this, 412, 566, 170, 44, 'REMATCH', () => {
             this.scene.restart({ ...this.request, seed: (Math.random() * 0x7fffffff) | 0 });
         });
-        makeButton(this, 612, 560, 170, 44, 'MENU', () => this.scene.start('Menu'));
+        makeButton(this, 612, 566, 170, 44, 'MENU', () => this.scene.start('Menu'));
     }
 
     private exportRobot(id: number): void {

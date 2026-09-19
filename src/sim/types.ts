@@ -3,6 +3,7 @@
 // touch engine internals, Phaser, or the DOM.
 
 import type { Rand } from './rng';
+import type { RobotStats, SkillLoadout } from './skills';
 
 export interface RobotMeta {
     id: string;
@@ -26,6 +27,14 @@ export interface SenseSelf {
     health: number;
     /** Ticks until the gun can fire again. 0 means ready. */
     cooldown: number;
+    /** Effective stats after your skill loadout. Read-only. */
+    stats: RobotStats;
+    /** Banked charge 0..1 (requires the charger skill, else always 0). */
+    charge: number;
+    /** True when a full charge is banked. */
+    charged: boolean;
+    /** Your sanitized skill loadout for this match. */
+    loadout: SkillLoadout;
 }
 
 export interface SensedRobot {
@@ -71,12 +80,20 @@ export interface Intent {
     towerTurn: number;
     /** Attempt to fire. Only fires when cooldown is 0. */
     fire: boolean;
+    /**
+     * Hold to bank charge (requires the charger skill). Charging slows drive
+     * to 75% and decays when released. Firing consumes banked charge for
+     * bonus damage: damage x (1 + charge x (mult - 1)).
+     */
+    charge: boolean;
 }
 
-export const IDLE_INTENT: Intent = { throttle: 0, turn: 0, towerTurn: 0, fire: false };
+export const IDLE_INTENT: Intent = { throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false };
 
 export interface RobotController {
     meta: RobotMeta;
+    /** Default skill loadout suggestion. Sanitized and budget-capped. */
+    loadout?: SkillLoadout;
     /** Called once when the robot spawns. Optional. */
     onSpawn?: (sense: SenseState) => void;
     /** Called every tick for living robots. Must be fast and deterministic. */

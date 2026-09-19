@@ -1,8 +1,9 @@
 // Turret: drives to a defensive anchor near its spawn, parks, and spins
 // its tower for full-circle awareness. Leads its shots like a Hunter.
 
-import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_SPEED, GUN_RANGE } from '../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
 import { dist } from '../sim/math';
+import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SensedRobot, SenseState } from '../sim/types';
 import { aimed, aimTurret, steerTo } from './common';
 
@@ -10,12 +11,14 @@ export const meta: RobotMeta = {
     id: 'turret',
     name: 'Turret',
     author: 'RobotArena',
-    version: '1.1.0',
+    version: '2.0.0',
     description: 'Parks on defense with a spinning tower. Do not walk into its lane.',
 };
 
-function leadAngle(selfX: number, selfY: number, foe: SensedRobot): number {
-    const flightTime = foe.distance / BULLET_SPEED;
+export const loadout: SkillLoadout = { marksman: 1, trigger: 2, longscan: 2, servos: 1 };
+
+function leadAngle(selfX: number, selfY: number, bulletSpeed: number, foe: SensedRobot): number {
+    const flightTime = foe.distance / bulletSpeed;
     const px = foe.x + Math.cos(foe.heading) * foe.speed * flightTime;
     const py = foe.y + Math.sin(foe.heading) * foe.speed * flightTime;
     return Math.atan2(py - selfY, px - selfX);
@@ -51,12 +54,12 @@ export function create(): RobotController {
         let towerTurn = 0.85; // continuous spin: full-circle awareness
         let fire = false;
         if (foe) {
-            const shot = leadAngle(self.x, self.y, foe);
+            const shot = leadAngle(self.x, self.y, self.stats.bulletSpeed, foe);
             towerTurn = aimTurret(self.tower, shot);
-            fire = foe.distance < GUN_RANGE && aimed(self.tower, shot, 0.05);
+            fire = foe.distance < self.stats.gunRange && aimed(self.tower, shot, 0.05);
         }
-        return { throttle, turn, towerTurn, fire };
+        return { throttle, turn, towerTurn, fire, charge: false };
     }
 
-    return { meta, onSpawn, update };
+    return { meta, loadout, onSpawn, update };
 }

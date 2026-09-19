@@ -1,8 +1,9 @@
 // Orbiter: keeps its distance and circle-strafes around its target,
 // holding a mid-range orbit where its gun still reaches.
 
-import { ARENA_HEIGHT, ARENA_WIDTH, GUN_RANGE } from '../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
 import { angleDiff, TAU } from '../sim/math';
+import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 import { aimed, aimTurret, steerTo } from './common';
 
@@ -10,9 +11,11 @@ export const meta: RobotMeta = {
     id: 'orbiter',
     name: 'Orbiter',
     author: 'RobotArena',
-    version: '1.0.0',
+    version: '2.0.0',
     description: 'Circle-strafes at mid range. Hard to hit, always annoying.',
 };
+
+export const loadout: SkillLoadout = { gyro: 2, overdrive: 2, trigger: 1, plating: 1 };
 
 const ORBIT_RANGE = 330;
 
@@ -44,9 +47,9 @@ export function create(): RobotController {
         const facing = Math.abs(angleDiff(self.heading, drive)) < 1.2;
         const throttle = facing ? 0.9 : 0.3;
         const towerTurn = foe ? aimTurret(self.tower, foe.bearing) : 0.8;
-        const fire = foe !== undefined && foe.distance < GUN_RANGE && aimed(self.tower, foe.bearing);
-        return { throttle, turn, towerTurn, fire };
+        const fire = foe !== undefined && foe.distance < self.stats.gunRange && aimed(self.tower, foe.bearing);
+        return { throttle, turn, towerTurn, fire, charge: false };
     }
 
-    return { meta, update };
+    return { meta, loadout, update };
 }

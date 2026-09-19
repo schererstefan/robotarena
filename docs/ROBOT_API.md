@@ -8,6 +8,7 @@ page, your robot can't do it — that's the fairness guarantee.
 A robot is a single TypeScript module in `src/robots/<id>.ts`:
 
 ```ts
+import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 
 export const meta: RobotMeta = {
@@ -18,6 +19,9 @@ export const meta: RobotMeta = {
     description: 'What it does, in one line.',
 };
 
+// Default skill build (6 points max). Players may override it per slot.
+export const loadout: SkillLoadout = { overdrive: 2, trigger: 2, plating: 2 };
+
 export function create(): RobotController {
     // Closed-over state is your memory. It persists across ticks.
     let lastSeenX = 480;
@@ -25,10 +29,10 @@ export function create(): RobotController {
 
     function update(sense: SenseState): Intent {
         // ... your strategy ...
-        return { throttle: 1, turn: 0, towerTurn: 0.5, fire: false };
+        return { throttle: 1, turn: 0, towerTurn: 0.5, fire: false, charge: false };
     }
 
-    return { meta, update };
+    return { meta, loadout, update };
 }
 ```
 
@@ -43,7 +47,7 @@ y grows downward). The sim ticks at 60 Hz.
 | Field          | Contents                                                                 |
 | -------------- | ------------------------------------------------------------------------ |
 | `tick`, `time` | Match tick and seconds elapsed.                                          |
-| `self`         | Your `id`, `team`, `x`, `y`, `heading`, `tower`, `speed`, `health`, and gun `cooldown` (ticks until ready, `0` = ready). |
+| `self`         | Your `id`, `team`, `x`, `y`, `heading`, `tower`, `speed`, `health`, gun `cooldown` (ticks until ready, `0` = ready), plus `stats` (effective values after skills), `charge`/`charged` (banked charge), and your `loadout`. |
 | `foes`         | Opponents **inside your sensor cone** this tick, nearest first: position, heading, speed, health, `distance`, absolute `bearing`. Empty when blind. |
 | `allies`       | Teammates, always known (radio link), same fields as foes.               |
 | `walls`        | Distance to each arena wall: `left`, `right`, `top`, `bottom`.           |
@@ -60,11 +64,40 @@ see foes your tower points at — scanning is part of the game.
 | `turn`      | `-1` (hard left) to `1` (hard right) chassis turn. Clamped.    |
 | `towerTurn` | `-1` (counter-clockwise) to `1` (clockwise) tower spin. Clamped. |
 | `fire`      | `true` to shoot. Only fires when `cooldown` is `0`.            |
+| `charge`    | Hold to bank charge (charger skill only). Slows drive to 75%.  |
 
 Missing, `NaN`, or non-numeric fields are treated as `0`/`false`. Out-of-range
-values are clamped. There is no way to exceed the shared platform.
+values are clamped. There is no way to exceed your loadout's stats.
 
-## Shared platform (all robots, always)
+## Skills: symmetric loadouts
+
+Every slot gets the same budget (**6 points**) and the same catalog. Fairness is
+symmetric: anyone can run any legal build, and loadouts are public (shown as
+codes like `OVR2 TRG2 PLT2` on the results screen). Never hardcode the base
+constants — read your effective values from `sense.self.stats` instead.
+
+| Skill (code)   | Max | Effect per rank                                              |
+| -------------- | --- | ------------------------------------------------------------ |
+| Overdrive (OVR)| 3   | +8% top speed                                                |
+| Gyro (GYR)     | 3   | +12% turn rate                                               |
+| Servos (SRV)   | 3   | +12% tower speed                                             |
+| Longscan (SCN) | 3   | +15% sensor range                                            |
+| Wideband (WND) | 2   | +0.25 rad sensor cone                                        |
+| Trigger (TRG)  | 3   | −3 ticks gun cooldown                                        |
+| Marksman (MRK) | 2   | +12% gun range                                               |
+| Charger (CHG)  | 2   | Unlock charge banking; rank 2 banks faster (20 vs 30 ticks)  |
+| Plating (PLT)  | 2   | +15 max health                                               |
+
+**Charge mechanic:** with the charger skill, holding `charge` while the gun is
+ready banks up to a full charge (drive slowed to 75%). Firing consumes the bank
+for `damage × (1 + charge × (mult − 1))` with mult 2. The bank decays over ~4 s
+when not held. Without the skill, `charge` does nothing.
+
+**Validation:** ranks clamp to max, unknown ids drop, and over-budget loadouts
+shed ranks from the end of the catalog until legal. Same loadout + same seed
+replays identically.
+
+## Shared base platform (before skills)
 
 From `src/sim/constants.ts`: top speed 150 u/s (reverse ×0.6), turn 2.7 rad/s,
 tower 3.6 rad/s, gun range 470, 0.4 s cooldown, 12 damage, 100 health, no

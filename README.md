@@ -2,9 +2,9 @@
 
 **Play it live: https://robotarena.vercel.app**
 
-2D robot battles in the browser. Every robot runs on the **identical platform** — same
-chassis speed, same sensor tower, same gun. The only thing that differs is the code:
-you write the strategy, the arena settles the rest.
+2D pixel-art robot battles in the browser. Every slot gets the **same skill budget**
+and the same catalog — drafts, builds, and code are what differ. You write the
+strategy, pick the loadout, and the arena settles the rest.
 
 Built with [Phaser 4](https://phaser.io/phaser4). No backend: battles run as a
 deterministic fixed-tick simulation entirely in the browser.
@@ -24,10 +24,12 @@ row to download that robot's source.
 ## Project layout
 
 - `src/sim/` — engine-agnostic battle simulation (no Phaser imports): fixed-timestep
-  ticks, identical stat constants, sensing, combat, win conditions. Runs headless.
+  ticks, base constants, skill loadouts (`skills.ts`), sensing, combat, win
+  conditions. Runs headless.
 - `src/robots/` — one file per robot plus `registry.ts`. Each robot exports its
-  `meta` and a `create()` factory returning a `RobotController`.
-- `src/game/` — Phaser app shell: menu, battle renderer, results, export.
+  `meta`, a default `loadout`, and a `create()` factory returning a `RobotController`.
+- `src/game/` — Phaser app shell: menu + loadout editor, pixel-art battle
+  renderer (`art.ts` holds the procedural sprite maps), results, export.
 - `tools/soak.ts` — headless checks: determinism, intent clamping, error isolation,
   and bot-vs-bot soak across all modes (`npm run test:sim`).
 - `docs/ROBOT_API.md` — the robot authoring contract.
@@ -44,8 +46,10 @@ row to download that robot's source.
 ## Fairness model
 
 Robots never touch engine state. Each tick they receive a read-only `SenseState`
-and return an `Intent`; the engine clamps every input to the shared constants in
-`src/sim/constants.ts`. Same tick, same API, same physics — only strategy differs.
+and return an `Intent`; the engine clamps every input to the robot's effective
+stats. Every slot gets the same skill budget (6 points) and the same catalog,
+and loadouts are public — symmetric loadouts, so builds, not hidden stats, win.
+Same tick, same API, same rules — only strategy and buildcraft differ.
 
 ## License
 

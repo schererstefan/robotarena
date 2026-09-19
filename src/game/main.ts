@@ -1,4 +1,4 @@
-import { AUTO, Game } from 'phaser';
+import { AUTO, Game, Scale } from 'phaser';
 import { BattleScene } from './scenes/BattleScene';
 import { MenuScene } from './scenes/MenuScene';
 
@@ -7,7 +7,17 @@ const config: Phaser.Types.Core.GameConfig = {
     width: 1024,
     height: 768,
     parent: 'game-container',
-    backgroundColor: '#0b0e12',
+    backgroundColor: '#06080b',
+    pixelArt: true,
+    roundPixels: true,
+    antialias: false,
+    scale: {
+        mode: Scale.FIT,
+        autoCenter: Scale.CENTER_BOTH,
+    },
+    fps: {
+        target: 60,
+    },
     scene: [MenuScene, BattleScene],
 };
 
