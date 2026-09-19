@@ -5,6 +5,7 @@ import { Scene } from 'phaser';
 import { getRobot, ROBOTS } from '../../robots/registry';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { chassisKey, ensureArtTextures } from '../art';
+import { isMuted, playClick, toggleMuted, unlockAudio } from '../audio';
 import { COLORS, FONTS } from '../theme';
 import { makeButton, makePanel } from '../ui';
 import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } from '../customize';
@@ -36,6 +37,7 @@ export class MenuScene extends Scene {
     private descText!: Phaser.GameObjects.Text;
     private modeButtons: Array<{ setLabel: (label: string) => void }> = [];
     private trailsButton!: { setLabel: (label: string) => void };
+    private muteButton!: { setLabel: (label: string) => void };
 
     constructor() {
         super('Menu');
@@ -73,8 +75,34 @@ export class MenuScene extends Scene {
 
         makeButton(this, CX - 160, 684, 260, 50, 'RANDOMIZE SKINS', () => this.randomizeSkins());
         makeButton(this, CX + 160, 684, 260, 50, 'START BATTLE', () => this.startBattle());
-        this.trailsButton = makeButton(this, CX, 736, 220, 30, '', () => this.toggleTrails());
+        this.trailsButton = makeButton(this, CX - 125, 736, 220, 30, '', () => this.toggleTrails());
+        this.muteButton = makeButton(this, CX + 125, 736, 220, 30, '', () => this.toggleMute());
         this.refreshTrailsLabel();
+        this.refreshMuteLabel();
+        // First click creates/resumes the AudioContext (autoplay policy);
+        // every click gets a UI blip.
+        this.input.on('pointerdown', this.onAnyPointer);
+        this.input.keyboard?.on('keydown-M', this.onMuteKey);
+        this.events.once('shutdown', () => this.input.keyboard?.off('keydown-M', this.onMuteKey));
+    }
+
+    private onAnyPointer = (): void => {
+        unlockAudio();
+        playClick();
+    };
+
+    private onMuteKey = (): void => {
+        unlockAudio();
+        this.toggleMute();
+    };
+
+    private toggleMute(): void {
+        toggleMuted();
+        this.refreshMuteLabel();
+    }
+
+    private refreshMuteLabel(): void {
+        this.muteButton.setLabel(isMuted() ? 'SOUND: OFF (M)' : 'SOUND: ON (M)');
     }
 
     private setMode(size: number): void {

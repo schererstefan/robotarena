@@ -8,6 +8,7 @@ import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from
 import { ROBOTS } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
 import { chassisKey, ensureArtTextures } from '../art';
+import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unlockAudio } from '../audio';
 import { COLORS, FONTS } from '../theme';
 import { downloadText, makeButton } from '../ui';
 import type { SlotSkin } from '../customize';
@@ -17,6 +18,14 @@ const AX = 32;
 const AY = 72;
 const BULLET_POOL = 40;
 const PARTICLE_POOL = 128;
+const DMG_POOL = 20;
+const IND_TTL = 0.8;
+const MAP_W = 72;
+const MAP_H = 48;
+const MAP_CX = 440;
+const MAP_CY = 738;
+const MAP_X0 = MAP_CX - MAP_W / 2;
+const MAP_Y0 = MAP_CY - MAP_H / 2;
 
 interface Particle {
     img: Phaser.GameObjects.Image;
@@ -25,6 +34,15 @@ interface Particle {
     life: number;
     maxLife: number;
     gravity: number;
+}
+
+interface EdgeIndicator {
+    vx: number;
+    vy: number;
+    ax: number;
+    ay: number;
+    team: 0 | 1;
+    ttl: number;
 }
 
 export class BattleScene extends Scene {
@@ -63,6 +81,10 @@ export class BattleScene extends Scene {
     private total1 = 0;
     private lastHudSecond = -1;
     private lastAlive: [number, number] = [-1, -1];
+    private dmgTexts: Phaser.GameObjects.Text[] = [];
+    private dmgCursor = 0;
+    private indicators: EdgeIndicator[] = [];
+    private mapG!: Phaser.GameObjects.Graphics;
 
     constructor() {
         super('Battle');
@@ -96,6 +118,9 @@ export class BattleScene extends Scene {
         this.bannerBusy = false;
         this.lastHudSecond = -1;
         this.lastAlive = [-1, -1];
+        this.dmgTexts = [];
+        this.dmgCursor = 0;
+        this.indicators = [];
     }
 
     create(): void {
@@ -187,13 +212,31 @@ export class BattleScene extends Scene {
         this.add.text(AX + ARENA_WIDTH - 12, 26, `SEED ${this.request.seed}`, FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
         this.banner = this.add.text(AX + ARENA_WIDTH / 2, AY + 56, '', FONTS.heading).setOrigin(0.5).setDepth(10).setAlpha(0);
 
+        // Damage-number pool + live minimap (bottom HUD strip).
+        for (let i = 0; i < DMG_POOL; i += 1) {
+            const text = this.add.text(-50, -50, '', FONTS.monoSmall).setOrigin(0.5).setDepth(10).setVisible(false);
+            text.setColor('#ffffff');
+            text.setStroke('#0b0e12', 3);
+            this.dmgTexts.push(text);
+        }
+        this.add
+            .rectangle(MAP_CX, MAP_CY, MAP_W + 10, MAP_H + 10, COLORS.panel)
+            .setStrokeStyle(1, COLORS.panelEdge)
+            .setDepth(10);
+        this.mapG = this.add.graphics().setDepth(10);
+
         this.pauseButton = makeButton(this, 760, 740, 120, 36, 'PAUSE', () => this.togglePause());
         this.speedButton = makeButton(this, 890, 740, 100, 36, '1X', () => this.cycleSpeed());
         makeButton(this, 134, 740, 120, 36, 'MENU', () => this.scene.start('Menu'));
-        // Named handler, removed on shutdown: the keyboard plugin is global and
-        // outlives the scene, so anonymous listeners would stack per visit.
+        this.input.on('pointerdown', this.onAnyPointer);
+        // Named handlers, removed on shutdown: the keyboard plugin is global
+        // and outlives the scene, so anonymous listeners would stack per visit.
         this.input.keyboard?.on('keydown-SPACE', this.onSpaceKey);
-        this.events.once('shutdown', () => this.input.keyboard?.off('keydown-SPACE', this.onSpaceKey));
+        this.input.keyboard?.on('keydown-M', this.onMuteKey);
+        this.events.once('shutdown', () => {
+            this.input.keyboard?.off('keydown-SPACE', this.onSpaceKey);
+            this.input.keyboard?.off('keydown-M', this.onMuteKey);
+        });
 
         this.syncSprites(this.match.robotSnapshots, this.match.bulletSnapshots);
         this.drawDynamic(this.match.robotSnapshots);
@@ -246,6 +289,17 @@ export class BattleScene extends Scene {
         this.togglePause();
     };
 
+    private onAnyPointer = (): void => {
+        unlockAudio();
+        playClick();
+    };
+
+    private onMuteKey = (): void => {
+        unlockAudio();
+        const nowMuted = toggleMuted();
+        this.queueBanner(nowMuted ? 'SOUND OFF' : 'SOUND ON');
+    };
+
     private togglePause(): void {
         if (this.match.result.over) return;
         this.paused = !this.paused;
@@ -259,6 +313,18 @@ export class BattleScene extends Scene {
 
     /** Compare fresh snapshots to previous frame: fire flashes, hits, deaths. */
     private diffSnapshots(snaps: RobotSnapshot[]): void {
+        // Attacker attribution (render-only): credit health drops to whichever
+        // robot's damageDealt grew most in this window.
+        let topDealer = -1;
+        let topDealt = 0;
+        snaps.forEach((s, i) => {
+            const p = this.prev[i] as RobotSnapshot;
+            const delta = s.damageDealt - p.damageDealt;
+            if (delta > topDealt) {
+                topDealt = delta;
+                topDealer = i;
+            }
+        });
         snaps.forEach((s, i) => {
             const p = this.prev[i] as RobotSnapshot;
             const cx = AX + s.x;
@@ -268,9 +334,18 @@ export class BattleScene extends Scene {
                 this.recoil[i] = 5;
                 (this.muzzles[i] as Phaser.GameObjects.Image).setScale(2 + Math.random() * 0.8);
                 this.burst(cx + Math.cos(s.tower) * 26, cy + Math.sin(s.tower) * 26, 0xffe28a, 4, 120, 0);
+                playShoot();
             }
-            if (s.health < p.health && s.alive) {
-                this.burst(cx, cy, 0xff5d5d, 6, 170, 300);
+            if (s.health < p.health) {
+                this.spawnDamageNumber(cx, cy - 18, Math.round(p.health - s.health));
+                if (s.alive) {
+                    this.burst(cx, cy, 0xff5d5d, 6, 170, 300);
+                    playHit();
+                }
+                if (topDealer >= 0 && topDealer !== i) {
+                    const a = snaps[topDealer] as RobotSnapshot;
+                    this.pushIndicator(s.x, s.y, a.x, a.y, a.team);
+                }
             }
             if (p.alive && !s.alive) {
                 this.explode(i, cx, cy);
@@ -288,6 +363,7 @@ export class BattleScene extends Scene {
         this.burst(cx, cy, COLORS.team[snap.team], 22, 260, 200);
         this.burst(cx, cy, 0xffffff, 8, 140, 100);
         this.cameras.main.shake(180, 0.006);
+        playExplosion();
         // Persistent wreck.
         const wreck = this.add.image(cx, cy, chassisKey(robotId)).setScale(2).setDepth(3);
         wreck.setTint(0x1c222a);
@@ -353,12 +429,37 @@ export class BattleScene extends Scene {
         }
     }
 
+    private spawnDamageNumber(x: number, y: number, dmg: number): void {
+        const text = this.dmgTexts[this.dmgCursor] as Phaser.GameObjects.Text;
+        this.dmgCursor = (this.dmgCursor + 1) % this.dmgTexts.length;
+        this.tweens.killTweensOf(text);
+        text.setText(`-${dmg}`).setPosition(x, y).setAlpha(1).setVisible(true);
+        this.tweens.add({
+            targets: text,
+            y: y - 34,
+            alpha: 0,
+            duration: 650,
+            ease: 'Cubic.easeOut',
+            onComplete: () => text.setVisible(false),
+        });
+    }
+
+    private pushIndicator(vx: number, vy: number, ax: number, ay: number, team: 0 | 1): void {
+        if (this.indicators.length >= 6) this.indicators.shift();
+        this.indicators.push({ vx, vy, ax, ay, team, ttl: IND_TTL });
+    }
+
     private decayEffects(dt: number): void {
         for (let i = 0; i < this.muzzleLife.length; i += 1) {
             if ((this.muzzleLife[i] as number) > 0) this.muzzleLife[i] = (this.muzzleLife[i] as number) - dt;
             if ((this.recoil[i] as number) > 0) {
                 this.recoil[i] = Math.max((this.recoil[i] as number) - dt * 60, 0);
             }
+        }
+        for (let i = this.indicators.length - 1; i >= 0; i -= 1) {
+            const ind = this.indicators[i] as EdgeIndicator;
+            ind.ttl -= dt;
+            if (ind.ttl <= 0) this.indicators.splice(i, 1);
         }
     }
 
@@ -459,6 +560,39 @@ export class BattleScene extends Scene {
                 g.strokeCircle(cx, cy, ROBOT_RADIUS + 9);
             }
         }
+        for (const ind of this.indicators) this.drawEdgeIndicator(g, ind);
+    }
+
+    /** Chevron on the arena rim pointing from the victim toward its attacker. */
+    private drawEdgeIndicator(g: Phaser.GameObjects.Graphics, ind: EdgeIndicator): void {
+        const dx = ind.ax - ind.vx;
+        const dy = ind.ay - ind.vy;
+        const len = Math.hypot(dx, dy);
+        if (len < 1) return;
+        const nx = dx / len;
+        const ny = dy / len;
+        const inset = 16;
+        let t = Number.POSITIVE_INFINITY;
+        if (nx > 0) t = Math.min(t, (ARENA_WIDTH - inset - ind.vx) / nx);
+        else if (nx < 0) t = Math.min(t, (ind.vx - inset) / -nx);
+        if (ny > 0) t = Math.min(t, (ARENA_HEIGHT - inset - ind.vy) / ny);
+        else if (ny < 0) t = Math.min(t, (ind.vy - inset) / -ny);
+        if (!Number.isFinite(t) || t < 0) return;
+        const ex = AX + ind.vx + nx * t;
+        const ey = AY + ind.vy + ny * t;
+        const size = 10;
+        const px = -ny;
+        const py = nx;
+        const alpha = Math.min(Math.max(ind.ttl / IND_TTL, 0), 1);
+        g.fillStyle(COLORS.team[ind.team], alpha);
+        g.fillTriangle(
+            ex + nx * size,
+            ey + ny * size,
+            ex - nx * size * 0.6 + px * size * 0.7,
+            ey - ny * size * 0.6 + py * size * 0.7,
+            ex - nx * size * 0.6 - px * size * 0.7,
+            ey - ny * size * 0.6 - py * size * 0.7,
+        );
     }
 
     private syncHud(snaps: RobotSnapshot[]): void {
@@ -481,10 +615,28 @@ export class BattleScene extends Scene {
             const ss = (second % 60).toString().padStart(2, '0');
             this.hudTimer.setText(`${mm}:${ss}`);
         }
+        this.drawMinimap(snaps);
+    }
+
+    private drawMinimap(snaps: RobotSnapshot[]): void {
+        const g = this.mapG;
+        g.clear();
+        for (const s of snaps) {
+            const mx = MAP_X0 + (s.x / ARENA_WIDTH) * MAP_W;
+            const my = MAP_Y0 + (s.y / ARENA_HEIGHT) * MAP_H;
+            if (s.alive) {
+                g.fillStyle(COLORS.team[s.team], 1);
+                g.fillCircle(mx, my, 2.5);
+            } else {
+                g.lineStyle(1, COLORS.team[s.team], 0.75);
+                g.strokeCircle(mx, my, 2.5);
+            }
+        }
     }
 
     private showResults(): void {
         const result = this.match.result;
+        if (result.winner !== -1) playWin();
         const title = result.winner === -1 ? 'DRAW' : result.winner === 0 ? 'TEAM 1 WINS' : 'TEAM 2 WINS';
         const color = result.winner === -1 ? COLORS.ink : COLORS.teamCss[result.winner];
         this.add.rectangle(512, 384, 620, 440, 0x0b0e12, 0.94).setStrokeStyle(2, COLORS.panelEdge).setDepth(20);
