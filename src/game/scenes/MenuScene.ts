@@ -3,7 +3,7 @@
 
 import { Scene } from 'phaser';
 import { getRobot, ROBOTS } from '../../robots/registry';
-import type { ArenaId } from '../../sim/constants';
+import { modifierCodes, type ArenaId, type MatchModifiers } from '../../sim/constants';
 import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
@@ -31,6 +31,7 @@ export interface BattleRequest {
     trails: boolean;
     seed: number;
     arena: ArenaId;
+    modifiers: MatchModifiers;
     /** True when this battle replays a shared code (HUD tag only). */
     replay?: boolean;
     /** Daily-challenge date key (YYYY-MM-DD) when this is the daily match. */
@@ -70,6 +71,9 @@ export class MenuScene extends Scene {
     private trails = true;
     private arena: ArenaId = 'open';
     private arenaButton!: { setLabel: (label: string) => void };
+    private mods: MatchModifiers = {};
+    private modsButton!: { setLabel: (label: string) => void };
+    private modsObjects: Phaser.GameObjects.GameObject[] = [];
     private slotObjects: Phaser.GameObjects.GameObject[] = [];
     private editorObjects: Phaser.GameObjects.GameObject[] = [];
     private statsObjects: Phaser.GameObjects.GameObject[] = [];
@@ -105,6 +109,7 @@ export class MenuScene extends Scene {
         this.slotObjects = [];
         this.editorObjects = [];
         this.statsObjects = [];
+        this.modsObjects = [];
         this.editorSlot = -1;
         this.tourMode = 'none';
         this.tourObjects = [];
@@ -123,8 +128,10 @@ export class MenuScene extends Scene {
             this.modeButtons.push(btn);
         });
         this.refreshModeLabels();
-        this.arenaButton = makeButton(this, CX + 290, 136, 200, 42, '', () => this.cycleArena());
+        this.arenaButton = makeButton(this, CX + 323, 136, 200, 42, '', () => this.cycleArena());
         this.refreshArenaLabel();
+        this.modsButton = makeButton(this, CX - 350, 136, 200, 42, '', () => this.openMods());
+        this.refreshModsLabel();
 
         this.add.text(92, 176, 'SLOT', FONTS.monoSmall).setOrigin(0, 0.5);
         this.add.text(208, 176, 'CALLSIGN', FONTS.monoSmall).setOrigin(0, 0.5);
@@ -210,6 +217,7 @@ export class MenuScene extends Scene {
             trails: this.trails,
             seed: dailySeed(date),
             arena: 'open',
+            modifiers: {},
             daily: date,
         } satisfies BattleRequest);
     }
@@ -524,6 +532,7 @@ export class MenuScene extends Scene {
             trails: this.trails,
             seed: TUTORIAL_SEED,
             arena: 'open',
+            modifiers: {},
             tutorial: true,
         } satisfies BattleRequest);
     }
@@ -631,6 +640,7 @@ export class MenuScene extends Scene {
                 trails: this.trails,
                 seed: data.seed,
                 arena: data.arena ?? 'open',
+                modifiers: data.modifiers ?? {},
                 replay: true,
             } satisfies BattleRequest);
         };
@@ -747,28 +757,116 @@ export class MenuScene extends Scene {
         this.statsObjects = [];
     }
 
+    // ---- Exhibition modifiers overlay ------------------------------------
+    private trackMods<T extends Phaser.GameObjects.GameObject>(obj: T): T {
+        this.modsObjects.push(obj);
+        return obj;
+    }
+
+    private refreshModsLabel(): void {
+        const codes = modifierCodes(this.mods);
+        this.modsButton.setLabel(codes.length === 0 ? 'MODS: OFF' : `MODS: ${codes.join('+')}`);
+    }
+
+    private openMods(): void {
+        this.closeMods();
+        // Backdrop swallows clicks so menu controls beneath can't fire.
+        this.trackMods(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50).setInteractive());
+        this.trackMods(this.add.rectangle(CX, 384, 560, 420, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
+        this.trackMods(this.add.text(CX, 208, 'EXHIBITION MODIFIERS', FONTS.heading).setOrigin(0.5).setDepth(50));
+        this.trackMods(
+            this.add.text(CX, 236, 'exhibition matches never touch stats', FONTS.small).setOrigin(0.5).setDepth(50),
+        );
+        this.refreshModsRows();
+    }
+
+    private refreshModsRows(): void {
+        // Drop old rows but keep the overlay frame (first 4 objects).
+        const frame = this.modsObjects.slice(0, 4);
+        for (const obj of this.modsObjects.slice(4)) obj.destroy();
+        this.modsObjects = frame;
+
+        const rows: Array<{ key: 'doubleDamage' | 'hardcoreFog' | 'mirror'; name: string; desc: string }> = [
+            { key: 'doubleDamage', name: 'DOUBLE DAMAGE', desc: 'every shot deals double damage' },
+            { key: 'hardcoreFog', name: 'HARDCORE FOG', desc: 'sensor range halved for every robot' },
+            { key: 'mirror', name: 'MIRROR MODE', desc: 'team 2 mirrors team 1 robots + builds' },
+        ];
+        rows.forEach((row, i) => {
+            const y = 292 + i * 64;
+            const on = this.mods[row.key] === true;
+            const bg = this.trackMods(
+                this.add.rectangle(CX, y, 480, 52, COLORS.panel).setStrokeStyle(2, on ? COLORS.team[0] : COLORS.panelEdge).setDepth(50),
+            );
+            const name = this.trackMods(this.add.text(CX - 220, y - 10, row.name, FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(50));
+            name.setColor(on ? '#7de08a' : COLORS.ink);
+            this.trackMods(this.add.text(CX - 220, y + 12, row.desc, FONTS.small).setOrigin(0, 0.5).setDepth(50));
+            const state = this.trackMods(this.add.text(CX + 220, y, on ? 'ON' : 'OFF', FONTS.button).setOrigin(1, 0.5).setDepth(50));
+            state.setColor(on ? '#7de08a' : COLORS.dim);
+            bg.setInteractive({ useHandCursor: true });
+            bg.on('pointerdown', () => {
+                const next = { ...this.mods };
+                if (on) delete next[row.key];
+                else next[row.key] = true;
+                this.mods = next;
+                this.refreshModsLabel();
+                this.refreshModsRows();
+            });
+        });
+
+        const done = this.trackMods(
+            this.add.rectangle(CX, 520, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50),
+        );
+        this.trackMods(this.add.text(CX, 520, 'DONE', FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        done.setInteractive({ useHandCursor: true });
+        done.on('pointerdown', () => this.closeMods());
+    }
+
+    private closeMods(): void {
+        for (const obj of this.modsObjects) obj.destroy();
+        this.modsObjects = [];
+    }
+
+    /** Mirror mode: team 2 runs team 1's robots and builds (skins stay put). */
+    private mirroredLineup(ids: string[], loadouts: SkillLoadout[]): { lineupIds: string[]; loadouts: SkillLoadout[] } {
+        if (this.mods.mirror !== true) {
+            return { lineupIds: [...ids], loadouts: loadouts.map((l) => ({ ...l })) };
+        }
+        const half = ids.length / 2;
+        return {
+            lineupIds: ids.map((id, i) => (i < half ? id : (ids[i - half] as string))),
+            loadouts: loadouts.map((l, i) => ({ ...(i < half ? l : (loadouts[i - half] as SkillLoadout)) })),
+        };
+    }
+
     private startBattle(): void {
+        const mirrored = this.mirroredLineup(this.lineupIds, this.loadouts);
         this.scene.start('Battle', {
             teamSize: this.teamSize,
-            lineupIds: [...this.lineupIds],
-            loadouts: this.loadouts.map((l) => ({ ...l })),
+            lineupIds: mirrored.lineupIds,
+            loadouts: mirrored.loadouts,
             skins: this.skins.map((s) => ({ ...s })),
             trails: this.trails,
             seed: (Math.random() * 0x7fffffff) | 0,
             arena: this.arena,
+            modifiers: { ...this.mods },
         } satisfies BattleRequest);
     }
 
     /** Pilot mode: drive slot 0's robot 1v1 against the slot 1 AI. */
     private startPilot(): void {
+        const mirrored = this.mirroredLineup(
+            [this.lineupIds[0] as string, this.lineupIds[1] as string],
+            [{ ...(this.loadouts[0] ?? {}) }, { ...(this.loadouts[1] ?? {}) }],
+        );
         this.scene.start('Battle', {
             teamSize: 1,
-            lineupIds: [this.lineupIds[0] as string, this.lineupIds[1] as string],
-            loadouts: [{ ...(this.loadouts[0] ?? {}) }, { ...(this.loadouts[1] ?? {}) }],
+            lineupIds: mirrored.lineupIds,
+            loadouts: mirrored.loadouts,
             skins: [{ ...(this.skins[0] as SlotSkin) }, { ...(this.skins[1] as SlotSkin) }],
             trails: this.trails,
             seed: (Math.random() * 0x7fffffff) | 0,
             arena: this.arena,
+            modifiers: { ...this.mods },
             pilot: true,
         } satisfies BattleRequest);
     }

@@ -122,6 +122,12 @@ a safe circle centered on the arena shrinks from full cover to zero over
 per robot, so both sides never pulse together). Only simultaneous
 elimination draws — stalling the clock no longer saves you.
 
+**Exhibition modifiers** (menu MODS panel; barred from stats, tagged in the
+HUD): double damage (every shot ×2, all bullets render hot), hardcore fog
+(your `sense.self.stats.sensorRange` and scan cone halve — read stats, never
+hardcode 540), mirror mode (both teams run identical robots and builds).
+Modded matches replay exactly via the same replay codes.
+
 ## Rules for robot code
 
 1. **Deterministic only.** No `Math.random`, `Date.now`, network, or storage.

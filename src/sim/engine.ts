@@ -1,7 +1,7 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSOR_SHARE_DELAY, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, type ArenaId, type ArenaObstacle } from './constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSOR_SHARE_DELAY, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
 import { angleDiff, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
@@ -106,6 +106,8 @@ export interface LineupEntry {
 export interface MatchOptions {
     /** Arena layout. Unknown values fall back to `open`. Defaults to `open`. */
     arena?: ArenaId;
+    /** Exhibition modifiers. Sanitized; defaults to none. */
+    modifiers?: MatchModifiers;
 }
 
 function sanitizeIntent(raw: unknown): Intent {
@@ -128,12 +130,14 @@ export class Match {
     private winner: -1 | 0 | 1 = -1;
     private readonly seed: number;
     private readonly arena: ArenaId;
+    private readonly mods: MatchModifiers;
     /** Recent ally sightings, pruned to the last SENSOR_SHARE_DELAY ticks. */
     private sightings: SharedSighting[] = [];
 
     constructor(lineups: LineupEntry[], seed: number, options: MatchOptions = {}) {
         this.seed = seed;
         this.arena = options.arena === 'blocks' ? 'blocks' : 'open';
+        this.mods = sanitizeModifiers(options.modifiers);
         lineups.forEach((entry, index) => {
             const spawn = Match.spawnFor(entry.team, Match.teamIndex(lineups, index), Match.teamSize(lineups, entry.team));
             // Guarded: hostile getters on the entry/controller must not kill setup.
@@ -145,6 +149,8 @@ export class Match {
                 setupErrors = 1;
             }
             const stats = computeStats(loadout);
+            // Hardcore fog halves every robot's sensor range (visible in stats).
+            if (this.mods.hardcoreFog === true) stats.sensorRange *= 0.5;
             this.robots.push({
                 id: index,
                 team: entry.team,
@@ -199,6 +205,11 @@ export class Match {
     /** Obstacle rects for this match's arena (renderer + tests). */
     get obstacles(): ArenaObstacle[] {
         return ARENA_OBSTACLES[this.arena];
+    }
+
+    /** Sanitized exhibition modifiers for this match. */
+    get modifiers(): MatchModifiers {
+        return { ...this.mods };
     }
 
     get robotSnapshots(): RobotSnapshot[] {
@@ -280,7 +291,8 @@ export class Match {
             if (intent.fire && robot.cooldown <= 0) {
                 robot.cooldown = robot.stats.cooldownTicks;
                 robot.shotsFired += 1;
-                const damage = robot.stats.damage * (1 + robot.charge * (robot.stats.chargeMult - 1));
+                const modMult = this.mods.doubleDamage === true ? 2 : 1;
+                const damage = robot.stats.damage * modMult * (1 + robot.charge * (robot.stats.chargeMult - 1));
                 robot.charge = 0;
                 this.bullets.push({
                     x: robot.x + Math.cos(robot.tower) * (ROBOT_RADIUS + 4),

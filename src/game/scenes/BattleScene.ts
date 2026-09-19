@@ -3,7 +3,7 @@
 // is sprite transforms plus one small dynamic Graphics (cones + trails).
 
 import { Scene } from 'phaser';
-import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS, type ArenaObstacle } from '../../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import { clamp } from '../../sim/math';
 import { encodeReplay } from '../../sim/replay';
@@ -115,6 +115,7 @@ export class BattleScene extends Scene {
     private pilot: PilotInput | null = null;
     private obstacles: ArenaObstacle[] = [];
     private sdAnnounced = false;
+    private exhibition = false;
     private tutStep = 0;
     private tutTitle!: Phaser.GameObjects.Text;
     private tutBody!: Phaser.GameObjects.Text;
@@ -179,8 +180,9 @@ export class BattleScene extends Scene {
                 loadout: { ...(this.request.loadouts[i] ?? {}) },
             };
         });
-        this.match = new Match(lineups, this.request.seed, { arena: this.request.arena });
+        this.match = new Match(lineups, this.request.seed, { arena: this.request.arena, modifiers: this.request.modifiers });
         this.obstacles = this.match.obstacles;
+        this.exhibition = isExhibition(this.request.modifiers);
         this.prev = this.match.robotSnapshots;
 
         // Static layers: composed floor, wall strips + corners + gates, decals.
@@ -287,16 +289,14 @@ export class BattleScene extends Scene {
         this.add.rectangle(AX + ARENA_WIDTH / 2, 26, ARENA_WIDTH + 32, 40, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(10);
         this.hudPips = this.add.text(AX + 12, 26, '', FONTS.mono).setOrigin(0, 0.5).setDepth(10);
         this.hudTimer = this.add.text(AX + ARENA_WIDTH / 2, 26, '', FONTS.heading).setOrigin(0.5).setDepth(10);
-        const tag =
-            this.request.pilot === true
-                ? 'PILOT'
-                : this.request.daily !== undefined
-                  ? 'DAILY'
-                  : this.request.replay === true
-                    ? 'REPLAY'
-                    : null;
-        const seedLabel = tag ? `SEED ${this.request.seed} - ${tag}` : `SEED ${this.request.seed}`;
-        this.add.text(AX + ARENA_WIDTH - 12, 26, seedLabel, FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
+        const tags: string[] = [];
+        if (this.request.pilot === true) tags.push('PILOT');
+        else if (this.request.daily !== undefined) tags.push('DAILY');
+        else if (this.request.replay === true) tags.push('REPLAY');
+        if (this.exhibition) tags.push(`EXHIBITION ${modifierCodes(this.request.modifiers).join('+')}`);
+        const seedLabel = tags.length > 0 ? `SEED ${this.request.seed} - ${tags.join(' - ')}` : `SEED ${this.request.seed}`;
+        const seedText = this.add.text(AX + ARENA_WIDTH - 12, 26, seedLabel, FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
+        if (this.exhibition) seedText.setColor('#ffd23f');
         if (this.request.pilot === true) {
             const help = 'WASD DRIVE - MOUSE AIM - SPACE TAP FIRE, HOLD CHARGE - P PAUSE';
             this.add.rectangle(AX + ARENA_WIDTH / 2, AY + 14, 560, 20, 0x000000, 0.6).setDepth(10);
@@ -306,6 +306,7 @@ export class BattleScene extends Scene {
                 .setDepth(10);
         }
         this.banner = this.add.text(AX + ARENA_WIDTH / 2, AY + 56, '', FONTS.heading).setOrigin(0.5).setDepth(10).setAlpha(0);
+        if (this.exhibition) this.queueBanner('EXHIBITION MATCH');
 
         // Damage-number pool + live minimap (bottom HUD strip).
         for (let i = 0; i < DMG_POOL; i += 1) {
@@ -909,8 +910,11 @@ export class BattleScene extends Scene {
         // matches go to the daily board instead of the main log so the fixed
         // daily matchup can't skew per-robot win rates. Pilot matches are
         // human-driven and tutorial matches are a fixed scripted matchup, so
-        // both stay out of the log for the same reason.
-        if (this.request.daily !== undefined) {
+        // both stay out of the log for the same reason. Exhibition matches
+        // (any modifier on) are barred from every board.
+        if (this.exhibition) {
+            // Barred from stats: no record anywhere.
+        } else if (this.request.daily !== undefined) {
             recordDailyResult(this.request.daily, {
                 seed: this.request.seed,
                 lineupIds: [...this.request.lineupIds],
@@ -948,6 +952,15 @@ export class BattleScene extends Scene {
             .text(512, 232, `seed ${this.request.seed} - ${(result.tick / 60).toFixed(1)}s`, FONTS.monoSmall)
             .setOrigin(0.5)
             .setDepth(20);
+        if (this.exhibition) {
+            this.add
+                .text(512, 250, `EXHIBITION ${modifierCodes(this.request.modifiers).join(' + ')} - NOT RECORDED`, {
+                    ...FONTS.monoSmall,
+                    color: '#ffd23f',
+                })
+                .setOrigin(0.5)
+                .setDepth(20);
+        }
 
         const snaps = this.match.robotSnapshots;
         snaps.forEach((s, i) => {
@@ -971,6 +984,7 @@ export class BattleScene extends Scene {
             lineupIds: this.request.lineupIds,
             loadouts: this.request.loadouts,
             arena: this.request.arena,
+            modifiers: this.request.modifiers,
         });
         const copyLabel = this.add
             .text(512, hintY + 26, 'REPLAY CODE - CLICK CODE TO COPY', FONTS.monoSmall)

@@ -13,6 +13,42 @@ export const SUDDEN_DEATH_DAMAGE = 6;
 /** Absolute tick cap (defensive only: the collapsed circle eliminates everyone first). */
 export const MAX_TICKS_TOTAL = MAX_TICKS + SUDDEN_DEATH_TICKS + TICK_HZ * 10;
 
+/**
+ * Exhibition modifiers: toggleable rules twists, barred from stats.
+ * `mirror` is lineup-level (both teams run identical robots); the sim reads
+ * it only as an exhibition marker.
+ */
+export interface MatchModifiers {
+    doubleDamage?: boolean;
+    hardcoreFog?: boolean;
+    mirror?: boolean;
+}
+
+/** Strict sanitize: only literal `true` survives. Key order is fixed. */
+export function sanitizeModifiers(raw: unknown): MatchModifiers {
+    if (typeof raw !== 'object' || raw === null) return {};
+    const r = raw as Record<string, unknown>;
+    const clean: MatchModifiers = {};
+    if (r['doubleDamage'] === true) clean.doubleDamage = true;
+    if (r['hardcoreFog'] === true) clean.hardcoreFog = true;
+    if (r['mirror'] === true) clean.mirror = true;
+    return clean;
+}
+
+/** True when any exhibition modifier is on (match is barred from stats). */
+export function isExhibition(modifiers: MatchModifiers): boolean {
+    return modifiers.doubleDamage === true || modifiers.hardcoreFog === true || modifiers.mirror === true;
+}
+
+/** Short HUD codes for the active modifiers, e.g. `['2X', 'FOG']`. */
+export function modifierCodes(modifiers: MatchModifiers): string[] {
+    const codes: string[] = [];
+    if (modifiers.doubleDamage === true) codes.push('2X');
+    if (modifiers.hardcoreFog === true) codes.push('FOG');
+    if (modifiers.mirror === true) codes.push('MIR');
+    return codes;
+}
+
 export const ARENA_WIDTH = 960;
 export const ARENA_HEIGHT = 640;
 

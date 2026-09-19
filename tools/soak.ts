@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSOR_SHARE_DELAY, SUDDEN_DEATH_TICKS, type ArenaId } from '../src/sim/constants';
+import { ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSOR_RANGE, SENSOR_SHARE_DELAY, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, type ReplaySpec } from '../src/sim/replay';
@@ -36,14 +36,14 @@ function check(name: string, condition: boolean, detail = ''): void {
     }
 }
 
-function runMatch(ids: string[], teams: Array<0 | 1>, seed: number, loadouts?: SkillLoadout[], arena: ArenaId = 'open'): Match {
+function runMatch(ids: string[], teams: Array<0 | 1>, seed: number, loadouts?: SkillLoadout[], arena: ArenaId = 'open', modifiers: MatchModifiers = {}): Match {
     const lineups: LineupEntry[] = ids.map((id, i) => {
         const entry = ROBOTS.find((r) => r.meta.id === id);
         if (!entry) throw new Error(`unknown robot ${id}`);
         const loadout = loadouts?.[i] ?? entry.loadout;
         return { team: teams[i] as 0 | 1, controller: entry.create(), loadout: { ...loadout } };
     });
-    const match = new Match(lineups, seed, { arena });
+    const match = new Match(lineups, seed, { arena, modifiers });
     let guard = 0;
     while (!match.result.over && guard <= MAX_TICKS_TOTAL + 10) {
         match.step();
@@ -58,7 +58,7 @@ function fingerprint(match: Match): string {
         [s.code, s.maxHealth, s.alive ? 1 : 0, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired, s.cooldown, s.charge].join(','),
     );
     const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team, b.hot ? 1 : 0].join(',')).join(';');
-    return `${match.arenaId}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}`;
+    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}`;
 }
 
 // --- 1. Determinism: same seed, same everything ------------------------------
@@ -433,6 +433,7 @@ console.log('replay');
             lineupIds: ['hunter', 'orbiter'],
             loadouts: [{ overdrive: 2, trigger: 3 }, { plating: 2, charger: 1, wideband: 1 }],
             arena: 'blocks',
+            modifiers: { doubleDamage: true, mirror: true },
         },
         {
             seed: 7,
@@ -451,12 +452,13 @@ console.log('replay');
                 back.teamSize === spec.teamSize &&
                 JSON.stringify(back.lineupIds) === JSON.stringify(spec.lineupIds) &&
                 JSON.stringify(back.loadouts) === JSON.stringify(spec.loadouts.map((l) => sanitizeLoadout(l))) &&
-                back.arena === (spec.arena ?? 'open');
-            check(`replay preserves seed+lineups+loadouts+arena (${spec.teamSize}v${spec.teamSize})`, sameSetup);
+                back.arena === (spec.arena ?? 'open') &&
+                JSON.stringify(back.modifiers) === JSON.stringify(sanitizeModifiers(spec.modifiers ?? {}));
+            check(`replay preserves seed+lineups+loadouts+arena+mods (${spec.teamSize}v${spec.teamSize})`, sameSetup);
             const teams = spec.lineupIds.map((_, i) => (i < spec.teamSize ? 0 : 1) as 0 | 1);
-            const direct = runMatch(spec.lineupIds, teams, spec.seed, spec.loadouts, spec.arena ?? 'open');
+            const direct = runMatch(spec.lineupIds, teams, spec.seed, spec.loadouts, spec.arena ?? 'open', spec.modifiers ?? {});
             // Re-run purely from the decoded code, as Watch Replay does.
-            const replayed = runMatch(back.lineupIds, teams, back.seed, back.loadouts, back.arena ?? 'open');
+            const replayed = runMatch(back.lineupIds, teams, back.seed, back.loadouts, back.arena ?? 'open', back.modifiers ?? {});
             check(
                 `same code => identical fingerprint (${spec.teamSize}v${spec.teamSize})`,
                 fingerprint(direct) === fingerprint(replayed),
@@ -474,6 +476,8 @@ console.log('replay');
         const json = Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
         const tampered = `RA1.${Buffer.from(json.replace('"blocks"', '"void"'), 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
         check('bad arena rejected', decodeReplay(tampered) === null);
+        const badMods = `RA1.${Buffer.from(json.replace('"dm"', '"dx"'), 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')}`;
+        check('bad modifiers rejected', decodeReplay(badMods) === null);
     }
     check('overlong code rejected', decodeReplay(`RA1.${'A'.repeat(3000)}`) === null);
 }
@@ -729,6 +733,104 @@ console.log('sharing');
         guard += 1;
     }
     check('1v1 shared stays empty (no allies)', soloLog.every((e) => e.shared.length === 0) && soloLog.length > 30);
+}
+
+// --- 10. Exhibition modifiers: each flips a scripted matchup -------------
+console.log('modifiers');
+{
+    // Sim core: fingerprint minus the arena+mods tags, so "flips" means the
+    // sim itself diverged, not just the label.
+    const simCore = (match: Match): string => fingerprint(match).split('|').slice(2).join('|');
+    check('sanitize keeps only literal true', JSON.stringify(sanitizeModifiers({ doubleDamage: true, hardcoreFog: 'yes', mirror: 1 })) === JSON.stringify({ doubleDamage: true }));
+    check('sanitize rejects non-objects', JSON.stringify(sanitizeModifiers(null)) === '{}' && JSON.stringify(sanitizeModifiers('2x')) === '{}');
+    check('clean match is not exhibition', !isExhibition({}));
+    check(
+        'each flag marks exhibition',
+        isExhibition({ doubleDamage: true }) && isExhibition({ hardcoreFog: true }) && isExhibition({ mirror: true }),
+    );
+
+    const plain = runMatch(['hunter', 'orbiter'], [0, 1], 11);
+    const dbl = runMatch(['hunter', 'orbiter'], [0, 1], 11, undefined, 'open', { doubleDamage: true });
+    const dblAgain = runMatch(['hunter', 'orbiter'], [0, 1], 11, undefined, 'open', { doubleDamage: true });
+    const fog = runMatch(['hunter', 'orbiter'], [0, 1], 11, undefined, 'open', { hardcoreFog: true });
+    check('modded matches are deterministic', fingerprint(dbl) === fingerprint(dblAgain));
+    check('double damage flips the matchup', simCore(plain) !== simCore(dbl));
+    check('hardcore fog flips the matchup', simCore(plain) !== simCore(fog));
+
+    // Mirror: same bot both sides completes; the flag itself is sim-neutral.
+    const mirror = runMatch(['hunter', 'hunter'], [0, 1], 11, undefined, 'open', { mirror: true });
+    const mirrorPlain = runMatch(['hunter', 'hunter'], [0, 1], 11);
+    check('mirror match completes', mirror.result.over);
+    check('mirror flag is sim-neutral (lineup is the flip)', simCore(mirror) === simCore(mirrorPlain));
+    check('mirror flips the matchup', simCore(plain) !== simCore(mirror));
+    check('match exposes sanitized modifiers', JSON.stringify(mirror.modifiers) === JSON.stringify({ mirror: true }));
+
+    // Double damage deals exactly 2x per hit, measured at the first-hit tick
+    // (one hit only: equal-speed shots land 24 ticks apart, no deaths yet).
+    const shooter: RobotController = {
+        meta: { id: 'shooter', name: 'Shooter', author: 'test', version: '0', description: '' },
+        update: (): Intent => ({ throttle: 1, turn: 0, towerTurn: 0, fire: true, charge: false }),
+    };
+    const target: RobotController = {
+        meta: { id: 'target', name: 'Target', author: 'test', version: '0', description: '' },
+        update: (): Intent => ({ throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false }),
+    };
+    const duel = (modifiers: MatchModifiers): Match =>
+        new Match(
+            [
+                { team: 0, controller: shooter },
+                { team: 1, controller: target },
+            ],
+            3,
+            { modifiers },
+        );
+    const firstHit = (): number => {
+        const match = duel({});
+        for (let i = 0; i < 2000; i += 1) {
+            match.step();
+            if ((match.robotSnapshots[0]?.damageDealt ?? 0) > 0) return i + 1;
+        }
+        return -1;
+    };
+    const dealtAt = (ticks: number, modifiers: MatchModifiers): number => {
+        const match = duel(modifiers);
+        for (let i = 0; i < ticks; i += 1) match.step();
+        return match.robotSnapshots[0]?.damageDealt ?? -1;
+    };
+    const hitTick = firstHit();
+    check('shooter lands a hit', hitTick > 0);
+    check(
+        'double damage deals exactly 2x per hit',
+        hitTick > 0 && dealtAt(hitTick, {}) === 12 && dealtAt(hitTick, { doubleDamage: true }) === 24,
+        `tick=${hitTick}`,
+    );
+
+    // Hardcore fog halves the effective sensor range (visible in stats/scan).
+    const scanWith = (modifiers: MatchModifiers): number => {
+        const match = new Match(
+            [
+                { team: 0, controller: target },
+                { team: 1, controller: target },
+            ],
+            3,
+            { modifiers },
+        );
+        return match.robotSnapshots[0]?.scan ?? -1;
+    };
+    check('clean scan is full range', scanWith({}) === SENSOR_RANGE);
+    check('fog scan is halved', scanWith({ hardcoreFog: true }) === SENSOR_RANGE / 2);
+
+    // The modifiers getter returns a copy: mutating it can't touch the sim.
+    const leak = new Match(
+        [
+            { team: 0, controller: target },
+            { team: 1, controller: target },
+        ],
+        3,
+        {},
+    );
+    leak.modifiers.doubleDamage = true;
+    check('modifiers getter is a copy', !isExhibition(leak.modifiers));
 }
 
 // --- Tutorial: first-run flag with guarded storage -------------------------
