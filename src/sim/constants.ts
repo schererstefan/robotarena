@@ -4,7 +4,14 @@
 
 export const TICK_HZ = 60;
 export const DT = 1 / TICK_HZ;
-export const MAX_TICKS = TICK_HZ * 150; // 2.5 minute match cap, then draw
+export const MAX_TICKS = TICK_HZ * 150; // 2.5 minutes, then sudden death
+/** Sudden-death collapse: the safe circle shrinks from full cover to zero over this many ticks. */
+export const SUDDEN_DEATH_TICKS = TICK_HZ * 30;
+/** Sudden-death pulses come every this many ticks, staggered by robot id so two robots never pulse together. */
+export const SUDDEN_DEATH_PERIOD = 6;
+export const SUDDEN_DEATH_DAMAGE = 6;
+/** Absolute tick cap (defensive only: the collapsed circle eliminates everyone first). */
+export const MAX_TICKS_TOTAL = MAX_TICKS + SUDDEN_DEATH_TICKS + TICK_HZ * 10;
 
 export const ARENA_WIDTH = 960;
 export const ARENA_HEIGHT = 640;

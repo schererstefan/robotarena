@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, MAX_SPEED, MAX_TICKS, ROBOT_RADIUS, SENSOR_SHARE_DELAY, type ArenaId } from '../src/sim/constants';
+import { ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSOR_SHARE_DELAY, SUDDEN_DEATH_TICKS, type ArenaId } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, type ReplaySpec } from '../src/sim/replay';
@@ -45,7 +45,7 @@ function runMatch(ids: string[], teams: Array<0 | 1>, seed: number, loadouts?: S
     });
     const match = new Match(lineups, seed, { arena });
     let guard = 0;
-    while (!match.result.over && guard <= MAX_TICKS + 10) {
+    while (!match.result.over && guard <= MAX_TICKS_TOTAL + 10) {
         match.step();
         guard += 1;
     }
@@ -129,7 +129,7 @@ console.log('isolation');
         42,
     );
     let guard = 0;
-    while (!match.result.over && guard <= MAX_TICKS + 10) {
+    while (!match.result.over && guard <= MAX_TICKS_TOTAL + 10) {
         match.step();
         guard += 1;
     }
@@ -244,6 +244,7 @@ console.log('soak');
         const maxWins = Math.max(...[...wins.values()]);
         const arenaGames = ids.length * (ids.length - 1) * seeds.length;
         check(`no robot wins every ${arena} matchup (balance smell)`, maxWins < arenaGames);
+        check(`zero 1v1 draws on ${arena}`, draws === 0, `draws=${draws}`);
     }
     check(`all ${games} 1v1 games finished`, games === ids.length * (ids.length - 1) * seeds.length * ARENA_IDS.length);
     check('built-in robots run error-free', totalErrors === 0, `errors=${totalErrors}`);
@@ -349,6 +350,77 @@ console.log('arena');
         }
     }
     check('robots never clip blocks mid-match', !clipped && sampled > 0);
+}
+
+// --- 5c. Sudden death: circle shrinks, outsiders pulse, draws vanish ------
+console.log('sudden-death');
+{
+    const dummy = (id: string): RobotController => ({
+        meta: { id, name: id, author: 'test', version: '0', description: '' },
+        update: (): Intent => ({ throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false }),
+    });
+    const stalled = (): Match =>
+        new Match(
+            [
+                { team: 0, controller: dummy('dummy-a') },
+                { team: 1, controller: dummy('dummy-b') },
+            ],
+            11,
+        );
+    const match = stalled();
+    while (match.result.tick < MAX_TICKS) match.step();
+    check('time cap no longer ends the match', !match.result.over);
+    check('sudden-death flag set past the cap', match.result.suddenDeath);
+    check('circle centered on the arena', match.safeCircle.x === ARENA_WIDTH / 2 && match.safeCircle.y === ARENA_HEIGHT / 2);
+    const r0 = match.safeCircle.r;
+    check('spawns start inside the safe circle', match.robotSnapshots.every((s) => s.health === 100));
+    for (let i = 0; i < SUDDEN_DEATH_TICKS / 2; i += 1) match.step();
+    const r1 = match.safeCircle.r;
+    check('circle shrinks over time', r1 < r0 && r1 > 0, `r0=${r0.toFixed(1)} r1=${r1.toFixed(1)}`);
+    let guard = 0;
+    while (!match.result.over && guard <= MAX_TICKS_TOTAL) {
+        match.step();
+        guard += 1;
+    }
+    check('stalled match ends decisively', match.result.over && match.result.winner !== -1);
+    check('outsiders die during the shrink', match.result.tick < MAX_TICKS + SUDDEN_DEATH_TICKS);
+    // Center-sitters ride the circle down to zero: nobody is safe at r = 0.
+    const sitter = (id: string): RobotController => ({
+        meta: { id, name: id, author: 'test', version: '0', description: '' },
+        update: (sense: SenseState): Intent => {
+            const dx = ARENA_WIDTH / 2 - sense.self.x;
+            const dy = ARENA_HEIGHT / 2 - sense.self.y;
+            const d = Math.hypot(dx, dy);
+            if (d < 4) return { throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false };
+            const want = Math.atan2(dy, dx);
+            let diff = (want - sense.self.heading) % (Math.PI * 2);
+            if (diff > Math.PI) diff -= Math.PI * 2;
+            if (diff < -Math.PI) diff += Math.PI * 2;
+            return { throttle: d > 30 ? 1 : 0.3, turn: Math.max(-1, Math.min(1, diff * 2)), towerTurn: 0, fire: false, charge: false };
+        },
+    });
+    const sit = new Match(
+        [
+            { team: 0, controller: sitter('sit-a') },
+            { team: 1, controller: sitter('sit-b') },
+        ],
+        11,
+    );
+    let guardSit = 0;
+    while (!sit.result.over && guardSit <= MAX_TICKS_TOTAL) {
+        sit.step();
+        guardSit += 1;
+    }
+    check('center-sitters survive past full collapse', sit.result.tick > MAX_TICKS + SUDDEN_DEATH_TICKS);
+    check('circle fully collapses', sit.safeCircle.r === 0);
+    check('collapsed circle still ends decisively', sit.result.over && sit.result.winner !== -1);
+    const again = stalled();
+    let guard2 = 0;
+    while (!again.result.over && guard2 <= MAX_TICKS_TOTAL) {
+        again.step();
+        guard2 += 1;
+    }
+    check('sudden death is deterministic', fingerprint(match) === fingerprint(again));
 }
 
 // --- 6. Replay codes: round-trip + same code => identical fingerprint ------
@@ -603,7 +675,7 @@ console.log('sharing');
             seed,
         );
         let guard = 0;
-        while (!match.result.over && guard <= MAX_TICKS + 10) {
+        while (!match.result.over && guard <= MAX_TICKS_TOTAL + 10) {
             match.step();
             guard += 1;
         }
@@ -652,7 +724,7 @@ console.log('sharing');
         5,
     );
     let guard = 0;
-    while (!solo.result.over && guard <= MAX_TICKS + 10) {
+    while (!solo.result.over && guard <= MAX_TICKS_TOTAL + 10) {
         solo.step();
         guard += 1;
     }

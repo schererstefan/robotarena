@@ -114,6 +114,7 @@ export class BattleScene extends Scene {
     private mapG!: Phaser.GameObjects.Graphics;
     private pilot: PilotInput | null = null;
     private obstacles: ArenaObstacle[] = [];
+    private sdAnnounced = false;
     private tutStep = 0;
     private tutTitle!: Phaser.GameObjects.Text;
     private tutBody!: Phaser.GameObjects.Text;
@@ -158,6 +159,7 @@ export class BattleScene extends Scene {
         this.pilot = null;
         this.tutStep = 0;
         this.tutNext = null;
+        this.sdAnnounced = false;
     }
 
     create(): void {
@@ -792,6 +794,15 @@ export class BattleScene extends Scene {
             );
         }
         for (const ind of this.indicators) this.drawEdgeIndicator(g, ind);
+        // Sudden-death safe circle: red ring shrinking onto the arena center.
+        if (this.match.result.suddenDeath) {
+            const circle = this.match.safeCircle;
+            const r = Math.max(circle.r, 1);
+            g.lineStyle(3, COLORS.danger, 0.9);
+            g.strokeCircle(AX + circle.x, AY + circle.y, r);
+            g.lineStyle(1, 0xffffff, 0.5);
+            g.strokeCircle(AX + circle.x, AY + circle.y, Math.max(r - 4, 1));
+        }
         // Pilot aim reticle: faint sight line plus a crosshair at the cursor.
         if (this.pilot) {
             const s0 = snaps[0] as RobotSnapshot | undefined;
@@ -840,6 +851,10 @@ export class BattleScene extends Scene {
     }
 
     private syncHud(snaps: RobotSnapshot[]): void {
+        if (this.match.result.suddenDeath && !this.sdAnnounced) {
+            this.sdAnnounced = true;
+            this.queueBanner('SUDDEN DEATH');
+        }
         let alive0 = 0;
         let alive1 = 0;
         for (const s of snaps) {

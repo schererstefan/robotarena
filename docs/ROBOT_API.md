@@ -116,7 +116,11 @@ tower 3.6 rad/s, gun range 470, 0.4 s cooldown, 12 damage, 100 health, no
 friendly fire. Arena is 960×640 with mirrored spawns. The BLOCKS layout adds
 four center blocks (mirrored through the arena center); robots and bullets
 collide with them, but your sensors don't report them — walls sense still
-measures the outer walls only. Matches cap at 2.5 minutes, then a draw.
+measures the outer walls only. Matches run 2.5 minutes, then sudden death:
+a safe circle centered on the arena shrinks from full cover to zero over
+30 seconds, pulsing 6 damage every 6 ticks to robots outside it (staggered
+per robot, so both sides never pulse together). Only simultaneous
+elimination draws — stalling the clock no longer saves you.
 
 ## Rules for robot code
 

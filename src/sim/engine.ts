@@ -1,7 +1,7 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, REVERSE_FACTOR, ROBOT_RADIUS, SENSOR_SHARE_DELAY, type ArenaId, type ArenaObstacle } from './constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSOR_SHARE_DELAY, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, type ArenaId, type ArenaObstacle } from './constants';
 import { angleDiff, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
@@ -42,6 +42,14 @@ export interface MatchResult {
     /** Winning team, or -1 for a draw / undecided. */
     winner: -1 | 0 | 1;
     tick: number;
+    /** True once the time cap passes and the safe circle starts shrinking. */
+    suddenDeath: boolean;
+}
+
+export interface SafeCircle {
+    x: number;
+    y: number;
+    r: number;
 }
 
 interface Robot {
@@ -173,7 +181,15 @@ export class Match {
     }
 
     get result(): MatchResult {
-        return { over: this.over, winner: this.winner, tick: this.tick };
+        return { over: this.over, winner: this.winner, tick: this.tick, suddenDeath: this.tick >= MAX_TICKS };
+    }
+
+    /** Sudden-death safe circle: arena center, shrinking to zero past the cap. */
+    get safeCircle(): SafeCircle {
+        const full = Math.hypot(ARENA_WIDTH / 2, ARENA_HEIGHT / 2);
+        const past = this.tick - MAX_TICKS;
+        const r = past <= 0 ? full : Math.max(0, full * (1 - past / SUDDEN_DEATH_TICKS));
+        return { x: ARENA_WIDTH / 2, y: ARENA_HEIGHT / 2, r };
     }
 
     get arenaId(): ArenaId {
@@ -282,6 +298,8 @@ export class Match {
         });
         // 4. Bullets.
         this.stepBullets();
+        // 5. Sudden death: past the cap, robots outside the circle pulse damage.
+        if (this.tick >= MAX_TICKS) this.suddenDeath();
         this.tick += 1;
         this.checkEnd();
     }
@@ -548,6 +566,21 @@ export class Match {
         this.bullets = survivors;
     }
 
+    private suddenDeath(): void {
+        const circle = this.safeCircle;
+        for (const robot of this.robots) {
+            if (!robot.alive) continue;
+            // Strictly inside is safe; at radius zero nobody is.
+            if (dist(robot.x, robot.y, circle.x, circle.y) < circle.r) continue;
+            if ((this.tick + robot.id) % SUDDEN_DEATH_PERIOD !== 0) continue;
+            robot.health -= SUDDEN_DEATH_DAMAGE;
+            if (robot.health <= 0) {
+                robot.health = 0;
+                robot.alive = false;
+            }
+        }
+    }
+
     private checkEnd(): void {
         const alive0 = this.robots.some((r) => r.alive && r.team === 0);
         const alive1 = this.robots.some((r) => r.alive && r.team === 1);
@@ -560,9 +593,23 @@ export class Match {
         } else if (!alive0) {
             this.over = true;
             this.winner = 1;
-        } else if (this.tick >= MAX_TICKS) {
+        } else if (this.tick >= MAX_TICKS_TOTAL) {
+            // Defensive only: the collapsed circle eliminates everyone first.
+            // Health, then damage, decides; an exact tie stays a draw.
             this.over = true;
-            this.winner = -1;
+            const health = (team: 0 | 1): number =>
+                this.robots.filter((r) => r.alive && r.team === team).reduce((sum, r) => sum + r.health, 0);
+            const damage = (team: 0 | 1): number =>
+                this.robots.filter((r) => r.team === team).reduce((sum, r) => sum + r.damageDealt, 0);
+            const h0 = health(0);
+            const h1 = health(1);
+            if (h0 !== h1) {
+                this.winner = h0 > h1 ? 0 : 1;
+            } else {
+                const d0 = damage(0);
+                const d1 = damage(1);
+                this.winner = d0 === d1 ? -1 : d0 > d1 ? 0 : 1;
+            }
         }
     }
 
