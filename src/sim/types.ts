@@ -66,6 +66,15 @@ export interface SenseState {
     foes: SensedRobot[];
     /** Teammates are always known (radio link). */
     allies: SensedRobot[];
+    /**
+     * Foe sightings shared by allies, delivered 30 ticks late. Position-only:
+     * `id`, `team`, `x`, `y`, `distance`, and `bearing` are valid, but
+     * `heading`, `speed`, and `health` are always 0 (never shared). Sorted
+     * nearest first. Never includes foes you currently see yourself, your
+     * own sightings echoed back, dead foes, or (in 1v1, with no allies)
+     * anything at all.
+     */
+    shared: SensedRobot[];
     walls: WallSense;
     /** Deterministic random draw in [0, 1). Use this, never Math.random. */
     rand: Rand;

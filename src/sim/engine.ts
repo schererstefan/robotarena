@@ -1,7 +1,7 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, REVERSE_FACTOR, ROBOT_RADIUS, type ArenaId, type ArenaObstacle } from './constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DT, MAX_TICKS, REVERSE_FACTOR, ROBOT_RADIUS, SENSOR_SHARE_DELAY, type ArenaId, type ArenaObstacle } from './constants';
 import { angleDiff, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
@@ -78,6 +78,17 @@ interface Bullet {
     speed: number;
 }
 
+/** One ally's sighting of a foe: position only, delivered 30 ticks later. */
+interface SharedSighting {
+    tick: number;
+    team: 0 | 1;
+    foe: number;
+    /** Observing ally: the observer never receives its own sighting back. */
+    by: number;
+    x: number;
+    y: number;
+}
+
 export interface LineupEntry {
     team: 0 | 1;
     controller: RobotController;
@@ -109,6 +120,8 @@ export class Match {
     private winner: -1 | 0 | 1 = -1;
     private readonly seed: number;
     private readonly arena: ArenaId;
+    /** Recent ally sightings, pruned to the last SENSOR_SHARE_DELAY ticks. */
+    private sightings: SharedSighting[] = [];
 
     constructor(lineups: LineupEntry[], seed: number, options: MatchOptions = {}) {
         this.seed = seed;
@@ -203,6 +216,11 @@ export class Match {
 
     step(): void {
         if (this.over) return;
+        // Drop sightings too old to ever be delivered (exact-delay window).
+        if (this.sightings.length > 0 && this.tick > SENSOR_SHARE_DELAY) {
+            const cutoff = this.tick - SENSOR_SHARE_DELAY;
+            this.sightings = this.sightings.filter((s) => s.tick >= cutoff);
+        }
         // 1. Brains: fixed robot order keeps the shared RNG stream deterministic.
         const intents = this.robots.map((robot) => {
             if (!robot.alive) return { ...IDLE_INTENT };
@@ -268,6 +286,56 @@ export class Match {
         this.checkEnd();
     }
 
+    /** True when the viewer's sensor cone currently covers the target. */
+    private static sees(viewer: Robot, target: Robot): boolean {
+        const d = dist(viewer.x, viewer.y, target.x, target.y);
+        if (d > viewer.stats.sensorRange) return false;
+        const bearing = Math.atan2(target.y - viewer.y, target.x - viewer.x);
+        return Math.abs(angleDiff(viewer.tower, bearing)) <= viewer.stats.sensorFov / 2;
+    }
+
+    /** Record what this robot's allies see right now for delayed delivery. */
+    private recordAllySightings(robot: Robot): void {
+        for (const ally of this.robots) {
+            if (!ally.alive || ally.team !== robot.team || ally.id === robot.id) continue;
+            for (const foe of this.robots) {
+                if (!foe.alive || foe.team === robot.team) continue;
+                if (!Match.sees(ally, foe)) continue;
+                const known = this.sightings.some(
+                    (s) => s.tick === this.tick && s.team === robot.team && s.foe === foe.id && s.by === ally.id,
+                );
+                if (!known) {
+                    this.sightings.push({ tick: this.tick, team: robot.team, foe: foe.id, by: ally.id, x: foe.x, y: foe.y });
+                }
+            }
+        }
+    }
+
+    /** Ally sightings from exactly SENSOR_SHARE_DELAY ticks ago. */
+    private sharedSightings(robot: Robot, ownFoeIds: Set<number>): SensedRobot[] {
+        const shared: SensedRobot[] = [];
+        const want = this.tick - SENSOR_SHARE_DELAY;
+        if (want < 0) return shared;
+        for (const s of this.sightings) {
+            if (s.tick !== want || s.team !== robot.team || s.by === robot.id || ownFoeIds.has(s.foe)) continue;
+            const foe = this.robots[s.foe] as Robot | undefined;
+            if (!foe || !foe.alive || foe.team === robot.team) continue;
+            shared.push({
+                id: foe.id,
+                team: foe.team,
+                x: s.x,
+                y: s.y,
+                heading: 0,
+                speed: 0,
+                health: 0,
+                distance: dist(robot.x, robot.y, s.x, s.y),
+                bearing: Math.atan2(s.y - robot.y, s.x - robot.x),
+            });
+        }
+        shared.sort((a, b) => a.distance - b.distance);
+        return shared;
+    }
+
     private sense(robot: Robot): SenseState {
         const foes: SensedRobot[] = [];
         const allies: SensedRobot[] = [];
@@ -288,12 +356,14 @@ export class Match {
             };
             if (other.team === robot.team) {
                 allies.push(sensed);
-            } else if (d <= robot.stats.sensorRange && Math.abs(angleDiff(robot.tower, bearing)) <= robot.stats.sensorFov / 2) {
+            } else if (Match.sees(robot, other)) {
                 foes.push(sensed);
             }
         }
         foes.sort((a, b) => a.distance - b.distance);
         allies.sort((a, b) => a.id - b.id);
+        this.recordAllySightings(robot);
+        const shared = this.sharedSightings(robot, new Set(foes.map((f) => f.id)));
         return {
             tick: this.tick,
             time: this.tick * DT,
@@ -315,6 +385,7 @@ export class Match {
             },
             foes,
             allies,
+            shared,
             walls: {
                 left: robot.x,
                 right: ARENA_WIDTH - robot.x,

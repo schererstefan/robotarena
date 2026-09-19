@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, MAX_SPEED, MAX_TICKS, ROBOT_RADIUS, type ArenaId } from '../src/sim/constants';
+import { ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, MAX_SPEED, MAX_TICKS, ROBOT_RADIUS, SENSOR_SHARE_DELAY, type ArenaId } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, type ReplaySpec } from '../src/sim/replay';
@@ -546,6 +546,117 @@ console.log('workshop');
         workshopPassed(checkRobotSource(`${WORKSHOP_TEMPLATE}\n// Math.random fetch document are all banned\n/* eval("x") */`)),
     );
     check('unusable id falls back to my-robot.ts', suggestFilename('export const meta = { id: "Nope!" };') === 'my-robot.ts');
+}
+
+// --- 9. Team sensor sharing: 30-tick delayed position-only blips ---------
+console.log('sharing');
+{
+    interface Fix {
+        id: number;
+        x: number;
+        y: number;
+    }
+    interface SpyLog {
+        tick: number;
+        foes: Fix[];
+        shared: Array<Fix & { heading: number; speed: number; health: number }>;
+    }
+    const makeSpy = (inner: RobotController, log: SpyLog[]): RobotController => ({
+        meta: inner.meta,
+        loadout: inner.loadout,
+        onSpawn:
+            inner.onSpawn === undefined
+                ? undefined
+                : (sense: SenseState): void => {
+                      inner.onSpawn?.(sense);
+                  },
+        update: (sense: SenseState): Intent => {
+            log.push({
+                tick: sense.tick,
+                foes: sense.foes.map((f) => ({ id: f.id, x: f.x, y: f.y })),
+                shared: sense.shared.map((f) => ({
+                    id: f.id,
+                    x: f.x,
+                    y: f.y,
+                    heading: f.heading,
+                    speed: f.speed,
+                    health: f.health,
+                })),
+            });
+            return inner.update(sense);
+        },
+    });
+    const runSpied2v2 = (seed: number): SpyLog[][] => {
+        const logs: SpyLog[][] = [[], []];
+        const mk = (id: string, team: 0 | 1, spy: number | null): LineupEntry => {
+            const entry = ROBOTS.find((r) => r.meta.id === id);
+            if (!entry) throw new Error(`unknown robot ${id}`);
+            const inner = entry.create();
+            return {
+                team,
+                controller: spy === null ? inner : makeSpy(inner, logs[spy] as SpyLog[]),
+                loadout: { ...entry.loadout },
+            };
+        };
+        const match = new Match(
+            [mk('hunter', 0, 0), mk('orbiter', 0, 1), mk('rusher', 1, null), mk('turret', 1, null)],
+            seed,
+        );
+        let guard = 0;
+        while (!match.result.over && guard <= MAX_TICKS + 10) {
+            match.step();
+            guard += 1;
+        }
+        return logs;
+    };
+    const logsA = runSpied2v2(5);
+    const logsB = runSpied2v2(5);
+    check('shared sight is deterministic', JSON.stringify(logsA) === JSON.stringify(logsB));
+    const maps = logsA.map((log) => new Map(log.map((entry) => [entry.tick, entry])));
+    let earlyLeak = 0;
+    let lateHits = 0;
+    let positionOnly = true;
+    let delayExact = true;
+    let excludesOwn = true;
+    logsA.forEach((log, r) => {
+        const ally = maps[1 - r] as Map<number, SpyLog>;
+        for (const entry of log) {
+            for (const s of entry.shared) {
+                if (s.health !== 0 || s.heading !== 0 || s.speed !== 0) positionOnly = false;
+            }
+            if (entry.tick < SENSOR_SHARE_DELAY) {
+                if (entry.shared.length > 0) earlyLeak += 1;
+            } else {
+                if (entry.shared.length > 0) lateHits += 1;
+                const ownIds = new Set(entry.foes.map((f) => f.id));
+                const seen = ally.get(entry.tick - SENSOR_SHARE_DELAY);
+                for (const s of entry.shared) {
+                    if (ownIds.has(s.id)) excludesOwn = false;
+                    const match = seen?.foes.find((f) => f.id === s.id && f.x === s.x && f.y === s.y);
+                    if (!match) delayExact = false;
+                }
+            }
+        }
+    });
+    check('nothing shared before tick 30', earlyLeak === 0);
+    check('sightings arrive after tick 30', lateHits > 0, `hits=${lateHits}`);
+    check('shared is position-only (no health/speed/heading)', positionOnly);
+    check('shared matches ally sightings exactly 30 ticks prior', delayExact);
+    check('shared excludes currently-seen foes', excludesOwn);
+    // 1v1 has no allies: shared stays empty all game.
+    const soloLog: SpyLog[] = [];
+    const soloEntry = ROBOTS.find((r) => r.meta.id === 'hunter');
+    if (!soloEntry) throw new Error('no hunter');
+    const solo = new Match(
+        [{ team: 0, controller: makeSpy(soloEntry.create(), soloLog) }, { team: 1, controller: ROBOTS[1]!.create() }],
+        5,
+    );
+    let guard = 0;
+    while (!solo.result.over && guard <= MAX_TICKS + 10) {
+        solo.step();
+        guard += 1;
+    }
+    check('1v1 shared stays empty (no allies)', soloLog.every((e) => e.shared.length === 0) && soloLog.length > 30);
 }
 
 // --- Tutorial: first-run flag with guarded storage -------------------------

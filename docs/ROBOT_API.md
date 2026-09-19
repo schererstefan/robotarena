@@ -50,11 +50,15 @@ y grows downward). The sim ticks at 60 Hz.
 | `self`         | Your `id`, `team`, `x`, `y`, `heading`, `tower`, `speed`, `health`, gun `cooldown` (ticks until ready, `0` = ready), plus `stats` (effective values after skills), `charge`/`charged` (banked charge), and your `loadout`. |
 | `foes`         | Opponents **inside your sensor cone** this tick, nearest first: position, heading, speed, health, `distance`, absolute `bearing`. Empty when blind. |
 | `allies`       | Teammates, always known (radio link), same fields as foes.               |
+| `shared`       | Foe sightings shared by allies, delivered **30 ticks late**, nearest first. Position-only: `id`, `team`, `x`, `y`, `distance`, `bearing` are valid; `heading`, `speed`, `health` are always `0`. Never includes foes you see yourself, your own sightings echoed back, dead foes, or anything in 1v1 (no allies). |
 | `walls`        | Distance to each arena wall: `left`, `right`, `top`, `bottom`.           |
 | `rand()`       | Deterministic random draw in `[0, 1)`. Use this for any randomness.      |
 
 Sensor cone: 540 units range, ~63° wide, centered on your `tower` angle. You only
-see foes your tower points at — scanning is part of the game.
+see foes your tower points at — scanning is part of the game. In team games,
+allies radio you their sightings 30 ticks late via `shared`: stale,
+position-only blips (no health). Treat them as "was there half a second ago,"
+not as targeting data.
 
 ## What you return: `Intent`
 

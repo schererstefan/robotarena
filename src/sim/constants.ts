@@ -49,6 +49,8 @@ export const TURN_RATE = 2.7; // radians per second at full turn input
 export const TOWER_RATE = 3.6; // radians per second at full tower input
 export const SENSOR_RANGE = 540;
 export const SENSOR_FOV = 1.1; // full cone width in radians (~63 deg)
+/** Team sensor sharing delay: ally sightings arrive this many ticks late. */
+export const SENSOR_SHARE_DELAY = 30;
 
 // Gun base values (same for all robots; skills modify per loadout).
 export const GUN_RANGE = 470;
