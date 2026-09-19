@@ -18,7 +18,8 @@ import {
     winRates,
 } from '../history';
 import { COLORS, FONTS } from '../theme';
-import { makeButton, makePanel } from '../ui';
+import { markTutorialSeen, shouldShowTutorial, TUTORIAL_LINEUP, TUTORIAL_SEED } from '../tutorial';
+import { makeButton, makePanel, type Button } from '../ui';
 import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } from '../customize';
 
 export interface BattleRequest {
@@ -34,9 +35,27 @@ export interface BattleRequest {
     daily?: string;
     /** True when the human pilots slot 0 (1v1 vs AI). Excluded from history. */
     pilot?: boolean;
+    /** True for the scripted spectated tutorial battle. Excluded from history. */
+    tutorial?: boolean;
 }
 
 const CX = 512;
+
+/** Guided loadout-editor tour: shown over the open editor, slot 0. */
+const LOADOUT_TOUR: Array<{ title: string; body: string }> = [
+    {
+        title: 'POINTS',
+        body: 'Every slot gets the same 6-point budget. Spend it across the 9-skill catalog - anyone can run any legal build.',
+    },
+    {
+        title: 'RANKS',
+        body: 'Plus and minus set ranks per skill; green counts are active. Builds are public, shown as codes on results.',
+    },
+    {
+        title: 'DONE',
+        body: 'DONE locks the build. RANDOM rolls one, CLEAR empties it. Next: START BATTLE to run your builds.',
+    },
+];
 
 export class MenuScene extends Scene {
     private teamSize = 1;
@@ -58,9 +77,21 @@ export class MenuScene extends Scene {
     private muteButton!: { setLabel: (label: string) => void };
     private dailyButton!: { setLabel: (label: string) => void };
     private replayOverlay: HTMLDivElement | null = null;
+    private tourRequested = false;
+    private tourMode: 'prompt' | 'tour' | 'none' = 'none';
+    private tourObjects: Phaser.GameObjects.GameObject[] = [];
+    private tourButtons: Button[] = [];
+    private tourStep = 0;
+    private tourTitle!: Phaser.GameObjects.Text;
+    private tourBody!: Phaser.GameObjects.Text;
+    private tourNext: Button | null = null;
 
     constructor() {
         super('Menu');
+    }
+
+    init(data?: { tour?: boolean }): void {
+        this.tourRequested = data?.tour === true;
     }
 
     create(): void {
@@ -71,6 +102,11 @@ export class MenuScene extends Scene {
         this.editorObjects = [];
         this.statsObjects = [];
         this.editorSlot = -1;
+        this.tourMode = 'none';
+        this.tourObjects = [];
+        this.tourButtons = [];
+        this.tourStep = 0;
+        this.tourNext = null;
         this.add.text(CX, 44, 'ROBOTARENA', FONTS.title).setOrigin(0.5);
         this.add
             .text(CX, 86, 'same budget. same catalog. only the code differs.', FONTS.small)
@@ -100,13 +136,24 @@ export class MenuScene extends Scene {
         this.trailsButton = makeButton(this, CX - 215, 728, 200, 26, '', () => this.toggleTrails());
         this.muteButton = makeButton(this, CX, 728, 200, 26, '', () => this.toggleMute());
         makeButton(this, CX + 215, 728, 200, 26, 'WATCH REPLAY', () => this.openReplayDialog());
-        this.dailyButton = makeButton(this, CX - 264, 754, 160, 24, '', () => this.startDaily());
-        makeButton(this, CX - 88, 754, 160, 24, 'TOURNEY', () => this.scene.start('Tournament'));
-        makeButton(this, CX + 88, 754, 160, 24, 'STATS', () => this.openStats());
-        makeButton(this, CX + 264, 754, 160, 24, 'WORKSHOP', () => this.scene.start('Workshop'));
+        this.dailyButton = makeButton(this, CX - 340, 754, 150, 24, '', () => this.startDaily());
+        makeButton(this, CX - 170, 754, 150, 24, 'TOURNEY', () => this.scene.start('Tournament'));
+        makeButton(this, CX, 754, 150, 24, 'STATS', () => this.openStats());
+        makeButton(this, CX + 170, 754, 150, 24, 'WORKSHOP', () => this.scene.start('Workshop'));
+        makeButton(this, CX + 340, 754, 150, 24, 'TUTORIAL', () => this.startTutorial());
         this.refreshTrailsLabel();
         this.refreshMuteLabel();
         this.refreshDailyLabel();
+        // Tutorial routing: the battle half hands off to the loadout tour;
+        // first-run visits get the prompt instead.
+        const startTour = this.tourRequested;
+        this.tourRequested = false;
+        if (startTour) {
+            this.openEditor(0);
+            this.startLoadoutTour();
+        } else if (shouldShowTutorial()) {
+            this.showTutorialPrompt();
+        }
         // First click creates/resumes the AudioContext (autoplay policy);
         // every click gets a UI blip.
         this.input.on('pointerdown', this.onAnyPointer);
@@ -394,6 +441,104 @@ export class MenuScene extends Scene {
         for (const obj of this.editorObjects) obj.destroy();
         this.editorObjects = [];
         this.editorSlot = -1;
+        // A manual DONE mid-tour finishes the tour too.
+        if (this.tourMode === 'tour') {
+            markTutorialSeen();
+            this.clearTour();
+        }
+    }
+
+    // ---- Onboarding tutorial: first-run prompt + loadout-editor tour ------
+    private trackTour<T extends Phaser.GameObjects.GameObject>(obj: T): T {
+        this.tourObjects.push(obj);
+        return obj;
+    }
+
+    private clearTour(): void {
+        for (const obj of this.tourObjects) obj.destroy();
+        this.tourObjects = [];
+        for (const button of this.tourButtons) button.destroy();
+        this.tourButtons = [];
+        this.tourMode = 'none';
+        this.tourNext = null;
+    }
+
+    private showTutorialPrompt(): void {
+        this.clearTour();
+        this.tourMode = 'prompt';
+        this.trackTour(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(60).setInteractive());
+        this.trackTour(this.add.rectangle(CX, 384, 460, 220, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(60));
+        this.trackTour(this.add.text(CX, 320, 'NEW HERE?', FONTS.heading).setOrigin(0.5).setDepth(60));
+        this.trackTour(
+            this.add.text(CX, 352, 'Play the 60-second tutorial: a spectated battle,', FONTS.small).setOrigin(0.5).setDepth(60),
+        );
+        this.trackTour(
+            this.add.text(CX, 370, 'then a guided tour of the loadout editor.', FONTS.small).setOrigin(0.5).setDepth(60),
+        );
+        this.tourButtons.push(
+            makeButton(this, CX - 110, 440, 200, 40, 'PLAY TUTORIAL', () => {
+                this.clearTour();
+                this.startTutorial();
+            }, 60),
+        );
+        this.tourButtons.push(
+            makeButton(this, CX + 110, 440, 200, 40, 'SKIP', () => {
+                markTutorialSeen();
+                this.clearTour();
+            }, 60),
+        );
+    }
+
+    /** Scripted spectated 1v1: fixed seed and matchup, coach marks on top. */
+    private startTutorial(): void {
+        const lineupIds = [...TUTORIAL_LINEUP];
+        this.scene.start('Battle', {
+            teamSize: 1,
+            lineupIds,
+            loadouts: lineupIds.map((id) => ({ ...(getRobot(id)?.loadout ?? {}) })),
+            skins: lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
+            trails: this.trails,
+            seed: TUTORIAL_SEED,
+            tutorial: true,
+        } satisfies BattleRequest);
+    }
+
+    private startLoadoutTour(): void {
+        this.clearTour();
+        this.tourMode = 'tour';
+        this.tourStep = 0;
+        // Panel sits below the editor footer, inside the editor frame.
+        this.trackTour(this.add.rectangle(CX, 632, 700, 52, 0x0b0e12).setStrokeStyle(2, COLORS.team[0]).setDepth(60));
+        this.tourTitle = this.trackTour(this.add.text(180, 612, '', FONTS.monoSmall).setOrigin(0, 0.5).setDepth(60));
+        this.tourBody = this.trackTour(this.add.text(180, 624, '', FONTS.small).setOrigin(0, 0).setDepth(60));
+        this.tourBody.setWordWrapWidth(430);
+        this.tourNext = makeButton(this, 668, 632, 120, 36, '', () => this.nextTourStep(), 60);
+        this.tourButtons.push(this.tourNext);
+        this.tourButtons.push(makeButton(this, 796, 632, 90, 36, 'SKIP', () => this.finishTour(), 60));
+        this.refreshTourStep();
+    }
+
+    private refreshTourStep(): void {
+        const step = LOADOUT_TOUR[this.tourStep] as { title: string; body: string };
+        this.tourTitle.setText(`LOADOUT TOUR ${this.tourStep + 1}/${LOADOUT_TOUR.length} - ${step.title}`);
+        this.tourBody.setText(step.body);
+        this.tourNext?.setLabel(this.tourStep === LOADOUT_TOUR.length - 1 ? 'FINISH' : 'NEXT');
+    }
+
+    private nextTourStep(): void {
+        if (this.tourStep >= LOADOUT_TOUR.length - 1) {
+            this.finishTour();
+            return;
+        }
+        this.tourStep += 1;
+        this.refreshTourStep();
+    }
+
+    private finishTour(): void {
+        markTutorialSeen();
+        this.closeEditor();
+        this.rebuildSlots();
+        this.clearTour();
     }
 
     private showDescription(i: number): void {

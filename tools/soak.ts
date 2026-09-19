@@ -7,6 +7,7 @@ import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, type ReplaySpec } from '../src/sim/replay';
 import { checkRobotSource, suggestFilename, WORKSHOP_TEMPLATE, workshopPassed } from '../src/game/workshop';
+import { markTutorialSeen, resetTutorialFlag, shouldShowTutorial } from '../src/game/tutorial';
 import {
     clearDailyBoard,
     clearHistory,
@@ -437,6 +438,52 @@ console.log('workshop');
         workshopPassed(checkRobotSource(`${WORKSHOP_TEMPLATE}\n// Math.random fetch document are all banned\n/* eval("x") */`)),
     );
     check('unusable id falls back to my-robot.ts', suggestFilename('export const meta = { id: "Nope!" };') === 'my-robot.ts');
+}
+
+// --- Tutorial: first-run flag with guarded storage -------------------------
+console.log('tutorial');
+{
+    const store = new Map<string, string>();
+    (globalThis as unknown as { localStorage: Storage }).localStorage = {
+        getItem: (key: string) => (store.has(key) ? (store.get(key) as string) : null),
+        setItem: (key: string, value: string) => {
+            store.set(key, value);
+        },
+        removeItem: (key: string) => {
+            store.delete(key);
+        },
+    } as Storage;
+    resetTutorialFlag();
+    check('fresh install shows tutorial', shouldShowTutorial());
+    markTutorialSeen();
+    check('seen tutorial hidden', !shouldShowTutorial());
+    check('flag persists as seen', store.get('robotarena.tutorial.v1') === 'seen');
+    resetTutorialFlag();
+    check('reset shows tutorial again', shouldShowTutorial());
+    store.set('robotarena.tutorial.v1', 'corrupt!!');
+    check('corrupt flag shows tutorial', shouldShowTutorial());
+    // Throwing storage (blocked cookies) must never throw.
+    const throwing = {
+        getItem: (): null => {
+            throw new Error('denied');
+        },
+        setItem: (): void => {
+            throw new Error('denied');
+        },
+        removeItem: (): void => {
+            throw new Error('denied');
+        },
+    } as Storage;
+    (globalThis as unknown as { localStorage: Storage }).localStorage = throwing;
+    let threw = false;
+    try {
+        resetTutorialFlag();
+        shouldShowTutorial();
+        markTutorialSeen();
+    } catch {
+        threw = true;
+    }
+    check('throwing storage never throws', !threw);
 }
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);

@@ -14,7 +14,8 @@ import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unl
 import { recordDailyResult, recordMatch } from '../history';
 import { createPilotController, PilotInput } from '../pilot';
 import { COLORS, FONTS } from '../theme';
-import { copyText, downloadText, makeButton } from '../ui';
+import { markTutorialSeen } from '../tutorial';
+import { copyText, downloadText, makeButton, type Button } from '../ui';
 import type { SlotSkin } from '../customize';
 import type { BattleRequest } from './MenuScene';
 
@@ -48,6 +49,26 @@ interface EdgeIndicator {
     team: 0 | 1;
     ttl: number;
 }
+
+/** Coach-mark script for the spectated tutorial battle (user-paced). */
+const TUTORIAL_STEPS: Array<{ title: string; body: string }> = [
+    {
+        title: 'WATCH',
+        body: 'Two bots fight on their own - you are spectating. Bots only see foes inside the cone their turret points at.',
+    },
+    {
+        title: 'DAMAGE',
+        body: 'Bars show health. A white ring means a full charge is banked: the next shot deals double damage.',
+    },
+    {
+        title: 'CONTROLS',
+        body: 'Space pauses, N steps one tick while paused, 1X cycles speed, M mutes. The minimap tracks every robot.',
+    },
+    {
+        title: 'RECORDS',
+        body: 'Every battle is logged: STATS shows per-robot win rates, and results give a replay code for the exact match.',
+    },
+];
 
 export class BattleScene extends Scene {
     private request!: BattleRequest;
@@ -91,6 +112,10 @@ export class BattleScene extends Scene {
     private indicators: EdgeIndicator[] = [];
     private mapG!: Phaser.GameObjects.Graphics;
     private pilot: PilotInput | null = null;
+    private tutStep = 0;
+    private tutTitle!: Phaser.GameObjects.Text;
+    private tutBody!: Phaser.GameObjects.Text;
+    private tutNext: Button | null = null;
 
     constructor() {
         super('Battle');
@@ -128,6 +153,8 @@ export class BattleScene extends Scene {
         this.dmgCursor = 0;
         this.indicators = [];
         this.pilot = null;
+        this.tutStep = 0;
+        this.tutNext = null;
     }
 
     create(): void {
@@ -281,8 +308,44 @@ export class BattleScene extends Scene {
             this.input.keyboard?.off('keydown-N', this.onStepKey);
         });
 
+        if (this.request.tutorial === true) this.buildTutorial();
+
         this.syncSprites(this.match.robotSnapshots, this.match.bulletSnapshots);
         this.drawDynamic(this.match.robotSnapshots);
+    }
+
+    // ---- Onboarding tutorial: scripted spectated battle + coach marks ------
+    private buildTutorial(): void {
+        this.tutStep = 0;
+        this.add.rectangle(512, 682, 780, 56, 0x0b0e12, 0.92).setStrokeStyle(2, COLORS.team[0]).setDepth(30);
+        this.tutTitle = this.add.text(140, 660, '', FONTS.monoSmall).setOrigin(0, 0.5).setDepth(30);
+        this.tutBody = this.add.text(140, 676, '', FONTS.small).setOrigin(0, 0).setDepth(30);
+        this.tutBody.setWordWrapWidth(556);
+        this.tutNext = makeButton(this, 768, 682, 120, 36, '', () => this.nextTutorialStep(), 30);
+        makeButton(this, 862, 682, 64, 36, 'SKIP', () => this.skipTutorial(), 30);
+        this.refreshTutorialStep();
+    }
+
+    private refreshTutorialStep(): void {
+        const step = TUTORIAL_STEPS[this.tutStep] as { title: string; body: string };
+        this.tutTitle.setText(`TUTORIAL ${this.tutStep + 1}/${TUTORIAL_STEPS.length} - ${step.title}`);
+        this.tutBody.setText(step.body);
+        this.tutNext?.setLabel(this.tutStep === TUTORIAL_STEPS.length - 1 ? 'LOADOUT TOUR' : 'NEXT');
+    }
+
+    private nextTutorialStep(): void {
+        if (this.tutStep >= TUTORIAL_STEPS.length - 1) {
+            // Seen is marked when the loadout tour ends; the tour is next.
+            this.scene.start('Menu', { tour: true });
+            return;
+        }
+        this.tutStep += 1;
+        this.refreshTutorialStep();
+    }
+
+    private skipTutorial(): void {
+        markTutorialSeen();
+        this.scene.start('Menu');
     }
 
     update(_time: number, delta: number): void {
@@ -782,7 +845,8 @@ export class BattleScene extends Scene {
         // Replays re-watch history; only live battles append to it. Daily
         // matches go to the daily board instead of the main log so the fixed
         // daily matchup can't skew per-robot win rates. Pilot matches are
-        // human-driven, so they stay out of the log for the same reason.
+        // human-driven and tutorial matches are a fixed scripted matchup, so
+        // both stay out of the log for the same reason.
         if (this.request.daily !== undefined) {
             recordDailyResult(this.request.daily, {
                 seed: this.request.seed,
@@ -790,7 +854,7 @@ export class BattleScene extends Scene {
                 winner: result.winner,
                 ticks: result.tick,
             });
-        } else if (this.request.replay !== true && this.request.pilot !== true) {
+        } else if (this.request.replay !== true && this.request.pilot !== true && this.request.tutorial !== true) {
             recordMatch({
                 teamSize: this.request.teamSize,
                 lineupIds: [...this.request.lineupIds],
@@ -876,6 +940,7 @@ export class BattleScene extends Scene {
                     seed: (Math.random() * 0x7fffffff) | 0,
                     replay: false,
                     daily: undefined,
+                    tutorial: undefined,
                 });
             },
             21,
