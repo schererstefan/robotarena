@@ -5,12 +5,14 @@
 import { Scene } from 'phaser';
 import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
+import { clamp } from '../../sim/math';
 import { encodeReplay } from '../../sim/replay';
 import { ROBOTS } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
 import { chassisKey, ensureArtTextures } from '../art';
 import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unlockAudio } from '../audio';
 import { recordDailyResult, recordMatch } from '../history';
+import { createPilotController, PilotInput } from '../pilot';
 import { COLORS, FONTS } from '../theme';
 import { copyText, downloadText, makeButton } from '../ui';
 import type { SlotSkin } from '../customize';
@@ -88,6 +90,7 @@ export class BattleScene extends Scene {
     private dmgCursor = 0;
     private indicators: EdgeIndicator[] = [];
     private mapG!: Phaser.GameObjects.Graphics;
+    private pilot: PilotInput | null = null;
 
     constructor() {
         super('Battle');
@@ -124,15 +127,23 @@ export class BattleScene extends Scene {
         this.dmgTexts = [];
         this.dmgCursor = 0;
         this.indicators = [];
+        this.pilot = null;
     }
 
     create(): void {
         ensureArtTextures(this);
+        // Pilot mode: slot 0 keeps its robot identity but is driven by human
+        // input through the same Intent pipeline (no sim changes).
+        this.pilot = this.request.pilot === true ? new PilotInput() : null;
         const lineups: LineupEntry[] = this.request.lineupIds.map((id, i) => {
             const entry = ROBOTS.find((r) => r.meta.id === id) ?? ROBOTS[0]!;
+            const controller =
+                i === 0 && this.pilot
+                    ? createPilotController(entry.meta, entry.loadout, this.pilot)
+                    : entry.create();
             return {
                 team: (i < this.request.teamSize ? 0 : 1) as 0 | 1,
-                controller: entry.create(),
+                controller,
                 loadout: { ...(this.request.loadouts[i] ?? {}) },
             };
         });
@@ -212,9 +223,24 @@ export class BattleScene extends Scene {
         this.add.rectangle(AX + ARENA_WIDTH / 2, 26, ARENA_WIDTH + 32, 40, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(10);
         this.hudPips = this.add.text(AX + 12, 26, '', FONTS.mono).setOrigin(0, 0.5).setDepth(10);
         this.hudTimer = this.add.text(AX + ARENA_WIDTH / 2, 26, '', FONTS.heading).setOrigin(0.5).setDepth(10);
-        const tag = this.request.daily !== undefined ? 'DAILY' : this.request.replay === true ? 'REPLAY' : null;
+        const tag =
+            this.request.pilot === true
+                ? 'PILOT'
+                : this.request.daily !== undefined
+                  ? 'DAILY'
+                  : this.request.replay === true
+                    ? 'REPLAY'
+                    : null;
         const seedLabel = tag ? `SEED ${this.request.seed} - ${tag}` : `SEED ${this.request.seed}`;
         this.add.text(AX + ARENA_WIDTH - 12, 26, seedLabel, FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
+        if (this.request.pilot === true) {
+            const help = 'WASD DRIVE - MOUSE AIM - SPACE TAP FIRE, HOLD CHARGE - P PAUSE';
+            this.add.rectangle(AX + ARENA_WIDTH / 2, AY + 14, 560, 20, 0x000000, 0.6).setDepth(10);
+            this.add
+                .text(AX + ARENA_WIDTH / 2, AY + 14, help, FONTS.monoSmall)
+                .setOrigin(0.5)
+                .setDepth(10);
+        }
         this.banner = this.add.text(AX + ARENA_WIDTH / 2, AY + 56, '', FONTS.heading).setOrigin(0.5).setDepth(10).setAlpha(0);
 
         // Damage-number pool + live minimap (bottom HUD strip).
@@ -238,11 +264,19 @@ export class BattleScene extends Scene {
         this.input.on('pointerdown', this.onAnyPointer);
         // Named handlers, removed on shutdown: the keyboard plugin is global
         // and outlives the scene, so anonymous listeners would stack per visit.
-        this.input.keyboard?.on('keydown-SPACE', this.onSpaceKey);
+        // In pilot mode Space fires the gun, so pause moves to P.
+        if (this.request.pilot === true) {
+            this.input.keyboard?.on('keydown', this.onPilotKeyDown);
+            this.input.keyboard?.on('keyup', this.onPilotKeyUp);
+        } else {
+            this.input.keyboard?.on('keydown-SPACE', this.onSpaceKey);
+        }
         this.input.keyboard?.on('keydown-M', this.onMuteKey);
         this.input.keyboard?.on('keydown-N', this.onStepKey);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-SPACE', this.onSpaceKey);
+            this.input.keyboard?.off('keydown', this.onPilotKeyDown);
+            this.input.keyboard?.off('keyup', this.onPilotKeyUp);
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown-N', this.onStepKey);
         });
@@ -254,6 +288,13 @@ export class BattleScene extends Scene {
     update(_time: number, delta: number): void {
         void _time;
         const dt = Math.min(delta / 1000, 0.1);
+        // Pilot aim follows the pointer (game coords minus the arena offset),
+        // refreshed before the sim ticks so the turret tracks the cursor.
+        if (this.pilot) {
+            const pointer = this.input.activePointer;
+            this.pilot.aimX = pointer.x - AX;
+            this.pilot.aimY = pointer.y - AY;
+        }
         let stepped = false;
         if (!this.paused && !this.match.result.over) {
             this.acc += dt * this.speed;
@@ -300,6 +341,72 @@ export class BattleScene extends Scene {
 
     private onStepKey = (): void => {
         this.stepOnce();
+    };
+
+    private onPilotKeyDown = (event: KeyboardEvent): void => {
+        const pilot = this.pilot;
+        if (!pilot) return;
+        switch (event.code) {
+            case 'KeyW':
+            case 'ArrowUp':
+                pilot.forward = true;
+                event.preventDefault();
+                break;
+            case 'KeyS':
+            case 'ArrowDown':
+                pilot.back = true;
+                event.preventDefault();
+                break;
+            case 'KeyA':
+            case 'ArrowLeft':
+                pilot.left = true;
+                event.preventDefault();
+                break;
+            case 'KeyD':
+            case 'ArrowRight':
+                pilot.right = true;
+                event.preventDefault();
+                break;
+            case 'Space':
+                pilot.charging = true;
+                if (!event.repeat) pilot.queueShot();
+                event.preventDefault();
+                break;
+            case 'KeyP':
+                this.togglePause();
+                break;
+            default:
+                break;
+        }
+    };
+
+    private onPilotKeyUp = (event: KeyboardEvent): void => {
+        const pilot = this.pilot;
+        if (!pilot) return;
+        switch (event.code) {
+            case 'KeyW':
+            case 'ArrowUp':
+                pilot.forward = false;
+                break;
+            case 'KeyS':
+            case 'ArrowDown':
+                pilot.back = false;
+                break;
+            case 'KeyA':
+            case 'ArrowLeft':
+                pilot.left = false;
+                break;
+            case 'KeyD':
+            case 'ArrowRight':
+                pilot.right = false;
+                break;
+            case 'Space':
+                pilot.charging = false;
+                pilot.queueShot();
+                break;
+            default:
+                break;
+        }
     };
 
     private onAnyPointer = (): void => {
@@ -583,6 +690,19 @@ export class BattleScene extends Scene {
             }
         }
         for (const ind of this.indicators) this.drawEdgeIndicator(g, ind);
+        // Pilot aim reticle: faint sight line plus a crosshair at the cursor.
+        if (this.pilot) {
+            const s0 = snaps[0] as RobotSnapshot | undefined;
+            if (s0 && s0.alive) {
+                const ax = clamp(AX + this.pilot.aimX, AX, AX + ARENA_WIDTH);
+                const ay = clamp(AY + this.pilot.aimY, AY, AY + ARENA_HEIGHT);
+                g.lineStyle(1, 0xffffff, 0.3);
+                g.lineBetween(AX + s0.x, AY + s0.y, ax, ay);
+                g.lineStyle(2, 0xffffff, 0.8);
+                g.lineBetween(ax - 6, ay, ax + 6, ay);
+                g.lineBetween(ax, ay - 6, ax, ay + 6);
+            }
+        }
     }
 
     /** Chevron on the arena rim pointing from the victim toward its attacker. */
@@ -661,7 +781,8 @@ export class BattleScene extends Scene {
         this.stepButton.setEnabled(false);
         // Replays re-watch history; only live battles append to it. Daily
         // matches go to the daily board instead of the main log so the fixed
-        // daily matchup can't skew per-robot win rates.
+        // daily matchup can't skew per-robot win rates. Pilot matches are
+        // human-driven, so they stay out of the log for the same reason.
         if (this.request.daily !== undefined) {
             recordDailyResult(this.request.daily, {
                 seed: this.request.seed,
@@ -669,7 +790,7 @@ export class BattleScene extends Scene {
                 winner: result.winner,
                 ticks: result.tick,
             });
-        } else if (this.request.replay !== true) {
+        } else if (this.request.replay !== true && this.request.pilot !== true) {
             recordMatch({
                 teamSize: this.request.teamSize,
                 lineupIds: [...this.request.lineupIds],
@@ -680,7 +801,19 @@ export class BattleScene extends Scene {
             });
         }
         if (result.winner !== -1) playWin();
-        const title = result.winner === -1 ? 'DRAW' : result.winner === 0 ? 'TEAM 1 WINS' : 'TEAM 2 WINS';
+        // The pilot always drives slot 0 (team 1), so name the verdict.
+        const title =
+            this.request.pilot === true
+                ? result.winner === -1
+                    ? 'DRAW'
+                    : result.winner === 0
+                      ? 'YOU WIN'
+                      : 'YOU LOSE'
+                : result.winner === -1
+                  ? 'DRAW'
+                  : result.winner === 0
+                    ? 'TEAM 1 WINS'
+                    : 'TEAM 2 WINS';
         const color = result.winner === -1 ? COLORS.ink : COLORS.teamCss[result.winner];
         this.add.rectangle(512, 384, 620, 440, 0x0b0e12, 0.94).setStrokeStyle(2, COLORS.panelEdge).setDepth(20);
         this.add.text(512, 196, title, { ...FONTS.banner, color }).setOrigin(0.5).setDepth(20);

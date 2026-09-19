@@ -21,6 +21,13 @@ or 3v3, assign a robot to each slot, dress it up (callsign, paint, finish, motio
 trails — all cosmetic, zero effect on performance), start the battle. Click a results
 row to download that robot's source.
 
+**Pilot mode:** hit PILOT 1V1 to drive slot 0's robot yourself against the slot 1
+AI — WASD to drive, mouse to aim the turret, Space to fire (tap for a snap shot,
+hold to bank charge on charger builds, release for the charged shot), P to pause.
+Your input flows through the same Intent pipeline as AI controllers, so the piloted
+robot gets no special physics. Pilot matches stay out of the match history so
+human games can't skew per-robot win rates.
+
 ## Project layout
 
 - `src/sim/` — engine-agnostic battle simulation (no Phaser imports): fixed-timestep

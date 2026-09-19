@@ -32,6 +32,8 @@ export interface BattleRequest {
     replay?: boolean;
     /** Daily-challenge date key (YYYY-MM-DD) when this is the daily match. */
     daily?: string;
+    /** True when the human pilots slot 0 (1v1 vs AI). Excluded from history. */
+    pilot?: boolean;
 }
 
 const CX = 512;
@@ -92,8 +94,9 @@ export class MenuScene extends Scene {
         this.descText = this.add.text(CX - 420, 562, '', FONTS.body).setWordWrapWidth(840);
         this.showDescription(0);
 
-        makeButton(this, CX - 160, 684, 260, 50, 'RANDOMIZE SKINS', () => this.randomizeSkins());
-        makeButton(this, CX + 160, 684, 260, 50, 'START BATTLE', () => this.startBattle());
+        makeButton(this, CX - 290, 684, 270, 50, 'RANDOMIZE SKINS', () => this.randomizeSkins());
+        makeButton(this, CX, 684, 270, 50, 'START BATTLE', () => this.startBattle());
+        makeButton(this, CX + 290, 684, 270, 50, 'PILOT 1V1', () => this.startPilot());
         this.trailsButton = makeButton(this, CX - 215, 728, 200, 26, '', () => this.toggleTrails());
         this.muteButton = makeButton(this, CX, 728, 200, 26, '', () => this.toggleMute());
         makeButton(this, CX + 215, 728, 200, 26, 'WATCH REPLAY', () => this.openReplayDialog());
@@ -580,6 +583,19 @@ export class MenuScene extends Scene {
             skins: this.skins.map((s) => ({ ...s })),
             trails: this.trails,
             seed: (Math.random() * 0x7fffffff) | 0,
+        } satisfies BattleRequest);
+    }
+
+    /** Pilot mode: drive slot 0's robot 1v1 against the slot 1 AI. */
+    private startPilot(): void {
+        this.scene.start('Battle', {
+            teamSize: 1,
+            lineupIds: [this.lineupIds[0] as string, this.lineupIds[1] as string],
+            loadouts: [{ ...(this.loadouts[0] ?? {}) }, { ...(this.loadouts[1] ?? {}) }],
+            skins: [{ ...(this.skins[0] as SlotSkin) }, { ...(this.skins[1] as SlotSkin) }],
+            trails: this.trails,
+            seed: (Math.random() * 0x7fffffff) | 0,
+            pilot: true,
         } satisfies BattleRequest);
     }
 }
