@@ -13,6 +13,9 @@ dist-ssr
 *.local
 .vercel
 
+# Eval harness outputs (checked-in goldens live in tools/eval/golden.json)
+/eval/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

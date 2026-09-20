@@ -8,7 +8,12 @@
     "build": "node log.js build & vite build --config vite/config.prod.mjs",
     "dev-nolog": "vite --config vite/config.dev.mjs",
     "build-nolog": "vite build --config vite/config.prod.mjs",
-    "test:sim": "esbuild tools/soak.ts --bundle --platform=node --format=esm --outfile=/tmp/robotarena-soak.mjs --log-level=warning && node /tmp/robotarena-soak.mjs"
+    "test:sim": "esbuild tools/soak.ts --bundle --platform=node --format=esm --outfile=/tmp/robotarena-soak.mjs --log-level=warning && node /tmp/robotarena-soak.mjs",
+    "eval:build": "esbuild tools/eval.ts --bundle --platform=node --format=cjs --outfile=/tmp/robotarena-eval.cjs --log-level=warning",
+    "eval:smoke": "npm run eval:build && node /tmp/robotarena-eval.cjs --mode smoke --out eval/out-smoke",
+    "eval:rr": "npm run eval:build && node /tmp/robotarena-eval.cjs --mode rr --jobs 8 --out eval/out-rr",
+    "eval:ladder": "npm run eval:build && node /tmp/robotarena-eval.cjs --mode ladder --jobs 8 --out eval/out-ladder",
+    "eval:full": "npm run eval:build && node /tmp/robotarena-eval.cjs --mode full --jobs 8 --out eval/out-full"
   },
   "devDependencies": {
     "typescript": "~5.7.2",
