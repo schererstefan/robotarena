@@ -72,14 +72,16 @@ function validIntent(raw: unknown): boolean {
     if (!isRecord(raw)) return false;
     // Every Intent field is optional-with-default: missing is fine, present
     // must be the right type (the engine clamps ranges downstream).
-    for (const field of ['throttle', 'turn', 'towerTurn']) {
+    for (const field of ['throttle', 'turn', 'towerTurn', 'strafe', 'moveX', 'moveY', 'moveMode', 'aimMode', 'aimTarget', 'fireMode']) {
         const value = raw[field];
         if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value))) return false;
     }
-    for (const field of ['fire', 'charge', 'dash', 'emp']) {
+    for (const field of ['fire', 'charge', 'dash', 'emp', 'aimLead']) {
         const value = raw[field];
         if (value !== undefined && typeof value !== 'boolean') return false;
     }
+    const radio = raw['radio'];
+    if (radio !== undefined && radio !== null && typeof radio !== 'object') return false;
     return true;
 }
 

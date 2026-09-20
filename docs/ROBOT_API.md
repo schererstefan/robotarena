@@ -106,9 +106,46 @@ Every field is optional-with-default: return only what you need
 | `charge`    | `false` | Hold to bank charge (charger skill only). Slows drive to 75%.  |
 | `dash`      | `false` | `true` to dash (2.5× top speed, 12 ticks). 8 s cooldown.       |
 | `emp`       | `false` | `true` to pulse EMP (foes in 220 u slowed to 45% for 3 s). 12 s cooldown. |
+| `strafe`    | `0`     | `-1` (port) to `1` (starboard) lateral drive at 50% top speed. Clamped, normalized with `throttle`. |
+| `moveX`/`moveY` | `0` | Drive-assist target (arena coords). Read only when `moveMode` is `1`. Clamped to the arena. |
+| `moveMode`  | `0`     | `1` = engine drives to (`moveX`, `moveY`), overriding `throttle`/`turn`. |
+| `aimMode`   | `0`     | `0` manual, `1` track `aimTarget`, `2` track with lead.        |
+| `aimTarget` | `-1`    | Robot id the turret assist tracks (`-1` = none).               |
+| `aimLead`   | `false` | `true` upgrades `aimMode` `1` to lead like `2`.                |
+| `fireMode`  | `0`     | `1` = also auto-fire on a locked aim assist (same cooldown gate). |
+| `radio`     | `null`  | One team message per tick (`{kind, x, y, foe, role, slot, bid}`), delivered 6 ticks late. |
 
 Missing, `NaN`, or non-numeric fields are treated as `0`/`false`. Out-of-range
-values are clamped. There is no way to exceed your loadout's stats.
+values are clamped, and unknown mode values fall back to manual (`0`). There
+is no way to exceed your loadout's stats.
+
+**Assists** (same caps as manual control, no hidden power):
+
+- **Strafe** (`strafe: ±1`): lateral drive at 50% of top speed, applied
+  instantly (no accel ramp). Forward + lateral are normalized together, so
+  diagonals never exceed top speed — strafe trades forward pace for
+  sidestep, it never adds pace.
+- **Drive assist** (`moveMode: 1`, `moveX`/`moveY`): the engine steers to
+  your target with the shared steer law (gain 2.5, back-up when the target
+  is behind, hold within 24 units), overriding your `throttle`/`turn`.
+  Your `strafe` still applies on top.
+- **Turret assist** (`aimMode`, `aimTarget`): the engine swings your tower
+  (same `towerRate` cap) at the target's best *legal* position: live cone
+  sighting first, then scout blip, then stale shared sighting, then stale
+  track. `aimMode: 2` (or `aimLead: true`) leads the shot, but only off a
+  live cone sighting — stale data aims at position only. Dead, allied,
+  or unknown ids fall back to your manual `towerTurn`.
+- **Hold-to-fire** (`fireMode: 1`): the gun also fires on its own whenever
+  an aim assist is locked and the tower bears (within 0.07 rad), even with
+  `fire: false`. The cooldown gate is unchanged.
+- **Radio** (`radio`): one `{kind, x, y, foe, role, slot, bid}` message per
+  tick to your team, delivered 6 ticks late via `sense.inbox` (routing
+  lands with the comms phase; until then messages are accepted and
+  dropped). Kinds: `ping`, `contact`, `claim`, `slot`, `focus`, `ack`.
+  Unknown kinds are dropped; dead robots neither send nor receive.
+
+Application order each tick: brains → dash/EMP → move assist → drive
+normalize → turret assist → fire gate → bullets → sudden death.
 
 ## Skills: symmetric loadouts
 

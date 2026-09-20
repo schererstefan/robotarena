@@ -17,6 +17,8 @@ export class PilotInput {
     back = false;
     left = false;
     right = false;
+    strafeLeft = false;
+    strafeRight = false;
     /** Aim point in arena coordinates (the same frame as sense.self x/y). */
     aimX = 0;
     aimY = 0;
@@ -54,6 +56,7 @@ export function createPilotController(
             towerTurn: aimTurret(self.tower, target),
             fire: input.consumeShot(),
             charge: input.charging,
+            strafe: (input.strafeRight ? 1 : 0) + (input.strafeLeft ? -1 : 0),
         };
     };
     return { meta, api: ROBOT_API_VERSION, loadout, update };

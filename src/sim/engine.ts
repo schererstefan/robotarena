@@ -1,11 +1,11 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
-import { angleDiff, clamp, dist, toNumber, wrapAngle } from './math';
+import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
+import { angleDiff, assistSteer, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
-import { IDLE_INTENT, type DamageSite, type Intent, type RobotController, type SensedAlly, type SensedBullet, type SensedRobot, type SenseEvent, type SenseState, type TrackedFoe } from './types';
+import { COMMS_KINDS, IDLE_INTENT, type CommsKind, type DamageSite, type Intent, type OutboxMessage, type RobotController, type SensedAlly, type SensedBullet, type SensedRobot, type SenseEvent, type SenseState, type TrackedFoe } from './types';
 
 export interface RobotSnapshot {
     id: number;
@@ -122,9 +122,33 @@ export interface MatchOptions {
     modifiers?: MatchModifiers;
 }
 
-function sanitizeIntent(raw: unknown): Required<Intent> {
+function sanitizeRadio(raw: unknown): OutboxMessage | null {
+    if (raw === null || raw === undefined) return null;
+    if (typeof raw !== 'object') return null;
+    const m = raw as Partial<OutboxMessage>;
+    if (!(COMMS_KINDS as readonly unknown[]).includes(m.kind)) return null;
+    const int = (value: unknown): number =>
+        typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : 0;
+    return {
+        kind: m.kind as CommsKind,
+        x: clamp(toNumber(m.x), 0, ARENA_WIDTH),
+        y: clamp(toNumber(m.y), 0, ARENA_HEIGHT),
+        foe: int(m.foe),
+        role: int(m.role),
+        slot: int(m.slot),
+        bid: int(m.bid),
+    };
+}
+
+/**
+ * Strict intent sanitize: every field clamped day one, unknown mode values
+ * fall to manual. Exported for the soak's sanitize unit checks.
+ */
+export function sanitizeIntent(raw: unknown): Required<Intent> {
     if (typeof raw !== 'object' || raw === null) return { ...IDLE_INTENT };
     const r = raw as Partial<Intent>;
+    const aimTarget =
+        typeof r.aimTarget === 'number' && Number.isFinite(r.aimTarget) ? Math.floor(r.aimTarget) : -1;
     return {
         throttle: clamp(toNumber(r.throttle), -1, 1),
         turn: clamp(toNumber(r.turn), -1, 1),
@@ -133,6 +157,15 @@ function sanitizeIntent(raw: unknown): Required<Intent> {
         charge: r.charge === true,
         dash: r.dash === true,
         emp: r.emp === true,
+        strafe: clamp(toNumber(r.strafe), -1, 1),
+        moveX: clamp(toNumber(r.moveX), 0, ARENA_WIDTH),
+        moveY: clamp(toNumber(r.moveY), 0, ARENA_HEIGHT),
+        moveMode: r.moveMode === 1 ? 1 : 0,
+        aimMode: r.aimMode === 1 ? 1 : r.aimMode === 2 ? 2 : 0,
+        aimTarget,
+        aimLead: r.aimLead === true,
+        fireMode: r.fireMode === 1 ? 1 : 0,
+        radio: sanitizeRadio(r.radio),
     };
 }
 
@@ -314,7 +347,10 @@ export class Match {
                 }
             }
         });
-        // 3. Drive + towers + charge.
+        // 3. Drive + towers + charge. Application order: move assist first
+        // (overrides throttle/turn), then drive normalize (forward + strafe
+        // never exceed top speed), then turret assist, then fire below.
+        // `radio` is sanitized but not yet routed (Phase 6 wires delivery).
         this.robots.forEach((robot, i) => {
             if (!robot.alive) return;
             const intent = intents[i] as Required<Intent>;
@@ -325,17 +361,35 @@ export class Match {
             } else {
                 robot.charge = Math.max(0, robot.charge - DT / 4); // bank decays in ~4s
             }
+            let throttle = intent.throttle;
+            let turn = intent.turn;
+            if (intent.moveMode === 1) {
+                const assist = assistSteer(robot.heading, intent.moveX, intent.moveY, robot.x, robot.y);
+                throttle = assist.throttle;
+                turn = assist.turn;
+            }
             const slow = intent.charge && canCharge ? 0.75 : 1;
             const dashing = this.tick < robot.dashUntil;
             const slowed = this.tick < robot.slowUntil;
             const top = robot.stats.maxSpeed * slow * (dashing ? DASH_SPEED_MULT : 1) * (slowed ? EMP_SLOW_MULT : 1);
-            const target = intent.throttle >= 0 ? intent.throttle * top : intent.throttle * top * REVERSE_FACTOR;
-            const dv = clamp(target - robot.speed, -robot.stats.accel * DT, robot.stats.accel * DT);
+            let forward = throttle >= 0 ? throttle : throttle * REVERSE_FACTOR;
+            let lateral = intent.strafe * STRAFE_FACTOR;
+            const driveMag = Math.hypot(forward, lateral);
+            if (driveMag > 1) {
+                forward /= driveMag;
+                lateral /= driveMag;
+            }
+            const dv = clamp(forward * top - robot.speed, -robot.stats.accel * DT, robot.stats.accel * DT);
             robot.speed += dv;
-            robot.heading = wrapAngle(robot.heading + intent.turn * robot.stats.turnRate * DT);
-            robot.tower = wrapAngle(robot.tower + intent.towerTurn * robot.stats.towerRate * DT);
-            robot.x += Math.cos(robot.heading) * robot.speed * DT;
-            robot.y += Math.sin(robot.heading) * robot.speed * DT;
+            robot.heading = wrapAngle(robot.heading + turn * robot.stats.turnRate * DT);
+            let towerTurn = intent.towerTurn;
+            if (intent.aimMode !== 0) {
+                const solution = this.aimSolution(robot, intent.aimTarget, intent.aimMode === 2 || intent.aimLead);
+                if (solution !== null) towerTurn = clamp(angleDiff(robot.tower, solution) * 3, -1, 1);
+            }
+            robot.tower = wrapAngle(robot.tower + towerTurn * robot.stats.towerRate * DT);
+            robot.x += (Math.cos(robot.heading) * robot.speed - Math.sin(robot.heading) * lateral * top) * DT;
+            robot.y += (Math.sin(robot.heading) * robot.speed + Math.cos(robot.heading) * lateral * top) * DT;
             if (robot.cooldown > 0) robot.cooldown -= 1;
             if (robot.dashCd > 0) robot.dashCd -= 1;
             if (robot.empCd > 0) robot.empCd -= 1;
@@ -351,7 +405,12 @@ export class Match {
         this.robots.forEach((robot, i) => {
             if (!robot.alive) return;
             const intent = intents[i] as Required<Intent>;
-            if (intent.fire && robot.cooldown <= 0) {
+            let shoot = intent.fire;
+            if (!shoot && intent.fireMode === 1 && intent.aimMode !== 0 && robot.cooldown <= 0) {
+                const solution = this.aimSolution(robot, intent.aimTarget, intent.aimMode === 2 || intent.aimLead);
+                shoot = solution !== null && Math.abs(angleDiff(robot.tower, solution)) < 0.07;
+            }
+            if (shoot && robot.cooldown <= 0) {
                 robot.cooldown = robot.stats.cooldownTicks;
                 robot.shotsFired += 1;
                 const modMult = this.mods.doubleDamage === true ? 2 : 1;
@@ -501,6 +560,40 @@ export class Match {
             this.step();
             guard += 1;
         }
+    }
+
+    /**
+     * Turret-assist solution: the tower angle for `aimTarget` from the best
+     * legal knowledge — live cone sighting (lead-capable), scout blip, stale
+     * shared sighting, stale track — or null for manual fallback (dead, ally,
+     * self, unknown id, or never seen).
+     */
+    private aimSolution(robot: Robot, targetId: number, lead: boolean): number | null {
+        const foe = this.robots[targetId] as Robot | undefined;
+        if (!foe || !foe.alive || foe.team === robot.team || foe.id === robot.id) return null;
+        if (Match.sees(robot, foe)) {
+            if (lead) {
+                const flight = dist(robot.x, robot.y, foe.x, foe.y) / robot.stats.bulletSpeed;
+                const px = foe.x + Math.cos(foe.heading) * foe.speed * flight;
+                const py = foe.y + Math.sin(foe.heading) * foe.speed * flight;
+                return Math.atan2(py - robot.y, px - robot.x);
+            }
+            return Math.atan2(foe.y - robot.y, foe.x - robot.x);
+        }
+        if (robot.stats.scoutRange > 0 && dist(robot.x, robot.y, foe.x, foe.y) <= robot.stats.scoutRange) {
+            return Math.atan2(foe.y - robot.y, foe.x - robot.x);
+        }
+        const want = this.tick - SENSOR_SHARE_DELAY;
+        if (want >= 0) {
+            for (const s of this.sightings) {
+                if (s.tick === want && s.team === robot.team && s.by !== robot.id && s.foe === foe.id) {
+                    return Math.atan2(s.y - robot.y, s.x - robot.x);
+                }
+            }
+        }
+        const track = robot.tracks.get(foe.id);
+        if (track) return Math.atan2(track.y - robot.y, track.x - robot.x);
+        return null;
     }
 
     /** True when the viewer's sensor cone currently covers the target. */

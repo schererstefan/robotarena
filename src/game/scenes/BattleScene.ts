@@ -530,6 +530,14 @@ export class BattleScene extends Scene {
                 pilot.right = true;
                 event.preventDefault();
                 break;
+            case 'KeyQ':
+                pilot.strafeLeft = true;
+                event.preventDefault();
+                break;
+            case 'KeyE':
+                pilot.strafeRight = true;
+                event.preventDefault();
+                break;
             case 'Space':
                 pilot.charging = true;
                 if (!event.repeat) pilot.queueShot();
@@ -562,6 +570,12 @@ export class BattleScene extends Scene {
             case 'KeyD':
             case 'ArrowRight':
                 pilot.right = false;
+                break;
+            case 'KeyQ':
+                pilot.strafeLeft = false;
+                break;
+            case 'KeyE':
+                pilot.strafeRight = false;
                 break;
             case 'Space':
                 pilot.charging = false;

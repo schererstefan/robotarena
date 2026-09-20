@@ -35,6 +35,13 @@ export const meta: RobotMeta = {
 // Default skill build: 6 points max, same catalog as every slot.
 export const loadout: SkillLoadout = { overdrive: 2, trigger: 2, plating: 2 };
 
+// Every Intent field is optional: return only what you need. Beyond the
+// basics below, the engine offers assists — strafe (lateral drive),
+// moveMode: 1 + moveX/moveY (drive assist), aimMode: 1|2 + aimTarget
+// (turret assist), fireMode: 1 (auto-fire on a locked assist), and radio
+// (one team message per tick). See docs/ROBOT_API.md; the engine clamps
+// every field, so partial returns like "fire: true" alone are complete.
+
 export function create(): RobotController {
     // Per-match memory lives here, inside create() — never at module level.
 
@@ -229,7 +236,10 @@ export function checkRobotSource(source: string): WorkshopCheck[] {
     // `{ fire: true }` is legal. What fails is an UNKNOWN field inside a
     // returned object literal that otherwise looks like an Intent (it names
     // at least one known field) — almost always a typo'd key.
-    const knownIntent = new Set(['throttle', 'turn', 'towerTurn', 'fire', 'charge', 'dash', 'emp']);
+    const knownIntent = new Set([
+        'throttle', 'turn', 'towerTurn', 'fire', 'charge', 'dash', 'emp',
+        'strafe', 'moveX', 'moveY', 'moveMode', 'aimMode', 'aimTarget', 'aimLead', 'fireMode', 'radio',
+    ]);
     const unknownIntent: string[] = [];
     for (const literal of code.matchAll(/return\s*\{([^}]*)\}/g)) {
         const keys = new Set<string>();

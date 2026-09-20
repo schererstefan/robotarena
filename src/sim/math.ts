@@ -30,3 +30,21 @@ export function dist(x1: number, y1: number, x2: number, y2: number): number {
 export function toNumber(value: unknown, fallback = 0): number {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
+
+/**
+ * Shared drive-assist law (`Intent.moveMode`): throttle/turn toward a point
+ * with the same gains and caps as manual drive (mirrors `common.ts`
+ * `steerTo`/`throttleFor` defaults: gain 2.5, back-up past 2.2 rad, ease
+ * past 1.1 rad). Holds position within 24 units of the target.
+ */
+export function assistSteer(
+    heading: number, tx: number, ty: number, x: number, y: number,
+): { throttle: number; turn: number } {
+    if (Math.hypot(tx - x, ty - y) < 24) return { throttle: 0, turn: 0 };
+    const target = Math.atan2(ty - y, tx - x);
+    const error = Math.abs(angleDiff(heading, target));
+    return {
+        throttle: error > 2.2 ? -0.5 : error > 1.1 ? 0.25 : 1,
+        turn: clamp(angleDiff(heading, target) * 2.5, -1, 1),
+    };
+}

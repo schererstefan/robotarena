@@ -88,6 +88,9 @@ export const REVERSE_FACTOR = 0.6; // reverse is slower than forward
 export const ACCEL = 340; // units per second^2 toward target speed
 export const TURN_RATE = 2.7; // radians per second at full turn input
 
+// Lateral drive: strafe ±1 maps to this fraction of top speed (universal).
+export const STRAFE_FACTOR = 0.5;
+
 // Sensor tower base values (same for all robots; skills modify per loadout).
 export const TOWER_RATE = 3.6; // radians per second at full tower input
 export const SENSOR_RANGE = 540;

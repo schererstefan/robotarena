@@ -2,9 +2,9 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
-import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
+import { Match, sanitizeIntent, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
 import { checkRobotSource, suggestFilename, WORKSHOP_TEMPLATE, workshopPassed } from '../src/game/workshop';
 import { markTutorialSeen, resetTutorialFlag, shouldShowTutorial } from '../src/game/tutorial';
@@ -85,7 +85,12 @@ console.log('clamping');
     };
     const garbage: RobotController = {
         meta: { id: 'garbage', name: 'Garbage', author: 'test', version: '0', description: '' },
-        update: () => ({ throttle: NaN, turn: Infinity, towerTurn: -Infinity, fire: 'yes', charge: 1, dash: 'yes', emp: 1 }) as unknown as Intent,
+        update: () =>
+            ({
+                throttle: NaN, turn: Infinity, towerTurn: -Infinity, fire: 'yes', charge: 1, dash: 'yes', emp: 1,
+                strafe: NaN, moveX: Infinity, moveY: -Infinity, moveMode: 7, aimMode: 'track', aimTarget: NaN,
+                aimLead: 1, fireMode: 2, radio: 'hello',
+            }) as unknown as Intent,
     };
     const match = new Match(
         [
@@ -1929,6 +1934,316 @@ console.log('senses');
         const threat = dodgeVector(480, 320, [{ x: 400, y: 320, vx: 430, vy: 0, distance: 80, bearing: Math.PI, closing: 430, damage: 12 }]);
         check('closing bullet pushes unit-length sideways', Math.abs(Math.hypot(threat.x, threat.y) - 1) < 1e-9 && Math.abs(threat.x) < 1e-9 && Math.abs(threat.y) === 1);
         check('toGrid maps corners and rejects outside', toGrid(0, 0, 80, 12, 8) === 0 && toGrid(959, 639, 80, 12, 8) === 95 && toGrid(960, 320, 80, 12, 8) === -1 && toGrid(-1, 0, 80, 12, 8) === -1);
+    }
+}
+
+// --- 12. Intent expansion: strafe, move/aim/fire assists, radio sanitize ---
+console.log('intent');
+{
+    // sanitizeIntent unit checks: every new field clamped day one.
+    const idle = sanitizeIntent(null);
+    check(
+        'null intent sanitizes to idle defaults',
+        idle.strafe === 0 && idle.moveX === 0 && idle.moveY === 0 && idle.moveMode === 0 && idle.aimMode === 0 && idle.aimTarget === -1 && idle.aimLead === false && idle.fireMode === 0 && idle.radio === null,
+    );
+    const wild = sanitizeIntent({
+        strafe: 99, moveX: -50, moveY: 9999, moveMode: 7, aimMode: 5, aimTarget: 2.7,
+        aimLead: 'yes', fireMode: true, radio: { kind: 'bogus', x: 1, y: 2, foe: 0, role: 0, slot: 0, bid: 0 },
+    });
+    check(
+        'wild values clamp to legal ranges',
+        wild.strafe === 1 && wild.moveX === 0 && wild.moveY === ARENA_HEIGHT && wild.moveMode === 0 && wild.aimMode === 0 && wild.aimTarget === 2 && wild.aimLead === false && wild.fireMode === 0 && wild.radio === null,
+    );
+    const modes = sanitizeIntent({ moveMode: 1, aimMode: 2, aimTarget: 3, fireMode: 1, radio: { kind: 'focus', x: -10, y: 100, foe: 1.9, role: 0, slot: 0, bid: 5 } });
+    check(
+        'legal modes + radio survive sanitize',
+        modes.moveMode === 1 && modes.aimMode === 2 && modes.aimTarget === 3 && modes.fireMode === 1 &&
+        modes.radio !== null && modes.radio.kind === 'focus' && modes.radio.x === 0 && modes.radio.y === 100 && modes.radio.foe === 1 && modes.radio.bid === 5,
+    );
+    check('non-object radio drops to null', sanitizeIntent({ radio: 42 }).radio === null && sanitizeIntent({ radio: 'ping' }).radio === null);
+    check('strafe lands behind STRAFE_FACTOR 0.5', STRAFE_FACTOR === 0.5);
+    const catalogIds = SKILL_DEFS.map((def) => def.id as string);
+    check('dash/emp stay universal (no catalog defs)', !catalogIds.includes('dash') && !catalogIds.includes('emp'));
+
+    const idleBot = (id: string): RobotController => ({
+        meta: { id, name: id, author: 'test', version: '0', description: '' },
+        update: (): Intent => ({}),
+    });
+    // Strafe: pure lateral at half top speed, symmetric, diagonal-capped.
+    {
+        const strafer = (strafe: number): RobotController => ({
+            meta: { id: `strafer${strafe}`, name: 'Strafer', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({ strafe }),
+        });
+        const runStrafe = (strafe: number, ticks: number): { x: number; y: number } => {
+            const m = new Match(
+                [
+                    { team: 0, controller: strafer(strafe) },
+                    { team: 1, controller: idleBot('sitter') },
+                ],
+                3,
+            );
+            for (let i = 0; i < ticks; i += 1) m.step();
+            const s = m.robotSnapshots[0] as { x: number; y: number };
+            return { x: s.x, y: s.y };
+        };
+        const south = runStrafe(1, 60);
+        check('strafe +1 slides starboard at half speed', south.x === 130 && Math.abs(south.y - 395) < 0.01, `(${south.x},${south.y.toFixed(2)})`);
+        const north = runStrafe(-1, 60);
+        check('strafe -1 slides port symmetrically', north.x === 130 && Math.abs(north.y - 245) < 0.01, `(${north.x},${north.y.toFixed(2)})`);
+        // Diagonal: throttle 1 + strafe 1 never exceeds top speed per tick.
+        const diag = new Match(
+            [
+                { team: 0, controller: { meta: idleBot('d').meta, update: (): Intent => ({ throttle: 1, strafe: 1 }) } },
+                { team: 1, controller: idleBot('sitter') },
+            ],
+            3,
+        );
+        let prev = diag.robotSnapshots[0] as { x: number; y: number };
+        let maxStep = 0;
+        for (let i = 0; i < 180; i += 1) {
+            diag.step();
+            const s = diag.robotSnapshots[0] as { x: number; y: number };
+            if (i >= 120) maxStep = Math.max(maxStep, Math.hypot(s.x - prev.x, s.y - prev.y));
+            prev = s;
+        }
+        check('diagonal drive caps at top speed', maxStep <= MAX_SPEED * DT + 0.01, `max=${maxStep.toFixed(3)}`);
+        const straight = new Match(
+            [
+                { team: 0, controller: { meta: idleBot('s').meta, update: (): Intent => ({ throttle: 1 }) } },
+                { team: 1, controller: idleBot('sitter') },
+            ],
+            3,
+        );
+        for (let i = 0; i < 180; i += 1) straight.step();
+        check(
+            'strafe trades forward pace (never adds it)',
+            (diag.robotSnapshots[0]?.x ?? 0) < (straight.robotSnapshots[0]?.x ?? 0),
+        );
+    }
+    // Move assist: overrides manual drive, arrives, holds, deterministic.
+    {
+        const assisted = (moveMode: 0 | 1): RobotController => ({
+            meta: { id: `assist${moveMode}`, name: 'Assist', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({ throttle: -1, turn: 1, moveX: 480, moveY: 320, moveMode }),
+        });
+        const runAssist = (moveMode: 0 | 1, ticks: number): { x: number; y: number } => {
+            const m = new Match(
+                [
+                    { team: 0, controller: assisted(moveMode) },
+                    { team: 1, controller: idleBot('sitter') },
+                ],
+                3,
+            );
+            for (let i = 0; i < ticks; i += 1) m.step();
+            const s = m.robotSnapshots[0] as { x: number; y: number };
+            return { x: s.x, y: s.y };
+        };
+        const arrived = runAssist(1, 400);
+        check('move assist reaches midfield', Math.hypot(arrived.x - 480, arrived.y - 320) < 30, `(${arrived.x.toFixed(0)},${arrived.y.toFixed(0)})`);
+        const held = runAssist(1, 800);
+        check('move assist holds the target', Math.hypot(held.x - 480, held.y - 320) < 30, `(${held.x.toFixed(0)},${held.y.toFixed(0)})`);
+        const fpAssist = (mode: 0 | 1, seed: number): string => {
+            const m = new Match(
+                [
+                    { team: 0, controller: assisted(mode) },
+                    { team: 1, controller: idleBot('sitter') },
+                ],
+                seed,
+            );
+            for (let i = 0; i < 400; i += 1) m.step();
+            return fingerprint(m);
+        };
+        const fpManual = (): string => {
+            const m = new Match(
+                [
+                    {
+                        team: 0,
+                        controller: {
+                            meta: idleBot('m').meta,
+                            update: (): Intent => ({ throttle: -1, turn: 1 }),
+                        },
+                    },
+                    { team: 1, controller: idleBot('sitter') },
+                ],
+                3,
+            );
+            for (let i = 0; i < 400; i += 1) m.step();
+            return fingerprint(m);
+        };
+        check('manual mode ignores moveX/moveY', fpAssist(0, 3) === fpManual());
+        check('move assist is deterministic', fpAssist(1, 21) === fpAssist(1, 21) && fpAssist(1, 21) !== fpAssist(0, 21));
+    }
+    // Aim assist: tracks live, leads on mode 2, falls back on bad ids.
+    {
+        const aimer = (aimMode: 0 | 1 | 2, aimTarget: number, extra?: Partial<Intent>): RobotController => ({
+            meta: { id: `aimer${aimMode}`, name: 'Aimer', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                const foe = sense.foes[0];
+                return {
+                    moveX: foe ? foe.x : 480, moveY: foe ? foe.y : 320, moveMode: 1,
+                    aimMode, aimTarget, towerTurn: 0, ...extra,
+                };
+            },
+        });
+        const trackErr = (aimMode: 0 | 1 | 2, lead: boolean): { err: number; swung: number } => {
+            let err = Infinity;
+            let firstTower = 0;
+            let lastTower = 0;
+            let first = true;
+            const spy: RobotController = {
+                meta: { id: 'spy', name: 'Spy', author: 'test', version: '0', description: '' },
+                update: (sense: SenseState): Intent => {
+                    if (first) {
+                        firstTower = sense.self.tower;
+                        first = false;
+                    }
+                    lastTower = sense.self.tower;
+                    const foe = sense.foes[0];
+                    if (foe) {
+                        const want = lead ? leadAngle(sense.self.x, sense.self.y, sense.self.stats.bulletSpeed, foe) : foe.bearing;
+                        let diff = Math.abs(sense.self.tower - want) % (Math.PI * 2);
+                        if (diff > Math.PI) diff = Math.PI * 2 - diff;
+                        err = Math.min(err, diff);
+                    }
+                    const inner = aimer(aimMode, 1);
+                    return inner.update(sense);
+                },
+            };
+            // Circling foe: the bearing sweeps (no midline degeneracy), so the
+            // tower must genuinely swing to hold the track.
+            const circler: RobotController = {
+                meta: { id: 'circler', name: 'Circler', author: 'test', version: '0', description: '' },
+                update: (): Intent => ({ throttle: 0.6, turn: 0.35 }),
+            };
+            const m = new Match(
+                [
+                    { team: 0, controller: spy },
+                    { team: 1, controller: circler },
+                ],
+                3,
+            );
+            for (let i = 0; i < 900 && !m.result.over; i += 1) m.step();
+            return { err, swung: Math.abs(lastTower - firstTower) };
+        };
+        const tracked = trackErr(1, false);
+        check('aim assist tracks the foe bearing', tracked.err < 0.05 && tracked.swung > 0.2, `err=${tracked.err.toFixed(3)} swung=${tracked.swung.toFixed(2)}`);
+        // Lead mode vs a crossing foe: only ticks with true crossing geometry
+        // (lead and bearing differ) count; the tower must match the intercept.
+        let leadErr = Infinity;
+        let crossed = 0;
+        const speeder: RobotController = {
+            meta: { id: 'speeder', name: 'Speeder', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => ({ throttle: 1, turn: sense.tick < 90 ? 0 : 1 }),
+        };
+        const leadSpy: RobotController = {
+            meta: { id: 'leadspy', name: 'LeadSpy', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                const foe = sense.foes[0];
+                if (foe && foe.speed > 50) {
+                    const shot = leadAngle(sense.self.x, sense.self.y, sense.self.stats.bulletSpeed, foe);
+                    let geom = Math.abs(shot - foe.bearing) % (Math.PI * 2);
+                    if (geom > Math.PI) geom = Math.PI * 2 - geom;
+                    if (geom > 0.05) {
+                        crossed += 1;
+                        let dl = Math.abs(sense.self.tower - shot) % (Math.PI * 2);
+                        if (dl > Math.PI) dl = Math.PI * 2 - dl;
+                        leadErr = Math.min(leadErr, dl);
+                    }
+                }
+                return { moveX: 480, moveY: 320, moveMode: 1, aimMode: 2, aimTarget: 1, towerTurn: 0 };
+            },
+        };
+        const leadMatch = new Match(
+            [
+                { team: 0, controller: leadSpy },
+                { team: 1, controller: speeder },
+            ],
+            3,
+        );
+        for (let i = 0; i < 900 && !leadMatch.result.over; i += 1) leadMatch.step();
+        check('aim mode 2 leads a crossing foe', crossed > 10 && leadErr < 0.08, `crossed=${crossed} lead=${leadErr.toFixed(3)}`);
+        // Bad ids fall back to the manual towerTurn (full-rate spin).
+        const spinRate = (aimTarget: number): number => {
+            const m = new Match(
+                [
+                    {
+                        team: 0,
+                        controller: {
+                            meta: idleBot('a').meta,
+                            update: (): Intent => ({ aimMode: 1, aimTarget, towerTurn: 1 }),
+                        },
+                    },
+                    { team: 1, controller: idleBot('sitter') },
+                ],
+                3,
+            );
+            let total = 0;
+            let prevT = m.robotSnapshots[0]?.tower ?? 0;
+            for (let i = 0; i < 30; i += 1) {
+                m.step();
+                const cur = m.robotSnapshots[0]?.tower ?? 0;
+                let d = (cur - prevT) % (Math.PI * 2);
+                if (d > Math.PI) d -= Math.PI * 2;
+                if (d < -Math.PI) d += Math.PI * 2;
+                total += d;
+                prevT = cur;
+            }
+            return total;
+        };
+        check('unknown aim id falls back to manual', Math.abs(spinRate(999) - 1.8) < 0.001, `spin=${spinRate(999).toFixed(3)}`);
+        check('self aim id falls back to manual', Math.abs(spinRate(0) - 1.8) < 0.001);
+    }
+    // Fire assist: mode 1 auto-fires on a locked assist behind the same gate.
+    {
+        const holder = (fireMode: 0 | 1): RobotController => ({
+            meta: { id: `holder${fireMode}`, name: 'Holder', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                const foe = sense.foes[0];
+                return {
+                    moveX: foe ? foe.x : 480, moveY: foe ? foe.y : 320, moveMode: 1,
+                    aimMode: 1, aimTarget: 1, towerTurn: 0, fire: false, fireMode,
+                };
+            },
+        });
+        const shotsAfter = (fireMode: 0 | 1): number => {
+            const m = new Match(
+                [
+                    { team: 0, controller: holder(fireMode) },
+                    { team: 1, controller: idleBot('sitter') },
+                ],
+                3,
+            );
+            for (let i = 0; i < 900 && !m.result.over; i += 1) m.step();
+            return m.robotSnapshots[0]?.shotsFired ?? -1;
+        };
+        const auto = shotsAfter(1);
+        check('fireMode 1 auto-fires on lock (fire:false)', auto > 0, `shots=${auto}`);
+        check('fireMode 0 stays silent on fire:false', shotsAfter(0) === 0);
+        check('auto-fire respects the cooldown gate', auto <= Math.ceil(900 / 24) + 1, `shots=${auto}`);
+    }
+    // Radio: sanitized, accepted, and (until Phase 6 routes it) dropped.
+    {
+        const rattler = (radio: unknown): RobotController => ({
+            meta: { id: 'rattler', name: 'Rattler', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({ throttle: 1, radio: radio as never }),
+        });
+        const runRadio = (radio: unknown): { fp: string; over: boolean } => {
+            const m = new Match(
+                [
+                    { team: 0, controller: rattler(radio) },
+                    { team: 1, controller: idleBot('sitter') },
+                ],
+                5,
+            );
+            m.runToEnd();
+            return { fp: fingerprint(m), over: m.result.over };
+        };
+        const quiet = runRadio(undefined);
+        const garbage = runRadio({ kind: 'bogus', x: 'far', foe: [1] });
+        const valid = runRadio({ kind: 'focus', x: 100, y: 200, foe: 1, role: 0, slot: 0, bid: 3 });
+        check('garbage radio neither crashes nor steers', garbage.over && garbage.fp === quiet.fp);
+        check('valid radio accepted, dropped pre-routing', valid.over && valid.fp === quiet.fp);
     }
 }
 

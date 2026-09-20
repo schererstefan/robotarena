@@ -281,9 +281,81 @@ export interface Intent {
      * cooldown, even when no foe is in radius. Optional.
      */
     emp?: boolean;
+    /**
+     * Lateral drive: -1 (port) .. 1 (starboard) at STRAFE_FACTOR of top
+     * speed. Normalized with throttle so combined drive never exceeds top
+     * speed. Clamped by the engine. Optional, defaults to 0.
+     */
+    strafe?: number;
+    /**
+     * Drive-assist target in arena coordinates. Read only when
+     * `moveMode` is 1. Clamped to the arena by the engine. Optional.
+     */
+    moveX?: number;
+    moveY?: number;
+    /**
+     * 1 = the engine drives toward (`moveX`, `moveY`) via the shared steer
+     * law (same gains and caps as manual drive), overriding `throttle` and
+     * `turn`; 0 = manual. Anything else reads as 0. Optional, defaults to 0.
+     */
+    moveMode?: 0 | 1;
+    /**
+     * 0 = manual tower (`towerTurn`); 1 = track `aimTarget`'s best legal
+     * position; 2 = track with lead (live cone sightings only, else falls
+     * back to 1). Dead/ally/unknown ids fall back to manual. Optional.
+     */
+    aimMode?: 0 | 1 | 2;
+    /** Robot id the turret assist tracks. Defaults to -1 (none). */
+    aimTarget?: number;
+    /**
+     * True upgrades `aimMode` 1 to lead like 2 (no effect otherwise).
+     * Optional, defaults to false.
+     */
+    aimLead?: boolean;
+    /**
+     * 0 = fire only when `fire` is true (current); 1 = hold-to-fire: also
+     * fires whenever an aim assist is locked and the tower bears, even with
+     * `fire` false. Same cooldown gate either way. Optional, defaults to 0.
+     */
+    fireMode?: 0 | 1;
+    /**
+     * One team radio message this tick (delivered 6 ticks late, Phase 6
+     * routes it; until then the engine accepts and drops it). Unknown kinds
+     * are dropped by sanitize. Optional, defaults to null.
+     */
+    radio?: OutboxMessage | null;
 }
 
-export const IDLE_INTENT: Required<Intent> = { throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false, dash: false, emp: false };
+/** Team radio message kinds. */
+export type CommsKind = 'ping' | 'contact' | 'claim' | 'slot' | 'focus' | 'ack';
+
+export const COMMS_KINDS: readonly CommsKind[] = ['ping', 'contact', 'claim', 'slot', 'focus', 'ack'];
+
+/** One radio message a robot may send per tick (team-scoped, delayed). */
+export interface OutboxMessage {
+    kind: CommsKind;
+    x: number;
+    y: number;
+    /** Foe id the message is about (-1 = none). Liveness validated at send. */
+    foe: number;
+    role: number;
+    slot: number;
+    bid: number;
+}
+
+/** A delivered radio message: outbox content plus engine stamps. */
+export interface InboxMessage extends OutboxMessage {
+    /** Sender's robot id. */
+    from: number;
+    /** Tick the message was sent. */
+    sent: number;
+}
+
+export const IDLE_INTENT: Required<Intent> = {
+    throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false, dash: false, emp: false,
+    strafe: 0, moveX: 0, moveY: 0, moveMode: 0, aimMode: 0, aimTarget: -1, aimLead: false, fireMode: 0,
+    radio: null,
+};
 
 export interface RobotController {
     meta: RobotMeta;
