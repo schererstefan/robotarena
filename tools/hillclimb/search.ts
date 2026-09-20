@@ -25,6 +25,8 @@ export interface RestartResult {
     incumbent: Genome;
     train: Aggregate;
     valid: Aggregate;
+    /** Held-out opponents × held-out seeds (opponent-fold validation). */
+    validOpp: Aggregate;
     promoted: boolean;
     history: GenRecord[];
     matchesRun: number;
@@ -35,6 +37,8 @@ export interface HillclimbOptions {
     def: GenomeDef;
     create: CreateFromGenome;
     opponents: string[];
+    /** Held-out opponent fold for the validOpp promotion gate (non-empty). */
+    validOpponents: string[];
     trainSeeds: number[];
     validSeeds: number[];
     generations: number;
@@ -57,8 +61,9 @@ export function hillclimbRestart(opts: HillclimbOptions, restart: number, seedLo
     // and scorers swap. teamSize 1 keeps the exact 1v1 code path.
     const teamSize = opts.teamSize ?? 1;
     const teamMode = teamSize > 1;
-    const buildTrainPool = (seeds: number[], offset: number): PoolMatch[] | TeamPoolMatch[] =>
-        teamMode ? buildTeamPool({ seeds, teamSize, opponents: opts.opponents, offset }) : buildPool({ seeds, oppsPerSeed: 1, opponents: opts.opponents, offset });
+    if (opts.validOpponents.length === 0) throw new Error('hillclimbRestart needs a non-empty validOpponents fold');
+    const buildPoolFor = (seeds: number[], opponents: string[], offset: number): PoolMatch[] | TeamPoolMatch[] =>
+        teamMode ? buildTeamPool({ seeds, teamSize, opponents, offset }) : buildPool({ seeds, oppsPerSeed: 1, opponents, offset });
     const evaluate = (genome: Genome, pool: PoolMatch[] | TeamPoolMatch[]): GenomeEval =>
         teamMode ? evaluateTeamGenome(opts.create, genome, pool as TeamPoolMatch[]) : evaluateGenome(opts.create, genome, pool as PoolMatch[]);
     const defaults = defaultParamsGenome(opts.def);
@@ -75,7 +80,7 @@ export function hillclimbRestart(opts: HillclimbOptions, restart: number, seedLo
 
     for (let gen = 0; gen < opts.generations; gen += 1) {
         // Rotated pool per generation; incumbent re-evaluated every gen.
-        const pool = buildTrainPool(opts.trainSeeds, gen);
+        const pool = buildPoolFor(opts.trainSeeds, opts.opponents, gen);
         const incumbentEval = evaluate(incumbent, pool);
         matchesRun += pool.length;
 
@@ -126,11 +131,17 @@ export function hillclimbRestart(opts: HillclimbOptions, restart: number, seedLo
         }
     }
 
-    // Held-out validation: promote only if valid ≥ train − 5pp.
-    const validPool = buildTrainPool(opts.validSeeds, 0);
+    // Held-out validation: promote only if valid ≥ train − 5pp (held-out seeds,
+    // train fold) AND validOpp ≥ train − 10pp (held-out seeds × held-out foes;
+    // slacker bound: novel foes are harder, so the drop allowance doubles).
+    const validPool = buildPoolFor(opts.validSeeds, opts.opponents, 0);
     const valid = evaluate(incumbent, validPool).agg;
     matchesRun += validPool.length;
-    return { restart, incumbent, train, valid, promoted: valid.mean >= train.mean - 0.05, history, matchesRun, stoppedEarly };
+    const validOppPool = buildPoolFor(opts.validSeeds, opts.validOpponents, 0);
+    const validOpp = evaluate(incumbent, validOppPool).agg;
+    matchesRun += validOppPool.length;
+    const promoted = valid.mean >= train.mean - 0.05 && validOpp.mean >= train.mean - 0.1;
+    return { restart, incumbent, train, valid, validOpp, promoted, history, matchesRun, stoppedEarly };
 }
 
 export interface VetoResult {

@@ -134,6 +134,27 @@ export function deriveSeeds(runSeed: number, train: number, valid: number, veto:
     return { trainSeeds, validSeeds, vetoSeeds };
 }
 
+/**
+ * Opponent fold split (opponent-diverse validation). Fold rule: sort the
+ * roster ids and hold out every 3rd archetype (1-based positions 3, 6, 9, …)
+ * as the validation fold; the rest trains. Deterministic from the roster
+ * alone, so the manifest's opponent list reproduces the split. Rosters
+ * shorter than 3 hold out the last id so the fold is never empty.
+ */
+export function splitOpponentFolds(opponents: string[]): { train: string[]; heldOut: string[] } {
+    const sorted = [...opponents].sort();
+    const train: string[] = [];
+    const heldOut: string[] = [];
+    sorted.forEach((id, i) => {
+        if ((i + 1) % 3 === 0) heldOut.push(id);
+        else train.push(id);
+    });
+    if (heldOut.length === 0 && train.length > 0) {
+        heldOut.push(train.pop() as string);
+    }
+    return { train, heldOut };
+}
+
 function gitSha(): string {
     try {
         return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim();
@@ -168,14 +189,15 @@ function tune(opts: TuneOptions, root: string): number {
     if (!def) throw new Error(`no genome def for archetype ${opts.archetype}`);
     const create = adapterFor(opts.archetype);
     const opponents = defaultOpponents(opts.archetype);
+    const folds = splitOpponentFolds(opponents);
     const runId = runIdNow();
     const { trainSeeds, validSeeds, vetoSeeds } = deriveSeeds(opts.runSeed, opts.trainSeedCount, opts.validSeedCount, 16);
     const rng = rngFromSeed(opts.runSeed);
-    console.log(`tune ${opts.archetype} ${teamMode ? `${opts.teamSize}v${opts.teamSize}` : '1v1'}: run ${runId}, seed ${opts.runSeed}, opponents ${opponents.length}`);
+    console.log(`tune ${opts.archetype} ${teamMode ? `${opts.teamSize}v${opts.teamSize}` : '1v1'}: run ${runId}, seed ${opts.runSeed}, opponents ${opponents.length} (train fold ${folds.train.length}, held-out ${folds.heldOut.length})`);
 
-    // Stage A: loadout-first halving at default params.
+    // Stage A: loadout-first halving at default params (train fold only).
     console.log(`stage A: ${opts.stageACandidates} loadouts, survivors ${opts.restarts}`);
-    const halving = stageA({ def, create, opponents, trainSeeds, candidates: opts.stageACandidates, survivors: opts.restarts, rng, teamSize: opts.teamSize });
+    const halving = stageA({ def, create, opponents: folds.train, trainSeeds, candidates: opts.stageACandidates, survivors: opts.restarts, rng, teamSize: opts.teamSize });
     for (const rung of halving.rungs) {
         console.log(`  rung ${rung.rung}: ${rung.candidates} cands x ${rung.poolSize} pool -> keep ${rung.kept} (top ${(rung.topMean * 100).toFixed(1)}%, cutoff ${(rung.cutoffMean * 100).toFixed(1)}%)`);
     }
@@ -189,7 +211,8 @@ function tune(opts: TuneOptions, root: string): number {
             {
                 def,
                 create,
-                opponents,
+                opponents: folds.train,
+                validOpponents: folds.heldOut,
                 trainSeeds,
                 validSeeds,
                 generations: opts.generations,
@@ -204,7 +227,7 @@ function tune(opts: TuneOptions, root: string): number {
         matchesRun += result.matchesRun;
         const accepts = result.history.filter((h) => h.accepted).length;
         console.log(
-            `  restart ${r}: train ${(result.train.mean * 100).toFixed(1)}% valid ${(result.valid.mean * 100).toFixed(1)}% ` +
+            `  restart ${r}: train ${(result.train.mean * 100).toFixed(1)}% valid ${(result.valid.mean * 100).toFixed(1)}% validOpp ${(result.validOpp.mean * 100).toFixed(1)}% ` +
                 `${result.promoted ? 'PROMOTED' : 'held-out'} accepts ${accepts}/${result.history.length}${result.stoppedEarly ? ' (early stop)' : ''}`,
         );
         restarts.push(result);
@@ -230,12 +253,13 @@ function tune(opts: TuneOptions, root: string): number {
             hash: genomeHash(winner.incumbent),
             train: winner.train,
             valid: winner.valid,
+            validOpp: winner.validOpp,
             fromRestart: winner.restart,
         };
         // Re-run validation with fingerprints + replay codes (determinism self-check).
         const validPool: PoolMatch[] | TeamPoolMatch[] = teamMode
-            ? buildTeamPool({ seeds: validSeeds, teamSize: opts.teamSize, opponents })
-            : buildPool({ seeds: validSeeds, oppsPerSeed: 1, opponents });
+            ? buildTeamPool({ seeds: validSeeds, teamSize: opts.teamSize, opponents: folds.train })
+            : buildPool({ seeds: validSeeds, oppsPerSeed: 1, opponents: folds.train });
         const detailed = teamMode
             ? evaluateTeamDetailed(create, winner.incumbent, validPool as TeamPoolMatch[])
             : evaluateDetailed(create, winner.incumbent, validPool as PoolMatch[]);
@@ -254,7 +278,7 @@ function tune(opts: TuneOptions, root: string): number {
             code: '', // filled after freeze (champion id known then)
         }));
 
-        veto = regressionVeto(create, winner.incumbent, validatedDefaults, vetoSeeds, opponents, opts.teamSize);
+        veto = regressionVeto(create, winner.incumbent, validatedDefaults, vetoSeeds, folds.train, opts.teamSize);
         matchesRun += veto.matches;
         console.log(
             `veto: champ ${(veto.champMean * 100).toFixed(1)}% vs default ${(veto.defaultMean * 100).toFixed(1)}% ` +
@@ -284,7 +308,7 @@ function tune(opts: TuneOptions, root: string): number {
             console.log('freeze skipped (--no-freeze); validation codes need a champion id');
         }
     } else {
-        console.log('no restart promoted (valid < train - 5pp everywhere); nothing to freeze');
+        console.log('no restart promoted (need valid ≥ train − 5pp and validOpp ≥ train − 10pp); nothing to freeze');
     }
 
     const manifest: TuneManifest = {
@@ -308,7 +332,7 @@ function tune(opts: TuneOptions, root: string): number {
         trainSeeds,
         validSeeds,
         stageA: halving.rungs,
-        restarts: restarts.map((r) => ({ restart: r.restart, train: r.train, valid: r.valid, promoted: r.promoted, stoppedEarly: r.stoppedEarly, matchesRun: r.matchesRun, history: r.history })),
+        restarts: restarts.map((r) => ({ restart: r.restart, train: r.train, valid: r.valid, validOpp: r.validOpp, promoted: r.promoted, stoppedEarly: r.stoppedEarly, matchesRun: r.matchesRun, history: r.history })),
         champion,
         veto,
         vetoSeeds,

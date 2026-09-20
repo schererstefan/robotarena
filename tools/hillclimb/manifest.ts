@@ -53,6 +53,7 @@ export interface TuneManifest {
         restart: number;
         train: Aggregate;
         valid: Aggregate;
+        validOpp: Aggregate;
         promoted: boolean;
         stoppedEarly: boolean;
         matchesRun: number;
@@ -63,6 +64,7 @@ export interface TuneManifest {
         hash: string;
         train: Aggregate;
         valid: Aggregate;
+        validOpp: Aggregate;
         fromRestart: number;
     } | null;
     veto: VetoResult | null;
