@@ -6,7 +6,7 @@
 import { GENOME_VERSION, validateGenome, type Genome, type GenomeDef } from '../../src/robots/genome';
 import { genomeLoadout } from '../../src/robots/genome';
 import { aggregate, better, type Aggregate } from './fitness';
-import { buildPool, evaluateGenome, type CreateFromGenome } from './evaluate';
+import { buildPool, buildTeamPool, evaluateGenome, evaluateTeamGenome, type CreateFromGenome, type PoolMatch, type TeamPoolMatch } from './evaluate';
 import { loadoutDistance, randomLoadout, type Rand } from './mutate';
 
 export interface Survivor {
@@ -38,6 +38,8 @@ export interface HalvingOptions {
     candidates: number;
     survivors: number;
     rng: Rand;
+    /** Bots per side; >1 runs rungs on team pools. Defaults to 1. */
+    teamSize?: number;
 }
 
 const OPPS_PER_SEED = 2;
@@ -85,9 +87,20 @@ export function stageA(opts: HalvingOptions): HalvingResult {
     const rungs: HalvingRung[] = [];
     let matchesRun = 0;
     let ranked: Survivor[] = [];
+    // Team arm: rungs run on team pools (1 rotating opp/seed per the team pool
+    // scheme, vs 2 in 1v1 — recorded in each rung's poolSize). teamSize 1 keeps
+    // the exact 1v1 code path.
+    const teamSize = opts.teamSize ?? 1;
+    const teamMode = teamSize > 1;
     rungSeeds.forEach((seeds, rung) => {
-        const pool = buildPool({ seeds: opts.trainSeeds.slice(0, seeds), oppsPerSeed: OPPS_PER_SEED, opponents: opts.opponents });
-        ranked = candidates.map((genome) => ({ genome, agg: evaluateGenome(opts.create, genome, pool).agg }));
+        const rungSeedsSlice = opts.trainSeeds.slice(0, seeds);
+        const pool: PoolMatch[] | TeamPoolMatch[] = teamMode
+            ? buildTeamPool({ seeds: rungSeedsSlice, teamSize, opponents: opts.opponents })
+            : buildPool({ seeds: rungSeedsSlice, oppsPerSeed: OPPS_PER_SEED, opponents: opts.opponents });
+        ranked = candidates.map((genome) => ({
+            genome,
+            agg: (teamMode ? evaluateTeamGenome(opts.create, genome, pool as TeamPoolMatch[]) : evaluateGenome(opts.create, genome, pool as PoolMatch[])).agg,
+        }));
         matchesRun += candidates.length * pool.length;
         ranked.sort((a, b) => (better(a.agg, b.agg) ? -1 : better(b.agg, a.agg) ? 1 : 0));
         const keep = rung === rungSeeds.length - 1 ? opts.survivors : Math.max(opts.survivors, Math.ceil(candidates.length / 4));

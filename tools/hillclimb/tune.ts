@@ -14,7 +14,7 @@ import { decodeReplay } from '../../src/sim/replay';
 import { defaultGenome, GENOME_VERSION, genomeDefFor, genomeHash, genomeLoadout, validateGenome } from '../../src/robots/genome';
 import { getRobot } from '../../src/robots/registry';
 import { fingerprintMatch } from '../eval/runner';
-import { adapterFor, buildPool, defaultOpponents, evaluateDetailed } from './evaluate';
+import { adapterFor, buildPool, buildTeamPool, defaultOpponents, evaluateDetailed, evaluateTeamDetailed, type PoolMatch, type TeamPoolMatch } from './evaluate';
 import { better } from './fitness';
 import { stageA } from './halving';
 import { validationCode, writeManifest, type TuneManifest, type ValidationMatch } from './manifest';
@@ -97,7 +97,7 @@ function helpText(): string {
         '',
         '  --archetype ID        tunable bot: brawler, ghost, hunter, orbiter,',
         '                          rusher, sniper, turret, wanderer [required]',
-        '  --teamSize 1          1v1 only (team search deferred: 8 strong 1v1 champions first)',
+        '  --teamSize N          bots per side: 1 for 1v1 (default), 2-3 for team search',
         '  --seed N              run seed (default 0xc11cb5)',
         '  --stageA N            Stage-A loadout candidates (default 256)',
         '  --restarts N          Stage-B restarts (default 8)',
@@ -160,7 +160,10 @@ function runIdNow(): string {
 function tune(opts: TuneOptions, root: string): number {
     const started = Date.now();
     if (!opts.archetype) throw new Error('--archetype is required (see --help)');
-    if (opts.teamSize !== 1) throw new Error(`--teamSize ${opts.teamSize} unsupported (1v1 only; team search deferred)`);
+    if (opts.teamSize < 1 || opts.teamSize > 3) throw new Error(`--teamSize ${opts.teamSize} unsupported (1-3; replay codec caps at 3v3)`);
+    // Team mode mutates the single shared genome (all slots share it);
+    // mutateTeamGenome stays unwired (per-slot genomes are future work).
+    const teamMode = opts.teamSize > 1;
     const def = genomeDefFor(opts.archetype);
     if (!def) throw new Error(`no genome def for archetype ${opts.archetype}`);
     const create = adapterFor(opts.archetype);
@@ -168,11 +171,11 @@ function tune(opts: TuneOptions, root: string): number {
     const runId = runIdNow();
     const { trainSeeds, validSeeds, vetoSeeds } = deriveSeeds(opts.runSeed, opts.trainSeedCount, opts.validSeedCount, 16);
     const rng = rngFromSeed(opts.runSeed);
-    console.log(`tune ${opts.archetype} 1v1: run ${runId}, seed ${opts.runSeed}, opponents ${opponents.length}`);
+    console.log(`tune ${opts.archetype} ${teamMode ? `${opts.teamSize}v${opts.teamSize}` : '1v1'}: run ${runId}, seed ${opts.runSeed}, opponents ${opponents.length}`);
 
     // Stage A: loadout-first halving at default params.
     console.log(`stage A: ${opts.stageACandidates} loadouts, survivors ${opts.restarts}`);
-    const halving = stageA({ def, create, opponents, trainSeeds, candidates: opts.stageACandidates, survivors: opts.restarts, rng });
+    const halving = stageA({ def, create, opponents, trainSeeds, candidates: opts.stageACandidates, survivors: opts.restarts, rng, teamSize: opts.teamSize });
     for (const rung of halving.rungs) {
         console.log(`  rung ${rung.rung}: ${rung.candidates} cands x ${rung.poolSize} pool -> keep ${rung.kept} (top ${(rung.topMean * 100).toFixed(1)}%, cutoff ${(rung.cutoffMean * 100).toFixed(1)}%)`);
     }
@@ -193,6 +196,7 @@ function tune(opts: TuneOptions, root: string): number {
                 challengers: opts.challengers,
                 earlyStop: opts.earlyStop,
                 rng,
+                teamSize: opts.teamSize,
             },
             r,
             survivor.genome,
@@ -229,8 +233,12 @@ function tune(opts: TuneOptions, root: string): number {
             fromRestart: winner.restart,
         };
         // Re-run validation with fingerprints + replay codes (determinism self-check).
-        const validPool = buildPool({ seeds: validSeeds, oppsPerSeed: 1, opponents });
-        const detailed = evaluateDetailed(create, winner.incumbent, validPool);
+        const validPool: PoolMatch[] | TeamPoolMatch[] = teamMode
+            ? buildTeamPool({ seeds: validSeeds, teamSize: opts.teamSize, opponents })
+            : buildPool({ seeds: validSeeds, oppsPerSeed: 1, opponents });
+        const detailed = teamMode
+            ? evaluateTeamDetailed(create, winner.incumbent, validPool as TeamPoolMatch[])
+            : evaluateDetailed(create, winner.incumbent, validPool as PoolMatch[]);
         matchesRun += validPool.length;
         const reMean = detailed.reduce((s, m) => s + m.score, 0) / detailed.length;
         if (Math.abs(reMean - winner.valid.mean) > 1e-9) throw new Error(`validation re-run diverged (${reMean} vs ${winner.valid.mean})`);
@@ -246,7 +254,7 @@ function tune(opts: TuneOptions, root: string): number {
             code: '', // filled after freeze (champion id known then)
         }));
 
-        veto = regressionVeto(create, winner.incumbent, validatedDefaults, vetoSeeds, opponents);
+        veto = regressionVeto(create, winner.incumbent, validatedDefaults, vetoSeeds, opponents, opts.teamSize);
         matchesRun += veto.matches;
         console.log(
             `veto: champ ${(veto.champMean * 100).toFixed(1)}% vs default ${(veto.defaultMean * 100).toFixed(1)}% ` +
@@ -263,7 +271,7 @@ function tune(opts: TuneOptions, root: string): number {
                 validation,
             });
             frozen = id;
-            for (const v of validation) v.code = validationCode(id, champLoadout, v);
+            for (const v of validation) v.code = validationCode(id, champLoadout, v, opts.teamSize);
             // Patch the champion record with final codes (freeze ran with empty codes).
             const recordPath = join(root, 'tools', 'hillclimb', 'champions', `${id}.json`);
             const record = JSON.parse(readFileSync(recordPath, 'utf8')) as { featuredReplays: Array<{ code: string }> };
