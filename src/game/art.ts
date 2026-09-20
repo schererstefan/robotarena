@@ -179,22 +179,56 @@ function bakeTinted(scene: Scene, key: string, map: PixelMap, recolor: Record<st
 }
 
 /**
- * Deterministic damage stamp over a char-map copy: a scorch blotch plus
- * sparse crack seams on hull pixels only (w/l/m/t — scorch eats trim too).
- * Same dims, legal chars.
+ * Deterministic damage stamp over a char-map copy, hull pixels only
+ * (w/l/m/t — scorch eats trim too). Stage 1 (<50% HP): scorch blotch +
+ * crack seams. Stage 2 (<25% HP): larger scorch with a burnt-through core,
+ * denser cracks, ember dots (y/o). Same dims, legal chars, no RNG.
  */
-export function damageStamp(map: PixelMap): PixelMap {
-    return map.map((row, y) =>
+export function damageStamp(map: PixelMap, stage: 1 | 2): PixelMap {
+    const scorch =
+        stage === 1
+            ? (x: number, y: number) => x >= 3 && x <= 8 && y >= 9 && y <= 12
+            : (x: number, y: number) => x >= 2 && x <= 9 && y >= 8 && y <= 13;
+    const core = (x: number, y: number) => x >= 4 && x <= 7 && y >= 9 && y <= 11;
+    const crackMod = stage === 1 ? 17 : 13;
+    const out = map.map((row, y) =>
         row
             .split('')
             .map((ch, x) => {
                 if (ch !== 'w' && ch !== 'l' && ch !== 'm' && ch !== 't') return ch;
-                if (x >= 4 && x <= 7 && y >= 9 && y <= 11) return ch === 'l' || ch === 'm' ? 'k' : 'd';
-                if ((x * 7 + y * 11) % 17 === 0) return 'k';
+                if (scorch(x, y)) {
+                    if (stage === 2 && core(x, y)) return 'k';
+                    // Ember dots on scorched hull (stage 2 only).
+                    if (stage === 2 && (x * 13 + y * 7) % 11 === 0) return (x + y) % 2 === 0 ? 'y' : 'o';
+                    return ch === 'l' || ch === 'm' ? 'k' : 'd';
+                }
+                if ((x * 7 + y * 11) % crackMod === 0) return 'k';
                 return ch;
             })
             .join(''),
     );
+    if (stage === 2) {
+        // Guarantee: stage 2 always shows embers. If the hash placed none
+        // (map-dependent), light the first scorched pixels in scan order.
+        let embers = 0;
+        out.forEach((row, y) => {
+            for (let x = 0; x < row.length; x += 1) {
+                if ((row[x] === 'y' || row[x] === 'o') && map[y]?.[x] !== row[x]) embers += 1;
+            }
+        });
+        if (embers === 0) {
+            const lit: Array<[number, number]> = [];
+            out.forEach((row, y) => {
+                for (let x = 0; x < row.length && lit.length < 2; x += 1) {
+                    if (scorch(x, y) && row[x] !== map[y]?.[x]) lit.push([x, y]);
+                }
+            });
+            lit.forEach(([x, y], k) => {
+                out[y] = `${out[y]?.slice(0, x)}${k === 0 ? 'y' : 'o'}${out[y]?.slice(x + 1)}`;
+            });
+        }
+    }
+    return out;
 }
 
 /** Direction-frame canvas size: fits a 16px sprite at 45° (16√2 ≈ 22.6). */
@@ -288,20 +322,24 @@ function css(hex: number): string {
 }
 
 /** Team-tinted chassis key (palette baked in: CB toggles stay correct). */
-export function chassisTeamKey(robotId: string, team: 0 | 1, damaged: boolean, dir: number): string {
-    return `chassis_${robotId}_t${team}_${isColorblind() ? 'cb' : 'std'}${damaged ? '_dmg' : ''}_d${dir}`;
+export function chassisTeamKey(robotId: string, team: 0 | 1, damage: 0 | 1 | 2, dir: number): string {
+    const dmgSeg = damage === 0 ? '' : damage === 1 ? '_dmg1' : '_dmg2';
+    return `chassis_${robotId}_t${team}_${isColorblind() ? 'cb' : 'std'}${dmgSeg}_d${dir}`;
 }
 
-/** Bake per-team chassis variants (both palettes, clean + damaged, 8 dirs). */
+/** Bake per-team chassis variants (both palettes, clean + 2 damage stages, 8 dirs). */
 function bakeTeamChassis(scene: Scene): void {
     for (const [id, map] of Object.entries(CHASSIS_V2)) {
-        // Rotate once per chassis (clean + damaged), recolor per team.
+        // Rotate once per chassis (clean + 2 damage stages), recolor per team.
         const cleanDirs: PixelMap[] = [];
-        const dmgDirs: PixelMap[] = [];
-        const dmg = damageStamp(map);
+        const dmg1Dirs: PixelMap[] = [];
+        const dmg2Dirs: PixelMap[] = [];
+        const dmg1 = damageStamp(map, 1);
+        const dmg2 = damageStamp(map, 2);
         for (let dir = 0; dir < 8; dir += 1) {
             cleanDirs.push(rotateMapDir8(map, dir));
-            dmgDirs.push(rotateMapDir8(dmg, dir));
+            dmg1Dirs.push(rotateMapDir8(dmg1, dir));
+            dmg2Dirs.push(rotateMapDir8(dmg2, dir));
         }
         for (const team of [0, 1] as const) {
             for (const cb of [false, true]) {
@@ -310,7 +348,8 @@ function bakeTeamChassis(scene: Scene): void {
                 const pal = cb ? 'cb' : 'std';
                 for (let dir = 0; dir < 8; dir += 1) {
                     bakeTinted(scene, `chassis_${id}_t${team}_${pal}_d${dir}`, cleanDirs[dir] as PixelMap, recolor);
-                    bakeTinted(scene, `chassis_${id}_t${team}_${pal}_dmg_d${dir}`, dmgDirs[dir] as PixelMap, recolor);
+                    bakeTinted(scene, `chassis_${id}_t${team}_${pal}_dmg1_d${dir}`, dmg1Dirs[dir] as PixelMap, recolor);
+                    bakeTinted(scene, `chassis_${id}_t${team}_${pal}_dmg2_d${dir}`, dmg2Dirs[dir] as PixelMap, recolor);
                 }
             }
         }
@@ -403,7 +442,7 @@ function bakeArenaFloor(scene: Scene): void {
 function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [number, number, number]>): void {
     // Spawn pads: shape-coded (triangle = team 0, square = team 1), no tint.
     context.lineWidth = 2;
-    context.strokeStyle = 'rgba(236,233,226,0.35)';
+    context.strokeStyle = 'rgba(236,233,226,0.25)';
     for (const x of [130, 830]) {
         for (const y of [170, 245, 320, 395, 470]) {
             context.strokeRect(x - 22, y - 22, 44, 44);
@@ -420,12 +459,12 @@ function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [numbe
         }
     }
     // Center-ring emblem = the SD collapse target.
-    context.strokeStyle = 'rgba(236,233,226,0.28)';
+    context.strokeStyle = 'rgba(236,233,226,0.2)';
     context.lineWidth = 3;
     context.beginPath();
     context.arc(480, 320, 60, 0, Math.PI * 2);
     context.stroke();
-    context.strokeStyle = 'rgba(236,233,226,0.2)';
+    context.strokeStyle = 'rgba(236,233,226,0.15)';
     context.lineWidth = 2;
     context.beginPath();
     context.arc(480, 320, 44, 0, Math.PI * 2);
@@ -436,12 +475,12 @@ function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [numbe
     context.moveTo(480, 320 - 72);
     context.lineTo(480, 320 + 72);
     context.stroke();
-    context.fillStyle = 'rgba(236,233,226,0.35)';
+    context.fillStyle = 'rgba(236,233,226,0.25)';
     context.beginPath();
     context.arc(480, 320, 4, 0, Math.PI * 2);
     context.fill();
     // Dot-vs-dash per-half cue along the center line (shape, not color).
-    context.fillStyle = 'rgba(236,233,226,0.25)';
+    context.fillStyle = 'rgba(236,233,226,0.18)';
     for (let y = 20; y < 640; y += 40) {
         context.beginPath();
         context.arc(470, y, 2.5, 0, Math.PI * 2);
@@ -449,7 +488,7 @@ function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [numbe
         context.fillRect(486, y - 1.5, 9, 3);
     }
     // Stronger rim-hazard band: diagonal ticks just inside every edge.
-    context.strokeStyle = 'rgba(255,179,64,0.28)';
+    context.strokeStyle = 'rgba(255,179,64,0.2)';
     context.lineWidth = 3;
     for (let x = 12; x < 960; x += 24) {
         for (const y of [10, 630]) {
@@ -571,6 +610,42 @@ function bakeHalo(scene: Scene): void {
     texture.refresh();
 }
 
+/**
+ * Contact shadow: dithered soft ellipse (20×10, pixel dots — no blur
+ * filter), rendered ×2 under every robot. Ordered checker/sparse edge
+ * falloff; deterministic, no RNG. Same overlay-texture family as scorch.
+ */
+function bakeShadowBlob(scene: Scene): void {
+    if (scene.textures.exists('shadow_blob')) {
+        bakedKeys.add('shadow_blob');
+        return;
+    }
+    const texture = scene.textures.createCanvas('shadow_blob', 20, 10);
+    if (!texture) return;
+    bakedKeys.add('shadow_blob');
+    const context = texture.getContext();
+    context.clearRect(0, 0, 20, 10);
+    for (let y = 0; y < 10; y += 1) {
+        for (let x = 0; x < 20; x += 1) {
+            const dx = (x + 0.5 - 10) / 9;
+            const dy = (y + 0.5 - 5) / 4;
+            const r = Math.sqrt(dx * dx + dy * dy);
+            if (r >= 1) continue;
+            if (r < 0.5) {
+                context.fillStyle = 'rgba(5,7,11,0.55)';
+            } else if (r < 0.75) {
+                if ((x + y) % 2 !== 0) continue;
+                context.fillStyle = 'rgba(5,7,11,0.45)';
+            } else {
+                if ((x + 2 * y) % 4 !== 0) continue;
+                context.fillStyle = 'rgba(5,7,11,0.35)';
+            }
+            context.fillRect(x, y, 1, 1);
+        }
+    }
+    texture.refresh();
+}
+
 /** Per-block one-time bake key (all blocks layout rects are 90×90). */
 export function blockKey(w: number, h: number): string {
     return `block_${w}x${h}`;
@@ -643,6 +718,7 @@ export function ensureArtTextures(scene: Scene): void {
     bakeScorch(scene);
     bakeSdRing(scene);
     bakeHalo(scene);
+    bakeShadowBlob(scene);
     if (debugArtRequested()) {
         const ms = (nowMs() - t0).toFixed(1);
         const issues = validateArt();

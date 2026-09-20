@@ -130,6 +130,7 @@ export class BattleScene extends Scene {
     private chassis: Phaser.GameObjects.Image[] = [];
     private towers: Phaser.GameObjects.Image[] = [];
     private hubs: Phaser.GameObjects.Image[] = [];
+    private shadows: Phaser.GameObjects.Image[] = [];
     private barBg: Phaser.GameObjects.Rectangle[] = [];
     private barFg: Phaser.GameObjects.Rectangle[] = [];
     private nameTexts: Phaser.GameObjects.Text[] = [];
@@ -297,6 +298,7 @@ export class BattleScene extends Scene {
         this.chassis = [];
         this.towers = [];
         this.hubs = [];
+        this.shadows = [];
         this.barBg = [];
         this.barFg = [];
         this.nameTexts = [];
@@ -482,13 +484,16 @@ export class BattleScene extends Scene {
             this.robotIds.push(robotId);
             // Bake-time team tint (t pixels only): no whole-sprite setTint.
             // Nearest-direction frames: pixel sprites are never rotated.
-            const body = this.add.image(0, 0, chassisTeamKey(robotId, snap.team, false, dir8ForHeading(snap.heading))).setScale(2).setDepth(4);
+            const body = this.add.image(0, 0, chassisTeamKey(robotId, snap.team, 0, dir8ForHeading(snap.heading))).setScale(2).setDepth(4);
             this.hurtT.push(0);
             this.punchT.push(0);
             this.punchOn.push(false);
             this.healAcc.push(0);
             this.lastHealTick.push(-9999);
             this.treads.push(this.add.image(0, 0, treadsDirKey(false, dir8ForHeading(snap.heading))).setScale(2).setDepth(3.5));
+            // Contact shadow: dithered blob under the robot (depth 2.5 sits
+            // above the dyn layer, below every robot part).
+            this.shadows.push(this.add.image(0, 0, 'shadow_blob').setScale(2).setDepth(2.5).setAlpha(0.8));
             this.treadAcc.push(0);
             this.treadLastX.push(-9999);
             this.treadLastY.push(-9999);
@@ -1790,10 +1795,11 @@ export class BattleScene extends Scene {
             }
             const wantTread = treadsDirKey(this.treadFlip[i] as boolean, dir8ForHeading(s.heading));
             if (tread.texture.key !== wantTread) tread.setTexture(wantTread);
-            // Bake-time damage overlay below 35% HP + nearest-direction
-            // frame (texture swap, no tint, never rotated).
-            const wantDmg = visible && s.health < s.maxHealth * 0.35;
-            const wantBody = chassisTeamKey(this.robotIds[i] as string, s.team, wantDmg, dir8ForHeading(s.heading));
+            // Bake-time damage stages (<50% stage 1, <25% stage 2) +
+            // nearest-direction frame (texture swap, no tint, never rotated).
+            const hpFrac = s.health / s.maxHealth;
+            const dmgStage: 0 | 1 | 2 = !visible ? 0 : hpFrac <= 0.25 ? 2 : hpFrac <= 0.5 ? 1 : 0;
+            const wantBody = chassisTeamKey(this.robotIds[i] as string, s.team, dmgStage, dir8ForHeading(s.heading));
             if (body.texture.key !== wantBody) body.setTexture(wantBody);
             // Hurt-flash: 2-frame white blink on the damaged chassis.
             // Slowed robots desaturate (tint) + carry the ❄ glyph instead.
@@ -1832,6 +1838,12 @@ export class BattleScene extends Scene {
                 .setPosition(px, py)
                 .setScale(chassisScale)
                 .setAlpha(introAlpha);
+            // Contact shadow stays grounded (no lean/bob/jitter/drop) with a
+            // slight bottom-right offset (top-left light). Fades with intro.
+            (this.shadows[i] as Phaser.GameObjects.Image)
+                .setVisible(visible && introAlpha > 0.05)
+                .setPosition(cx + 3, cy + 4)
+                .setAlpha(0.8 * introAlpha);
             stripe
                 .setVisible(visible && skin.finish === 'Stripe' && introAlpha > 0.05)
                 .setPosition(px, py)

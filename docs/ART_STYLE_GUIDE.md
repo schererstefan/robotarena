@@ -114,7 +114,9 @@ the game cohesive; terrain uses the same ramp as the cast).
 - Contact shadow: dithered soft ellipse under every robot, low alpha,
   offset slightly bottom-right (top-left light). Pixel-styled dots —
   never a blur filter. Same technique family as `scorch`/`halo` (canvas
-  overlay textures, exempt from char budgets).
+  overlay textures, exempt from char budgets). Bake: `shadow_blob` 20×10
+  (solid core → checker → sparse edge), rendered ×2 at alpha 0.8, grounded
+  at (x+3, y+4) — no lean/bob/jitter/drop tracking.
 
 ## 9. Damage readability
 
