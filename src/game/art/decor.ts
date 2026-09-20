@@ -1,104 +1,106 @@
 // Arena-decor props: dressing for OUTSIDE the play area (never gameplay).
 // 16x16 pixel maps using the palette chars from src/game/art.ts:
-// .=transparent, k, d, m, l, w, r, g, y.
+// .=transparent, k, d, m, l, w, y.
+// Phase 5 pass: same quiet roles, better light discipline (lit lids and
+// left edges, shaded right/base AO), mounting hardware, clearer fan.
 
 type PixelMap = string[];
 
-// CRATE: stenciled box (X stencil mark), dark industrial.
+// CRATE: stenciled box — lit lid lip, corner bolts, shaded right edge.
 export const DECOR_CRATE: PixelMap = [
     '................',
     '..kkkkkkkkkkkk..',
-    '..kddddddddddk..',
-    '..kdmmmmmmmmdk..',
-    '..kdmkkkkkkmdk..',
-    '..kdmkddddkmdk..',
-    '..kdmklddlkmdk..',
-    '..kdmkdlldkmdk..',
-    '..kdmkdlldkmdk..',
-    '..kdmklddlkmdk..',
-    '..kdmkddddkmdk..',
-    '..kdmkkkkkkmdk..',
+    '..kllllllllllk..',
+    '..kwmmmmmmmmwk..',
+    '..kdlkkkkkkddk..',
+    '..kdlkddddkddk..',
+    '..kdlklddlkddk..',
+    '..kdlkdlldkddk..',
+    '..kdlkdlldkddk..',
+    '..kdlklddlkddk..',
+    '..kdlkddddkddk..',
+    '..kdlkkkkkkddk..',
     '..kdmmmmmmmmdk..',
     '..kddddddddddk..',
     '..kkkkkkkkkkkk..',
     '................',
 ];
 
-// BARREL: hazard banded cylinder, muted yellow/black band.
+// BARREL: lidded cylinder — lit lid + left sheen, hazard band, base rim.
 export const DECOR_BARREL: PixelMap = [
     '................',
     '....kkkkkkkk....',
-    '...kddddddddk...',
-    '..kddddddddddk..',
-    '..kdlmdddddddk..',
-    '..kdlmdddddddk..',
-    '..kdlmdddddddk..',
+    '...kllllllllk...',
+    '..klmddddddddk..',
+    '..klmddddddddk..',
+    '..klmddddddddk..',
+    '..klmddddddddk..',
     '..kyykkyykkyyk..',
     '..kkyykkyykkyk..',
-    '..kdlmdddddddk..',
-    '..kdlmdddddddk..',
-    '..kdlmdddddddk..',
-    '..kddddddddddk..',
+    '..klmddddddddk..',
+    '..klmddddddddk..',
+    '..klmddddddddk..',
     '..kkkkkkkkkkkk..',
     '...kkkkkkkkkk...',
     '................',
+    '................',
 ];
 
-// LAMP: small glowing post, restrained (2px amber lens, no halo).
+// LAMP: hooded post — caged amber lens, shaded post, flared bolted base.
 export const DECOR_LAMP: PixelMap = [
     '................',
-    '................',
-    '......kkkk......',
+    '......mmmm......',
+    '.....kkkkkk.....',
+    '.....kllllk.....',
+    '.....kkyykk.....',
+    '.....kllllk.....',
     '......kllk......',
-    '......kyyk......',
-    '......kllk......',
-    '.......kk.......',
-    '.......mm.......',
-    '.......mm.......',
-    '.......mm.......',
-    '.......mm.......',
-    '.......mm.......',
-    '......kmmk......',
-    '.....kkmmkk.....',
+    '......klmk......',
+    '......klmk......',
+    '......klmk......',
+    '......klmk......',
+    '......klmk......',
+    '.....kklmkk.....',
+    '....kkklmkkk....',
     '....kkkkkkkk....',
     '................',
 ];
 
-// LAMP_B: lamp lit frame — hot lens plus a wider spill row (1 s flicker).
+// LAMP_B: lamp lit frame — hot lens, glow spilling past the cage + neck.
 export const DECOR_LAMP_B: PixelMap = [
     '................',
-    '................',
-    '......kkkk......',
-    '......kwwk......',
+    '......mmmm......',
+    '.....kkkkkk.....',
+    '.....kwwwwk.....',
+    '....kwwwwwwk....',
     '.....kwwwwk.....',
     '......kwwk......',
-    '.......kk.......',
-    '.......mm.......',
-    '.......mm.......',
-    '.......mm.......',
-    '.......mm.......',
-    '.......mm.......',
-    '......kmmk......',
-    '.....kkmmkk.....',
+    '......klmk......',
+    '......klmk......',
+    '......klmk......',
+    '......klmk......',
+    '......klmk......',
+    '.....kklmkk.....',
+    '....kkklmkkk....',
     '....kkkkkkkk....',
     '................',
 ];
 
-// VENT: wall grate with fan hint (arc blades + hub behind slats).
+// VENT: bolted wall grate — recessed ring, pale blades, hot hub.
 export const DECOR_VENT: PixelMap = [
     '................',
     '................',
     '..kkkkkkkkkkkk..',
-    '..kddddddddddk..',
-    '..kdmmmmmmmmdk..',
-    '..kdkkllllkkdk..',
+    '..kdwddddddwdk..',
+    '..kddmmmmmmddk..',
     '..kdmmllllmmdk..',
-    '..kdkllddllkdk..',
-    '..kdkllddllkdk..',
+    '..kdmllllllmdk..',
+    '..kdmllwwllmdk..',
+    '..kdmllwwllmdk..',
+    '..kdmllllllmdk..',
     '..kdmmllllmmdk..',
-    '..kdkkllllkkdk..',
-    '..kdmmmmmmmmdk..',
-    '..kddddddddddk..',
+    '..kddmmmmmmddk..',
+    '..kdwddddddwdk..',
     '..kkkkkkkkkkkk..',
     '................',
     '................',
