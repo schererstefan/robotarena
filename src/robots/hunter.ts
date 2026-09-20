@@ -5,12 +5,14 @@
 // frozen hillclimb champion.
 
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
+import { clamp } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 import { createBrain, pickTarget, type BrainParams } from './brain';
-import { aimed, aimTurret, leadAngle, manageCharge, steerTo, throttleFor } from './common';
+import { aimed, aimTurret, leadAngle, manageCharge, rayClearance, steerTo, throttleFor } from './common';
 import { castFocusVote, focusTarget } from './comms';
 import type { Genome } from './genome';
+import { createOpponentModel, MODEL_DEFAULTS, type ModelParams } from './model';
 
 export const meta: RobotMeta = {
     id: 'hunter',
@@ -36,6 +38,8 @@ export interface HunterParams {
     targetPolicy: TargetPolicy;
     /** Brain mode utilities (brain.* genome group); absent = preset defaults. */
     brain?: Partial<BrainParams>;
+    /** Opponent-model counter-lead (model.* genome group); absent = model defaults. */
+    model?: Partial<ModelParams>;
 }
 
 export const HUNTER_DEFAULTS: HunterParams = {
@@ -47,6 +51,7 @@ export const HUNTER_DEFAULTS: HunterParams = {
     closeThrottle: 0.35,
     scanTurn: 0.9,
     targetPolicy: 'weakest',
+    model: { ...MODEL_DEFAULTS },
 };
 
 const TARGET_POLICIES: ReadonlyArray<TargetPolicy> = ['first', 'nearest', 'weakest', 'strongest'];
@@ -76,6 +81,12 @@ export function hunterParamsFromGenome(genome: Genome): HunterParams {
             aggression: num('brain.aggression', 1),
             focusBonus: num('brain.focusBonus', 0.3),
             orbitDir: p['brain.orbitDir'] === -1 ? -1 : 1,
+        },
+        model: {
+            leadScale: num('model.leadScale', MODEL_DEFAULTS.leadScale),
+            counterGain: num('model.counterGain', MODEL_DEFAULTS.counterGain),
+            minConf: num('model.minConf', MODEL_DEFAULTS.minConf),
+            aimTolBoost: num('model.aimTolBoost', MODEL_DEFAULTS.aimTolBoost),
         },
     };
 }
@@ -145,10 +156,90 @@ export function createWithParams(overrides?: Partial<HunterParams>): RobotContro
         targetPolicy: p.targetPolicy,
         ...(p.brain ?? {}),
     });
+    const model = createOpponentModel(p.model ?? {});
 
     function update(sense: SenseState): Intent {
+        model.update(sense);
         const out = brain.update(sense);
-        return { ...out.intent, radio: out.targetId !== null ? castFocusVote(out.targetId) : null };
+        const intent = { ...out.intent };
+        // Counter-lead: when the brain holds fire on a visible target, loose
+        // the model's solution instead. Never overrides a brain shot.
+        // Long-range fire waits only for a productive bank (charger skill)
+        // or a fast close (a better shot is moments away): without either,
+        // the bank-wait never resolves and only donates damage.
+        if (!intent.fire && out.targetId !== null) {
+            const self = sense.self;
+            const target = sense.foes.find((f) => f.id === out.targetId);
+            if (target !== undefined && target.distance < self.stats.gunRange) {
+                const shot = model.aimAt(target, self.x, self.y, self.stats.bulletSpeed);
+                const tol = model.releaseTol(target, p.aimTol);
+                intent.towerTurn = aimTurret(self.tower, shot, p.turretGain);
+                const bankHold =
+                    target.distance > self.stats.gunRange * p.bankRangeFrac &&
+                    !self.charged &&
+                    (model.shouldBank(self) || model.closingFast(target.id));
+                if (aimed(self.tower, shot, tol) && !bankHold) {
+                    intent.fire = true;
+                    intent.charge = false;
+                }
+            }
+        } else if (out.targetId === null) {
+            // Blind tower discipline (never fires blind): re-acquire onto a
+            // fresh sighting instead of scanning empty air, and hold forward
+            // until first contact (foes spawn ahead; sweeping away donates
+            // the whole approach). Past tick 300 with no contact, fall back
+            // to the brain's scan so corner campers are still found.
+            const self = sense.self;
+            const mem = model.lastSeen();
+            if (mem !== null && sense.tick - mem.tick < 90) {
+                intent.towerTurn = aimTurret(self.tower, Math.atan2(mem.y - self.y, mem.x - self.x), p.turretGain);
+            } else if (!model.hasSeen() && sense.tick < 300) {
+                intent.towerTurn = 0;
+            }
+        }
+        // Flank campers: a head-on chase at a parked gun is predictable, so
+        // spiral in (tangent + radial) instead of running straight at them.
+        // Drive only — the tower/fire solution above stands. Never overrides
+        // a defensive mode, a close brawl, or the finish on a weak foe.
+        // Both bows are raycast and the clear runway wins (midfield bow
+        // preferred: attacking from the open side pins the camper against
+        // its own wall); when both runways are blocked the brain's straight
+        // lane (which threads between the blocks) stands.
+        if (out.targetId !== null && brain.mode === 'engage') {
+            const self = sense.self;
+            const target = sense.foes.find((f) => f.id === out.targetId);
+            if (target !== undefined && target.distance > 200 && target.health >= 30 && model.isCamping(target)) {
+                const toFoe = Math.atan2(target.y - self.y, target.x - self.x);
+                const cx = ARENA_WIDTH / 2 - self.x;
+                const cy = ARENA_HEIGHT / 2 - self.y;
+                const midBow = Math.cos(toFoe + Math.PI / 2) * cx + Math.sin(toFoe + Math.PI / 2) * cy >= 0 ? 1 : -1;
+                const obstacles = sense.arena?.obstacles;
+                const runwayFor = (bow: 1 | -1): { angle: number; runway: number } => {
+                    const tangent = toFoe + (bow * Math.PI) / 2;
+                    const goalX = clamp(
+                        self.x + Math.cos(tangent) * 250 + Math.cos(toFoe) * 150,
+                        20,
+                        ARENA_WIDTH - 20,
+                    );
+                    const goalY = clamp(
+                        self.y + Math.sin(tangent) * 250 + Math.sin(toFoe) * 150,
+                        20,
+                        ARENA_HEIGHT - 20,
+                    );
+                    const angle = Math.atan2(goalY - self.y, goalX - self.x);
+                    const runway = obstacles !== undefined ? rayClearance(self.x, self.y, angle, obstacles) : self.blocked.ahead;
+                    return { angle, runway };
+                };
+                const mid = runwayFor(midBow);
+                const far = runwayFor(midBow === 1 ? -1 : 1);
+                const pick = mid.runway > 220 ? mid : far.runway > 220 ? far : null;
+                if (pick !== null) {
+                    intent.throttle = throttleFor(self.heading, pick.angle);
+                    intent.turn = steerTo(self.heading, pick.angle, p.steerGain);
+                }
+            }
+        }
+        return { ...intent, radio: out.targetId !== null ? castFocusVote(out.targetId) : null };
     }
 
     return { meta, loadout, update };
