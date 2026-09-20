@@ -151,6 +151,66 @@ export const SKILL_ICONS: Record<string, PixelMap> = {
     ],
 };
 
+// 8x8 UI icons (Phase 5): always rendered paired with a text label,
+// never alone. White detail on transparent, read at 1x next to 9-12px type.
+export const UI_ICONS: Record<string, PixelMap> = {
+    // Double speed chevron (dash cooldown dial).
+    dash: [
+        '........',
+        '.w...w..',
+        '.ww..ww.',
+        '.www.www',
+        '.ww..ww.',
+        '.w...w..',
+        '........',
+        '........',
+    ],
+    // Starburst (EMP cooldown dial).
+    emp: [
+        '...w....',
+        '.w.w.w..',
+        '..www...',
+        'wwwwwww.',
+        '..www...',
+        '.w.w.w..',
+        '...w....',
+        '........',
+    ],
+    // Cup with stem and base (MVP line).
+    trophy: [
+        'ww...ww.',
+        'wwwwwww.',
+        '.wwwww..',
+        '..www...',
+        '...w....',
+        '...w....',
+        '..www...',
+        '........',
+    ],
+    // Skull with eye sockets (death markers, results rows).
+    skull: [
+        '..wwww..',
+        '.wwwwww.',
+        '.wkwwkw.',
+        '.wwwwww.',
+        '..wwww..',
+        '..w..w..',
+        '........',
+        '........',
+    ],
+    // Overlapping copy rects (replay-code row).
+    copy: [
+        '..kkkk..',
+        '..kwwk..',
+        '..kwwkk.',
+        '..kkkwk.',
+        '...kwk..',
+        '...kwk..',
+        '...kkk..',
+        '........',
+    ],
+};
+
 // 16x16 pixel-chrome frame tile: dark fill, light top-left bevel,
 // dark bottom-right bevel, single rivet near the top-left corner.
 export const PANEL_TILE: PixelMap = [

@@ -490,6 +490,48 @@ export function cooldownPips(dashReady: boolean, empReady: boolean): string {
     return `D${dashReady ? '●' : '○'} E${empReady ? '●' : '○'}`;
 }
 
+/** Cooldown readout with seconds under 3 s ("D 2.1 E ●", "D ○ E 12"). */
+export function cooldownLabel(dashCd: number, empCd: number): string {
+    const part = (cd: number, letter: string): string => {
+        if (cd <= 0) return `${letter} ●`;
+        if (cd < 180) return `${letter} ${(cd / 60).toFixed(1)}`;
+        return `${letter} ○`;
+    };
+    return `${part(dashCd, 'D')} ${part(empCd, 'E')}`;
+}
+
+/** Team-plate cooldown cell, integer seconds ("D 3s E ●"). */
+export function plateCooldown(dashCd: number, empCd: number): string {
+    const part = (cd: number, letter: string): string => (cd <= 0 ? `${letter} ●` : `${letter} ${Math.ceil(cd / 60)}s`);
+    return `${part(dashCd, 'D')} ${part(empCd, 'E')}`;
+}
+
+/** 5-block mini HP bar ("▓▓▓░░"). */
+export function hpMini(frac: number): string {
+    const full = Math.round(Math.max(Math.min(frac, 1), 0) * 5);
+    return '▓'.repeat(full) + '░'.repeat(5 - full);
+}
+
+/** Team-plate row ("BOLT ▓▓▓░░ D 3s E ● A1B2", callsign truncated to 6). */
+export function plateRow(callsign: string, frac: number, dashCd: number, empCd: number, code: string): string {
+    return `${callsign.slice(0, 6)} ${hpMini(frac)} ${plateCooldown(dashCd, empCd)} ${code}`;
+}
+
+/** Struck-through dead plate row (the strike line is drawn, not typed). */
+export function plateDeadRow(callsign: string): string {
+    return `✕ ${callsign.slice(0, 6)}`;
+}
+
+/** Team-plate header totals ("T1 2/3"). */
+export function plateTotal(team: 1 | 2, alive: number, total: number): string {
+    return `T${team} ${alive}/${total}`;
+}
+
+/** Results MVP line ("MVP: BOLT — 3 KO, 412 DMG"). */
+export function mvpLine(callsign: string, kills: number, damage: number): string {
+    return `MVP: ${callsign} — ${kills} KO, ${Math.round(damage)} DMG`;
+}
+
 export function damageText(dmg: number): string {
     return `-${dmg}`;
 }

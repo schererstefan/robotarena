@@ -3,13 +3,14 @@
 // is sprite transforms plus one small dynamic Graphics (cones + trails).
 
 import { Scene } from 'phaser';
-import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DT, EMP_RADIUS, MAX_TICKS, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DASH_COOLDOWN_TICKS, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, MAX_TICKS, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import { angleDiff, clamp, wrapAngle } from '../../sim/math';
+import { loadoutCode, type SkillLoadout } from '../../sim/skills';
 import { decodeReplay, encodeReplay } from '../../sim/replay';
 import { getRobot } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
-import { SD_RING_R, bakedTextureCount, blockKey, chassisTeamKey, ensureArtTextures, ensureBlockTexture, towerKey, wreckKey } from '../art';
+import { SD_RING_R, bakedTextureCount, blockKey, chassisTeamKey, ensureArtTextures, ensureBlockTexture, towerKey, uiIconKey, wreckKey } from '../art';
 import {
     playBattleStart,
     playClick,
@@ -37,7 +38,7 @@ import {
     BATTLE_TUTORIAL,
     BATTLE_TUTORIAL_STEPS,
     COMMON,
-    cooldownPips,
+    cooldownLabel,
     damageText,
     destroyedBanner,
     exhibitionResultsLine,
@@ -46,6 +47,10 @@ import {
     healText,
     hudTeamPips,
     killCreditBanner,
+    mvpLine,
+    plateDeadRow,
+    plateRow,
+    plateTotal,
     reelCountdown,
     reelExitCountdown,
     resultRow,
@@ -227,6 +232,16 @@ export class BattleScene extends Scene {
     private indicators: EdgeIndicator[] = [];
     /** Scratch edge indicator for pilot rim chevrons (reused, never alloc'd). */
     private chevScratch: EdgeIndicator = { vx: 0, vy: 0, ax: 0, ay: 0, team: 1, ttl: 0 };
+    /** Cooldown dial icons + ready-edge latches for the ready pop. */
+    private iconDash: Phaser.GameObjects.Image[] = [];
+    private iconEmp: Phaser.GameObjects.Image[] = [];
+    private prevDashReady: boolean[] = [];
+    private prevEmpReady: boolean[] = [];
+    /** Team plates flanking the minimap (4 Hz refresh) + strike graphics. */
+    private plateG!: Phaser.GameObjects.Graphics;
+    private plateHead: Phaser.GameObjects.Text[] = [];
+    private plateRows: Phaser.GameObjects.Text[][] = [];
+    private lastPlateTick = -99;
     private mapG!: Phaser.GameObjects.Graphics;
     private pilot: PilotInput | null = null;
     private obstacles: ArenaObstacle[] = [];
@@ -313,6 +328,13 @@ export class BattleScene extends Scene {
         this.lampB = null;
         this.flickT = 0;
         this.flickOn = false;
+        this.iconDash = [];
+        this.iconEmp = [];
+        this.prevDashReady = [];
+        this.prevEmpReady = [];
+        this.plateHead = [];
+        this.plateRows = [];
+        this.lastPlateTick = -99;
         this.firstBlood = false;
         this.trails = [];
         this.lastTrailTick = -1;
@@ -469,9 +491,13 @@ export class BattleScene extends Scene {
             const name = this.add.text(0, 0, skin.callsign, FONTS.monoSmall).setOrigin(0.5).setDepth(9);
             name.setColor(teamCss(snap.team));
             this.nameTexts.push(name);
-            // Active-skill cooldown pips: D = dash, E = EMP, filled = ready.
+            // Cooldown readout: sweep dials (dyn) + D/E icons + seconds text.
             this.pipTexts.push(this.add.text(0, 0, '', FONTS.monoSmall).setOrigin(0.5).setDepth(9));
             this.pipCache.push('');
+            this.prevDashReady.push(true);
+            this.prevEmpReady.push(true);
+            this.iconDash.push(this.add.image(0, 0, uiIconKey('dash')).setDepth(9).setAlpha(0.9));
+            this.iconEmp.push(this.add.image(0, 0, uiIconKey('emp')).setDepth(9).setAlpha(0.9));
             const muzzle = this.add.image(0, 0, 'muzzle').setScale(2).setDepth(8).setVisible(false);
             muzzle.setTint(skin.paint);
             this.muzzles.push(muzzle);
@@ -592,9 +618,12 @@ export class BattleScene extends Scene {
 
         this.pauseButton = makeButton(this, 760, 740, 120, 36, BATTLE.pause, () => this.togglePause(), 0, 44);
         this.speedButton = makeButton(this, 890, 740, 100, 36, speedLabel(1), () => this.cycleSpeed(), 0, 44);
-        this.stepButton = makeButton(this, 600, 740, 120, 36, BATTLE.step, () => this.stepOnce(), 0, 44);
+        // Bottom strip (coordinated with the team plates): MENU + STEP dock
+        // left, T0 plate, minimap, T1 plate, then PAUSE + SPEED right.
+        this.stepButton = makeButton(this, 195, 740, 100, 36, BATTLE.step, () => this.stepOnce(), 0, 44);
         this.stepButton.setEnabled(false);
-        makeButton(this, 134, 740, 120, 36, COMMON.menu, () => this.scene.start('Menu'), 0, 44);
+        makeButton(this, 80, 740, 100, 36, COMMON.menu, () => this.scene.start('Menu'), 0, 44);
+        this.buildPlates();
         this.input.on('pointerdown', this.onAnyPointer);
         // Named handlers, removed on shutdown: the keyboard plugin is global
         // and outlives the scene, so anonymous listeners would stack per visit.
@@ -1092,6 +1121,25 @@ export class BattleScene extends Scene {
             // Range-expiry fizzle: a 2-spark shrink-out, no decal.
             this.burst(AX + x, AY + y, COLORS.faintNum, 2, 40, 0);
         }
+    }
+
+    /**
+     * Cooldown sweep dial: dark well + ready-fraction sweep in the team
+     * color, gold ring when ready. The sweep fraction (shape) carries the
+     * state; the pip text alongside keeps the D/E letters + seconds.
+     */
+    private coolDial(g: Phaser.GameObjects.Graphics, x: number, y: number, cd: number, max: number, team: 0 | 1): void {
+        const frac = max <= 0 ? 1 : clamp(1 - cd / max, 0, 1);
+        const ready = cd <= 0;
+        g.fillStyle(0x000000, 0.7);
+        g.fillCircle(x, y, 7);
+        if (frac > 0) {
+            g.fillStyle(ready ? COLORS.gold : teamColor(team), 0.9);
+            g.slice(x, y, 6, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2);
+            g.fillPath();
+        }
+        g.lineStyle(ready ? 2 : 1, ready ? COLORS.gold : COLORS.panelEdge, 1);
+        g.strokeCircle(x, y, 7);
     }
 
     /** True when (tx,ty) sits inside s's sensor cone (victim-centered arcs). */
@@ -1602,17 +1650,30 @@ export class BattleScene extends Scene {
             // Dead names stop persisting: the skull marker takes over.
             const label = this.nameTexts[i] as Phaser.GameObjects.Text;
             label.setVisible((s.alive || throes) && introAlpha > 0.5).setPosition(cx, cy - 40);
-            // Cooldown pips under the chassis; text only re-renders on change.
+            // Cooldown readout under the chassis: sweep dials flank the icons
+            // in dyn; the text keeps the D/E letters + seconds under 3 s.
+            const dashReady = s.dashCd <= 0;
+            const empReady = s.empCd <= 0;
             const pips = this.pipTexts[i] as Phaser.GameObjects.Text;
-            pips.setVisible(plateOn).setPosition(cx, cy + 30);
+            pips.setVisible(plateOn).setPosition(cx, cy + 44);
             if (visible) {
-                const text = cooldownPips(s.dashCd <= 0, s.empCd <= 0);
+                const text = cooldownLabel(s.dashCd, s.empCd);
                 if (text !== this.pipCache[i]) {
                     this.pipCache[i] = text;
                     pips.setText(text);
-                    pips.setColor(s.dashCd <= 0 && s.empCd <= 0 ? '#7de08a' : '#9aa7b4');
+                    pips.setColor(dashReady && empReady ? '#7de08a' : '#9aa7b4');
+                }
+                // Ready pop on the false→true edge (motion-gated).
+                if (!this.reducedMotion && ((dashReady && !this.prevDashReady[i]) || (empReady && !this.prevEmpReady[i]))) {
+                    this.tweens.killTweensOf(pips);
+                    pips.setScale(1.5);
+                    this.tweens.add({ targets: pips, scale: 1, duration: 150, ease: 'Back.easeOut' });
                 }
             }
+            this.prevDashReady[i] = dashReady;
+            this.prevEmpReady[i] = empReady;
+            (this.iconDash[i] as Phaser.GameObjects.Image).setVisible(plateOn).setPosition(cx - 30, cy + 30);
+            (this.iconEmp[i] as Phaser.GameObjects.Image).setVisible(plateOn).setPosition(cx + 30, cy + 30);
         });
         // Bullets from pool (tint only when the slot's team changes).
         // Cur/prev positions feed the dyn-Graphics hot-bullet tracers.
@@ -1735,6 +1796,9 @@ export class BattleScene extends Scene {
                 const tx = cx - 22 + (44 * v) / s.maxHealth;
                 g.lineBetween(tx, cy - 30, tx, cy - 26);
             }
+            // Cooldown sweep dials: dash left, EMP right of the chassis.
+            this.coolDial(g, cx - 13, cy + 30, s.dashCd, DASH_COOLDOWN_TICKS, s.team);
+            this.coolDial(g, cx + 13, cy + 30, s.empCd, EMP_COOLDOWN_TICKS, s.team);
             // Charge cast-bar (bar + white MAX frame, not color-only).
             if (s.charge > 0.05) {
                 g.fillStyle(0x000000, 0.7);
@@ -1889,6 +1953,71 @@ export class BattleScene extends Scene {
             this.lastMapTick = this.match.result.tick;
             this.drawMinimap(snaps, bullets);
         }
+        // Team plates refresh at 4 Hz (every 15 ticks).
+        if (this.match.result.tick - this.lastPlateTick >= 15 || this.match.result.over) {
+            this.lastPlateTick = this.match.result.tick;
+            this.refreshPlates(snaps);
+        }
+    }
+
+    /**
+     * Team plates flanking the minimap: callsign, mini-HP, cooldowns,
+     * loadout code, team totals; dead rows get ✕ + a drawn strike line.
+     * Layout coordinated with the bottom strip (MENU/STEP left, PAUSE/SPEED
+     * right, minimap center): T0 250–380, minimap panel 387–493, T1 500–630.
+     */
+    private buildPlates(): void {
+        this.plateG = this.add.graphics().setDepth(11);
+        for (const team of [0, 1] as const) {
+            const cxp = team === 0 ? 315 : 565;
+            this.add.rectangle(cxp, 738, 130, 60, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(10);
+            const head = this.add.text(cxp, 712, '', FONTS.monoSmall).setOrigin(0.5).setDepth(10);
+            head.setColor(teamCss(team));
+            this.plateHead.push(head);
+            const rows: Phaser.GameObjects.Text[] = [];
+            for (let r = 0; r < 3; r += 1) {
+                rows.push(this.add.text(cxp - 61, 726 + r * 14, '', FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(10));
+            }
+            this.plateRows.push(rows);
+        }
+    }
+
+    private refreshPlates(snaps: RobotSnapshot[]): void {
+        this.plateG.clear();
+        for (const team of [0, 1] as const) {
+            const cxp = team === 0 ? 315 : 565;
+            const members: number[] = [];
+            snaps.forEach((s, i) => {
+                if (s.team === team) members.push(i);
+            });
+            let alive = 0;
+            for (const i of members) {
+                if ((snaps[i] as RobotSnapshot).alive) alive += 1;
+            }
+            (this.plateHead[team] as Phaser.GameObjects.Text).setText(plateTotal(team === 0 ? 1 : 2, alive, members.length));
+            const rows = this.plateRows[team] as Phaser.GameObjects.Text[];
+            rows.forEach((row, r) => {
+                const i = members[r];
+                if (i === undefined) {
+                    row.setVisible(false);
+                    return;
+                }
+                const s = snaps[i] as RobotSnapshot;
+                const skin = this.request.skins[i] as SlotSkin;
+                row.setVisible(true);
+                if (s.alive) {
+                    row.setText(plateRow(skin.callsign, Math.max(s.health, 0) / s.maxHealth, s.dashCd, s.empCd, loadoutCode(this.request.loadouts[i] as SkillLoadout)));
+                    row.setColor(teamCss(team));
+                } else {
+                    row.setText(plateDeadRow(skin.callsign));
+                    row.setColor(COLORS.faint);
+                    // Struck-through dead: a drawn line (Text has no strike).
+                    const y = 726 + r * 14;
+                    this.plateG.lineStyle(1, COLORS.faintNum, 0.9);
+                    this.plateG.lineBetween(cxp - 61, y, cxp + 61, y);
+                }
+            });
+        }
     }
 
     /**
@@ -1985,15 +2114,26 @@ export class BattleScene extends Scene {
         }
         const title = resultsTitle(this.request.pilot === true, result.winner);
         const color = result.winner === -1 ? COLORS.ink : teamCss(result.winner);
-        this.add.rectangle(512, 384, 620, 440, 0x0b0e12, 0.94).setStrokeStyle(2, COLORS.panelEdge).setDepth(20);
-        this.add.text(512, 196, title, { ...FONTS.banner, color }).setOrigin(0.5).setDepth(20);
-        this.add
+        // Results drama: dim → title slam → rows cascade (60 ms) → MVP line
+        // → replay code + buttons. ≤1.2 s total, click-skippable, instant
+        // under reduced motion. Everything is built up front (hidden unless
+        // reduced) and revealed by the timeline or the skip handler.
+        const R = this.reducedMotion;
+        const backdrop = this.add
+            .rectangle(512, 384, 620, 440, 0x0b0e12, R ? 0.94 : 0)
+            .setStrokeStyle(2, COLORS.panelEdge)
+            .setDepth(20);
+        const titleObj = this.add.text(512, R ? 196 : 186, title, { ...FONTS.banner, color }).setOrigin(0.5).setDepth(20);
+        if (!R) titleObj.setScale(1.8).setAlpha(0);
+        const subObj = this.add
             .text(512, 232, resultsSub(this.request.seed, result.tick), FONTS.monoSmall)
             .setOrigin(0.5)
             .setDepth(20);
+        if (!R) subObj.setAlpha(0);
+        let tagObj: Phaser.GameObjects.Text | null = null;
         if (this.exhibition) {
             const parts = [...(this.customMatch ? [BATTLE.customRobotPart] : []), ...modifierCodes(this.request.modifiers)];
-            this.add
+            tagObj = this.add
                 .text(512, 250, exhibitionResultsLine(parts), {
                     ...FONTS.monoSmall,
                     color: COLORS.goldCss,
@@ -2001,7 +2141,7 @@ export class BattleScene extends Scene {
                 .setOrigin(0.5)
                 .setDepth(20);
         } else if (this.request.showcase !== undefined) {
-            this.add
+            tagObj = this.add
                 .text(512, 250, showcaseResultsLine(), {
                     ...FONTS.monoSmall,
                     color: COLORS.goldCss,
@@ -2009,22 +2149,47 @@ export class BattleScene extends Scene {
                 .setOrigin(0.5)
                 .setDepth(20);
         }
+        if (tagObj && !R) tagObj.setAlpha(0);
 
         const snaps = this.match.robotSnapshots;
+        const rowObjs: Phaser.GameObjects.Text[] = [];
         snaps.forEach((s, i) => {
             const y = 274 + i * 30;
             const skin = this.request.skins[i] as SlotSkin;
             const row = resultRow(s.alive, skin.callsign, s.name, s.kills, Math.round(s.damageDealt), s.shotsFired);
-            const code = this.add.text(232, y + 13, s.code, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
+            const x0 = R ? 232 : 220;
+            const code = this.add.text(x0, y + 13, s.code, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
             code.setColor(COLORS.faint);
-            const text = this.add.text(232, y, row, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
+            const text = this.add.text(x0, y, row, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
             text.setColor(s.alive ? teamCss(s.team) : COLORS.faint);
+            if (!R) {
+                code.setAlpha(0);
+                text.setAlpha(0);
+            }
+            rowObjs.push(code, text);
             const hit = this.add.rectangle(512, y, 560, 26).setDepth(20);
             hit.setInteractive({ useHandCursor: true });
             hit.on('pointerdown', () => this.exportRobot(s.id));
         });
         const hintY = 274 + snaps.length * 30;
-        this.add.text(512, hintY, BATTLE.exportHint, FONTS.small).setOrigin(0.5).setDepth(20);
+        // MVP line: most kills, damageDealt tiebreak — trophy icon + text.
+        const mvpIdx = this.computeMvp(snaps);
+        const mvpSnap = snaps[mvpIdx] as RobotSnapshot;
+        const mvpSkin = this.request.skins[mvpIdx] as SlotSkin;
+        const mvpObj = this.add
+            .text(512, hintY, mvpLine(mvpSkin.callsign, mvpSnap.kills, mvpSnap.damageDealt), {
+                ...FONTS.monoSmall,
+                color: COLORS.goldCss,
+            })
+            .setOrigin(0.5)
+            .setDepth(20);
+        const trophy = this.add.image(512 - mvpObj.width / 2 - 14, hintY, uiIconKey('trophy')).setDepth(20);
+        const hintObj = this.add.text(512, hintY + 20, BATTLE.exportHint, FONTS.small).setOrigin(0.5).setDepth(20);
+        if (!R) {
+            mvpObj.setAlpha(0);
+            trophy.setAlpha(0);
+            hintObj.setAlpha(0);
+        }
 
         const code = encodeReplay({
             seed: this.request.seed,
@@ -2034,67 +2199,135 @@ export class BattleScene extends Scene {
             arena: this.request.arena,
             modifiers: this.request.modifiers,
         });
+        let replayObjs: Phaser.GameObjects.GameObject[] = [];
         if (this.customMatch) {
             // The code can't restore imported robots, so don't show one.
-            this.add
-                .text(512, hintY + 26, BATTLE.replayUnavailable, { ...FONTS.monoSmall, color: COLORS.goldCss })
+            const unavail = this.add
+                .text(512, hintY + 44, BATTLE.replayUnavailable, { ...FONTS.monoSmall, color: COLORS.goldCss })
                 .setOrigin(0.5)
                 .setDepth(20);
+            if (!R) unavail.setAlpha(0);
+            replayObjs = [unavail];
         } else {
-            this.showReplayCode(code, hintY);
+            replayObjs = this.showReplayCode(code, hintY + 18, !R);
         }
 
         const showcase = this.request.showcase;
-        if (showcase?.reel) {
-            this.showReelButtons(showcase.reel);
-        } else if (showcase !== undefined) {
-            makeButton(
-                this,
-                412,
-                566,
-                170,
-                44,
-                BATTLE.rematch,
-                () => {
-                    this.scene.restart({
-                        ...this.request,
-                        seed: (Math.random() * 0x7fffffff) | 0,
-                        replay: false,
-                        daily: undefined,
-                        tutorial: undefined,
-                    });
-                },
-                21,
-            );
-            makeButton(this, 612, 566, 170, 44, BATTLE.exitShowcase, () => this.scene.start('Showcase'), 21);
-        } else {
-            makeButton(
-                this,
-                412,
-                566,
-                170,
-                44,
-                BATTLE.rematch,
-                () => {
-                    this.scene.restart({
-                        ...this.request,
-                        seed: (Math.random() * 0x7fffffff) | 0,
-                        replay: false,
-                        daily: undefined,
-                        tutorial: undefined,
-                    });
-                },
-                21,
-            );
-            makeButton(this, 612, 566, 170, 44, COMMON.menu, () => this.scene.start('Menu'), 21);
+        const buildButtons = (): void => {
+            if (showcase?.reel) {
+                this.showReelButtons(showcase.reel);
+            } else if (showcase !== undefined) {
+                makeButton(
+                    this,
+                    412,
+                    566,
+                    170,
+                    44,
+                    BATTLE.rematch,
+                    () => {
+                        this.scene.restart({
+                            ...this.request,
+                            seed: (Math.random() * 0x7fffffff) | 0,
+                            replay: false,
+                            daily: undefined,
+                            tutorial: undefined,
+                        });
+                    },
+                    21,
+                    0,
+                    { tier: 'primary' },
+                );
+                makeButton(this, 612, 566, 170, 44, BATTLE.exitShowcase, () => this.scene.start('Showcase'), 21);
+            } else {
+                makeButton(
+                    this,
+                    412,
+                    566,
+                    170,
+                    44,
+                    BATTLE.rematch,
+                    () => {
+                        this.scene.restart({
+                            ...this.request,
+                            seed: (Math.random() * 0x7fffffff) | 0,
+                            replay: false,
+                            daily: undefined,
+                            tutorial: undefined,
+                        });
+                    },
+                    21,
+                    0,
+                    { tier: 'primary' },
+                );
+                makeButton(this, 612, 566, 170, 44, COMMON.menu, () => this.scene.start('Menu'), 21);
+            }
+        };
+        if (R) {
+            buildButtons();
+            return;
         }
+        // Staged timeline (~0.95 s worst case): any click finishes instantly.
+        let finished = false;
+        let buttonsBuilt = false;
+        const finish = (): void => {
+            if (finished) return;
+            finished = true;
+            this.tweens.killTweensOf([backdrop, titleObj, subObj, ...rowObjs, mvpObj, trophy, hintObj, ...replayObjs]);
+            backdrop.setAlpha(0.94);
+            titleObj.setScale(1).setAlpha(1).setY(196);
+            subObj.setAlpha(1);
+            tagObj?.setAlpha(1);
+            for (const o of rowObjs) o.setAlpha(1).setX(232);
+            mvpObj.setAlpha(1);
+            trophy.setAlpha(1);
+            hintObj.setAlpha(1);
+            for (const o of replayObjs) (o as unknown as { setAlpha: (a: number) => void }).setAlpha(1);
+            if (!buttonsBuilt) {
+                buttonsBuilt = true;
+                buildButtons();
+            }
+        };
+        this.input.once('pointerdown', finish);
+        this.tweens.add({ targets: backdrop, alpha: 0.94, duration: 150, ease: 'Quad.easeOut' });
+        this.tweens.add({ targets: titleObj, scale: 1, alpha: 1, y: 196, duration: 180, delay: 120, ease: 'Cubic.easeIn' });
+        const headliners: Phaser.GameObjects.Text[] = tagObj ? [subObj, tagObj] : [subObj];
+        this.tweens.add({ targets: headliners, alpha: 1, duration: 150, delay: 200 });
+        snaps.forEach((_s, k) => {
+            this.tweens.add({
+                targets: [rowObjs[k * 2] as Phaser.GameObjects.Text, rowObjs[k * 2 + 1] as Phaser.GameObjects.Text],
+                alpha: 1,
+                x: '+=12',
+                duration: 150,
+                delay: 320 + k * 60,
+            });
+        });
+        const tailT = 320 + snaps.length * 60;
+        this.time.delayedCall(tailT, () => {
+            if (!finished) this.tweens.add({ targets: [mvpObj, trophy, hintObj], alpha: 1, duration: 150 });
+        });
+        this.time.delayedCall(tailT + 140, () => {
+            if (finished) return;
+            this.tweens.add({ targets: replayObjs, alpha: 1, duration: 150 });
+            buttonsBuilt = true;
+            buildButtons();
+        });
+    }
+
+    /** MVP: most kills, damageDealt tiebreak (render-side, existing data). */
+    private computeMvp(snaps: RobotSnapshot[]): number {
+        let best = 0;
+        snaps.forEach((s, i) => {
+            const b = snaps[best] as RobotSnapshot;
+            if (s.kills > b.kills || (s.kills === b.kills && s.damageDealt > b.damageDealt)) best = i;
+        });
+        return best;
     }
 
     /** Reel results: NEXT steps the reel, EXIT returns to the showcase. */
     private showReelButtons(reel: { codes: string[]; index: number }): void {
         const hasNext = reel.index + 1 < reel.codes.length;
         if (hasNext) {
-            makeButton(this, 412, 566, 170, 44, COMMON.next, () => this.advanceReel(), 21);
+            makeButton(this, 412, 566, 170, 44, COMMON.next, () => this.advanceReel(), 21, 0, { tier: 'primary' });
         }
         makeButton(this, hasNext ? 612 : 512, 566, 170, 44, BATTLE.exitShowcase, () => this.scene.start('Showcase'), 21);
         // 4 s skippable auto-advance: NEXT jumps ahead immediately, EXIT
@@ -2139,11 +2372,13 @@ export class BattleScene extends Scene {
         } satisfies BattleRequest);
     }
 
-    private showReplayCode(code: string, hintY: number): void {
+    private showReplayCode(code: string, hintY: number, hidden = false): Phaser.GameObjects.GameObject[] {
         const copyLabel = this.add
             .text(512, hintY + 26, BATTLE.replayLabel, FONTS.monoSmall)
             .setOrigin(0.5)
             .setDepth(20);
+        // Copy icon paired with the replay label (icons never stand alone).
+        const icon = this.add.image(512 - copyLabel.width / 2 - 14, hintY + 26, uiIconKey('copy')).setDepth(20);
         const codeText = this.add
             .text(512, hintY + 40, code, { ...FONTS.monoSmall, color: COLORS.goldCss })
             .setOrigin(0.5, 0)
@@ -2158,6 +2393,12 @@ export class BattleScene extends Scene {
                 });
             });
         });
+        if (hidden) {
+            copyLabel.setAlpha(0);
+            icon.setAlpha(0);
+            codeText.setAlpha(0);
+        }
+        return [copyLabel, icon, codeText];
     }
 
     private exportRobot(id: number): void {

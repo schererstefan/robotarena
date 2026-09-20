@@ -23,7 +23,7 @@ import { CHASSIS_V2 } from './art/chassis';
 import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_LAMP_B, DECOR_VENT } from './art/decor';
 import { FLOOR_A, FLOOR_B, FLOOR_C, FLOOR_D } from './art/floor';
 import { BOOM_1, BOOM_2, BOOM_3, BOOM_4, CHARGE_AURA, RING_FX } from './art/fx';
-import { LOGO_BAR, SKILL_ICONS } from './art/menu';
+import { LOGO_BAR, PANEL_TILE, SKILL_ICONS, UI_ICONS } from './art/menu';
 import { validateArt } from './art/validate';
 import { BULLET_CHARGED, BULLET_V2, SPARK_V2, TRACER } from './art/projectiles';
 import { HUB_V2, MUZZLE_V2, TOWER_HEAVY, TOWER_LIGHT, TOWER_TWIN } from './art/towers';
@@ -71,6 +71,9 @@ export function artRegistry(): ArtEntry[] {
     for (const [id, map] of Object.entries(CHASSIS_V2)) entries.push({ key: `chassis_${id}`, map, w: 16, h: 16 });
     for (const [id, map] of Object.entries(WRECKS)) entries.push({ key: `wreck_${id}`, map, w: 16, h: 16 });
     for (const [id, map] of Object.entries(SKILL_ICONS)) entries.push({ key: `skill_${id}`, map: map as PixelMap, w: 8, h: 8 });
+    for (const [id, map] of Object.entries(UI_ICONS)) entries.push({ key: `icon_${id}`, map: map as PixelMap, w: 8, h: 8 });
+    // Reclaimed dead asset (Phase 5): corner chrome for makePanel.
+    entries.push({ key: 'panel_tile', map: PANEL_TILE, w: 16, h: 16 });
     const fixed: Array<[string, PixelMap, number, number]> = [
         ['tower_light', TOWER_LIGHT, 16, 16],
         ['tower_heavy', TOWER_HEAVY, 16, 16],
@@ -532,4 +535,9 @@ export function towerKey(robotId: string): string {
 
 export function skillIconKey(skillId: string): string {
     return `skill_${skillId}`;
+}
+
+/** 8×8 UI icon key (dash/emp/trophy/skull/copy), always paired with text. */
+export function uiIconKey(iconId: string): string {
+    return `icon_${iconId}`;
 }

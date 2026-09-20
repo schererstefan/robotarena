@@ -69,7 +69,7 @@ import {
     type CopyStep,
 } from '../strings';
 import { markTutorialSeen, shouldShowTutorial, TUTORIAL_LINEUP, TUTORIAL_SEED } from '../tutorial';
-import { addTouchHit, makeButton, makePanel, transition, type Button } from '../ui';
+import { addTouchHit, makeButton, makePanel, transition, type Button, type ButtonOpts } from '../ui';
 import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } from '../customize';
 
 export interface BattleRequest {
@@ -129,6 +129,7 @@ export class MenuScene extends Scene {
     private colorButton!: { setLabel: (label: string) => void };
     private motionButton!: { setLabel: (label: string) => void };
     private dailyButton!: { setLabel: (label: string) => void };
+    private dailyDot: Phaser.GameObjects.Arc | null = null;
     private nav!: FocusNav;
     private navBase: NavTarget[] = [];
     private navSlots: NavTarget[] = [];
@@ -184,12 +185,32 @@ export class MenuScene extends Scene {
         this.onlineToken += 1;
         this.nav = new FocusNav(this);
         this.nav.onEscape = () => this.escapeOverlay();
-        this.add.text(CX, 44, APP.title, FONTS.title).setOrigin(0.5);
-        this.add.image(CX - 285, 44, 'logo_bar').setScale(2);
-        this.add.image(CX + 285, 44, 'logo_bar').setScale(2);
+        // Menu hero (zero new art): a drifting floor tileSprite + two
+        // circling chassis silhouettes behind a scrim. Frozen under reduced
+        // motion (static frame, no tweens).
+        const reduced = isReducedMotion();
+        const hero = this.add.tileSprite(CX, 384, 1024, 768, 'floor_big').setDepth(-10).setAlpha(0.5);
+        const silA = this.add.image(-170, 0, chassisKey('hunter')).setScale(4).setTint(0x000000).setAlpha(0.3);
+        const silB = this.add.image(170, 0, chassisKey('orbiter')).setScale(4).setTint(0x000000).setAlpha(0.3);
+        const orbit = this.add.container(CX, 384, [silA, silB]).setDepth(-9);
+        this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.62).setDepth(-5);
+        if (!reduced) {
+            this.tweens.add({ targets: hero, tilePositionX: '+=960', duration: 90000, repeat: -1 });
+            this.tweens.add({ targets: orbit, angle: 360, duration: 24000, repeat: -1 });
+        }
+        const titleObj = this.add.text(CX, 44, APP.title, FONTS.title).setOrigin(0.5);
+        const logoL = this.add.image(CX - 285, 44, 'logo_bar').setScale(2);
+        const logoR = this.add.image(CX + 285, 44, 'logo_bar').setScale(2);
         this.add
             .text(CX, 86, APP.tagline, FONTS.small)
             .setOrigin(0.5);
+        // Staggered title pop, one-shot.
+        if (!reduced) {
+            for (const [obj, delay] of [[logoL, 0], [titleObj, 80], [logoR, 160]] as const) {
+                obj.setScale(obj === titleObj ? 0.8 : 1.6);
+                this.tweens.add({ targets: obj, scale: obj === titleObj ? 1 : 2, duration: 260, delay, ease: 'Back.easeOut' });
+            }
+        }
 
         [1, 2, 3].forEach((size, i) => {
             const btn = this.navButton(CX - 150 + i * 150, 136, 130, 42, '', () => this.setMode(size), 0, 44);
@@ -213,9 +234,10 @@ export class MenuScene extends Scene {
         this.descText = this.add.text(CX - 420, 562, '', FONTS.body).setWordWrapWidth(840);
         this.showDescription(0);
 
-        this.navButton(CX - 290, 684, 270, 50, MENU.randomizeSkins, () => this.randomizeSkins());
-        this.navButton(CX, 684, 270, 50, MENU.startBattle, () => this.startBattle());
-        this.navButton(CX + 290, 684, 270, 50, MENU.pilot, () => this.startPilot());
+        // Single centered primary START; tertiary actions drop to ghost.
+        this.navButton(CX - 290, 684, 270, 50, MENU.randomizeSkins, () => this.randomizeSkins(), 0, 0, { tier: 'ghost' });
+        this.navButton(CX, 684, 270, 50, MENU.startBattle, () => this.startBattle(), 0, 0, { tier: 'primary' });
+        this.navButton(CX + 290, 684, 270, 50, MENU.pilot, () => this.startPilot(), 0, 0, { tier: 'ghost' });
         this.trailsButton = this.navButton(CX - 350, 728, 140, 26, '', () => this.toggleTrails());
         this.muteButton = this.navButton(CX - 210, 728, 140, 26, '', () => this.toggleMute());
         this.navButton(CX - 70, 728, 140, 26, MENU.watchReplay, () => this.openReplayDialog());
@@ -238,6 +260,8 @@ export class MenuScene extends Scene {
             );
         });
         this.dailyButton = this.navButton(CX - 362, 754, 130, 24, '', () => this.startDaily());
+        // DAILY gold dot: today's challenge is still unplayed.
+        this.dailyDot = this.add.circle(CX - 362 - 73, 754, 5, COLORS.gold);
         this.navButton(CX - 218, 754, 130, 24, MENU.tourney, () => this.scene.start('Tournament'));
         this.navButton(CX - 74, 754, 130, 24, MENU.stats, () => this.openStats());
         this.navButton(CX + 74, 754, 130, 24, MENU.workshop, () => this.scene.start('Workshop'));
@@ -327,9 +351,10 @@ export class MenuScene extends Scene {
         onClick: () => void,
         depth = 0,
         minTouch = 0,
+        opts?: ButtonOpts,
     ): Button {
         this.navBase.push({ x, y, w, h, activate: onClick });
-        return makeButton(this, x, y, w, h, label, onClick, depth, minTouch);
+        return makeButton(this, x, y, w, h, label, onClick, depth, minTouch, opts);
     }
 
     private overlayOpen(): boolean {
@@ -429,6 +454,7 @@ export class MenuScene extends Scene {
     private refreshDailyLabel(): void {
         const done = loadDailyBoard().some((entry) => entry.date === dailyDateKey());
         this.dailyButton.setLabel(dailyLabel(done));
+        this.dailyDot?.setVisible(!done);
     }
 
     /** Daily seeded challenge: fixed matchup, date-derived seed. */

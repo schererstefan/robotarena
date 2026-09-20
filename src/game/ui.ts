@@ -32,6 +32,20 @@ export interface Button {
     destroy: () => void;
 }
 
+/** Visual hierarchy: one primary per screen, danger for destructive, ghost for tertiary. */
+export type ButtonTier = 'primary' | 'default' | 'danger' | 'ghost';
+
+export interface ButtonOpts {
+    tier?: ButtonTier;
+}
+
+const TIER_STYLE: Record<ButtonTier, { fill: number; edge: number; hoverFill: number; hoverEdge: number; text: string }> = {
+    primary: { fill: 0x3a2f12, edge: 0xffd23f, hoverFill: 0x4a3c16, hoverEdge: 0xffd23f, text: '#ffd23f' },
+    default: { fill: COLORS.panel, edge: COLORS.panelEdge, hoverFill: COLORS.panelHover, hoverEdge: COLORS.team[0], text: COLORS.ink },
+    danger: { fill: 0x33161a, edge: 0xff5d5d, hoverFill: 0x421b20, hoverEdge: 0xff5d5d, text: '#ff8a8a' },
+    ghost: { fill: COLORS.panel, edge: 0x2b3542, hoverFill: COLORS.panelHover, hoverEdge: 0x7d8b9b, text: COLORS.dim },
+};
+
 export function makeButton(
     scene: Scene,
     x: number,
@@ -42,9 +56,14 @@ export function makeButton(
     onClick: () => void,
     depth = 0,
     minTouch = 0,
+    opts?: ButtonOpts,
 ): Button {
-    const bg = scene.add.rectangle(x, y, w, h, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(depth);
+    const tier = opts?.tier ?? 'default';
+    const style = TIER_STYLE[tier];
+    const bg = scene.add.rectangle(x, y, w, h, style.fill).setStrokeStyle(2, style.edge).setDepth(depth);
+    if (tier === 'ghost') bg.setFillStyle(style.fill, 0.25);
     const text = scene.add.text(x, y, label, FONTS.button).setOrigin(0.5).setDepth(depth);
+    text.setColor(style.text);
     // Touch: pad small buttons up to minTouch with an invisible hit rect on
     // top (same depth, created later). Only use where neighbors leave room —
     // overlapping hit rects would misroute taps to the topmost control.
@@ -53,20 +72,20 @@ export function makeButton(
         hit = scene.add.rectangle(x, y, Math.max(w, minTouch), Math.max(h, minTouch), COLORS.white, 0).setDepth(depth);
     }
     const showHover = (): void => {
-        bg.setFillStyle(COLORS.panelHover);
-        bg.setStrokeStyle(2, COLORS.team[0]);
+        bg.setFillStyle(style.hoverFill, tier === 'ghost' ? 0.6 : 1);
+        bg.setStrokeStyle(2, style.hoverEdge);
         playHover();
     };
     const hideHover = (): void => {
-        bg.setFillStyle(COLORS.panel);
-        bg.setStrokeStyle(2, COLORS.panelEdge);
+        bg.setFillStyle(style.fill, tier === 'ghost' ? 0.25 : 1);
+        bg.setStrokeStyle(2, style.edge);
     };
     // Press state: instant down-tint dip (kept under reduced motion — it is
     // state, not animation) + an 80 ms 0.96→1 scale punch (motion-gated).
     const reduced = isReducedMotion();
     const press = (): void => {
         bg.setFillStyle(COLORS.press);
-        bg.setStrokeStyle(2, COLORS.team[0]);
+        bg.setStrokeStyle(2, style.hoverEdge);
         if (!reduced) {
             scene.tweens.killTweensOf([bg, text]);
             bg.setScale(0.96);
@@ -102,9 +121,13 @@ export function makeButton(
             }
             text.setAlpha(enabled ? 1 : 0.4);
             if (!enabled) {
-                hideHover();
+                // Disabled fill: sunk below every tier's resting fill.
+                bg.setFillStyle(COLORS.press, 1);
+                bg.setStrokeStyle(2, COLORS.panelEdge);
                 bg.setScale(1);
                 text.setScale(1);
+            } else {
+                hideHover();
             }
         },
         destroy: () => {
@@ -131,9 +154,22 @@ export function addTouchHit(
     return hit;
 }
 
-export function makePanel(scene: Scene, x: number, y: number, w: number, h: number): void {
+export function makePanel(scene: Scene, x: number, y: number, w: number, h: number, title?: string): void {
     scene.add.rectangle(x, y, w, h, 0x0b0e12).setStrokeStyle(4, 0x0b0e12);
     scene.add.rectangle(x, y, w - 8, h - 8, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge);
+    // Top highlight + header bar + reclaimed panel_tile corner chrome.
+    scene.add.rectangle(x, y - h / 2 + 6, w - 12, 2, COLORS.white, 0.07);
+    if (title !== undefined) {
+        scene.add.rectangle(x, y - h / 2 + 18, w - 12, 22, COLORS.panelHover).setStrokeStyle(1, COLORS.panelEdge);
+        scene.add.text(x, y - h / 2 + 18, title, FONTS.monoSmall).setOrigin(0.5);
+    }
+    if (scene.textures.exists('panel_tile')) {
+        const cx = w / 2 - 14;
+        const cy = h / 2 - 14;
+        for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
+            scene.add.image(x + sx * cx, y + sy * cy, 'panel_tile').setScale(0.5).setFlipX(sx > 0).setFlipY(sy > 0);
+        }
+    }
 }
 
 /** Best-effort clipboard copy with a legacy execCommand fallback. */
