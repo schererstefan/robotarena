@@ -21,6 +21,7 @@ import { Scene } from 'phaser';
 import { isColorblind, teamColorFor } from './accessibility';
 import { BIG_MUZZLE, RECOIL_A, RECOIL_B, SPAWN_A, SPAWN_B, TREADS_A, TREADS_B } from './art/anim';
 import { CHASSIS_V2 } from './art/chassis';
+import { MENU_BACKDROP } from './art/backdrop';
 import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_LAMP_B, DECOR_VENT } from './art/decor';
 import { FLOOR_A, FLOOR_B, FLOOR_C, FLOOR_D, FLOOR_E, FLOOR_F, FLOOR_G } from './art/floor';
 import { BOOM_1, BOOM_2, BOOM_3, BOOM_4, CHARGE_AURA, RING_FX } from './art/fx';
@@ -100,6 +101,7 @@ export function artRegistry(): ArtEntry[] {
         ['ring_fx', RING_FX, 16, 16],
         ['charge_aura', CHARGE_AURA, 16, 16],
         ['logo_bar', LOGO_BAR, 32, 8],
+        ['menu_backdrop', MENU_BACKDROP, 128, 96],
         ['decor_crate', DECOR_CRATE, 16, 16],
         ['decor_barrel', DECOR_BARREL, 16, 16],
         ['decor_lamp', DECOR_LAMP, 16, 16],

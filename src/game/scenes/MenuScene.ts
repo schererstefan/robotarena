@@ -191,19 +191,13 @@ export class MenuScene extends Scene {
         this.onlineToken += 1;
         this.nav = new FocusNav(this);
         this.nav.onEscape = () => this.escapeOverlay();
-        // Menu hero (zero new art): a drifting floor tileSprite + two
-        // circling chassis silhouettes behind a scrim. Frozen under reduced
-        // motion (static frame, no tweens).
+        // Menu hero: quantized backdrop art (menu_backdrop, 128x96 baked
+        // from docs/art-evidence/menu-backdrop-v1.webp) rendered at 8x for
+        // full-bleed 1024x768, under a scrim for text legibility. Static in
+        // all motion modes (no drift — the art carries the depth).
         const reduced = isReducedMotion();
-        const hero = this.add.tileSprite(CX, 384, 1024, 768, 'floor_big').setDepth(-10).setAlpha(0.5);
-        const silA = this.add.image(-170, 0, chassisKey('hunter')).setScale(4).setTint(0x000000).setAlpha(0.3);
-        const silB = this.add.image(170, 0, chassisKey('orbiter')).setScale(4).setTint(0x000000).setAlpha(0.3);
-        const orbit = this.add.container(CX, 384, [silA, silB]).setDepth(-9);
+        this.add.image(CX, 384, 'menu_backdrop').setScale(8).setDepth(-10);
         this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.62).setDepth(-5);
-        if (!reduced) {
-            this.tweens.add({ targets: hero, tilePositionX: '+=960', duration: 90000, repeat: -1 });
-            this.tweens.add({ targets: orbit, angle: 360, duration: 24000, repeat: -1 });
-        }
         const titleObj = this.add.text(CX, 44, APP.title, FONTS.title).setOrigin(0.5);
         const logoL = this.add.image(CX - 285, 44, 'logo_bar').setScale(2);
         const logoR = this.add.image(CX + 285, 44, 'logo_bar').setScale(2);
