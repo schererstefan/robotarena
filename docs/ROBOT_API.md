@@ -141,10 +141,14 @@ is no way to exceed your loadout's stats.
   `fire: false`. The cooldown gate is unchanged.
 - **Radio** (`radio`): one `{kind, x, y, foe, role, slot, bid}` message per
   tick to your team, delivered 6 ticks late via `sense.inbox`. Kinds:
-  `ping`, `contact`, `claim`, `slot`, `focus`, `ack`. Unknown kinds are
-  dropped, `foe` ids are liveness-checked at send (`-1` = none), and dead
-  robots neither send nor receive (in-flight mail from a robot that dies
-  is dropped). Your own messages are never echoed back.
+  `ping`, `contact`, `claim`, `slot`, `focus`, `ack`. Payloads:
+  `focus{foe}` votes your target, `contact{x,y,foe}` shares a foe
+  position, `claim{role,bid}` bids for a squad role (highest bid wins,
+  ties to the lowest id), `slot{role,slot}` heartbeats a held formation
+  slot; `ping`/`ack` are free-form. Unused fields are `0` (`foe: -1` =
+  none). Unknown kinds are dropped, `foe` ids are liveness-checked at
+  send, and dead robots neither send nor receive (in-flight mail from a
+  robot that dies is dropped). Your own messages are never echoed back.
 
 Application order each tick: brains → radio collect → dash/EMP → move
 assist → drive normalize → turret assist → fire gate → bullets → sudden
@@ -161,6 +165,18 @@ chase. `resolveRoles` settles `claim{role,bid}` mail by sealed-bid
 auction (highest bid wins, ties to the lowest id), and `formationSlot`
 maps a slot index onto ring geometry around an anchor. Hunter votes
 focus, ghost reports contact — read them before rolling your own.
+
+`src/robots/roles.ts` builds squad roles on top: `castClaim` /
+`castSlotHold` send sealed role bids and slot heartbeats,
+`collectClaims` + `myRole` settle the auction from your inbox plus your
+own bid, `latestSlotHold` reads mates' heartbeats, and
+`createRoleTracker` runs the whole loop — claim, incumbency stickiness,
+sparse heartbeats, re-resolve when the live set changes — with
+`roleGoal` mapping a settled role onto a formation slot around the
+target. The one radio slot per tick is shared with focus votes, so
+claims go out only while unsettled and holds every 12 ticks; with no
+allies the tracker idles (1v1 behavior unchanged). Hunter is the
+reference implementation: role drive in the flank band, B2 aim intact.
 
 ## Skills: symmetric loadouts
 
@@ -253,15 +269,18 @@ Modded matches replay exactly via the same replay codes.
 3. **Self-contained.** Import only from `../sim/*`, `./common.ts` (optional
    steering helpers: `aimTurret`, `steerTo`, `throttleFor`, `aimed`,
    `leadAngle`/`leadShot`, `dodgeVector`, `rayClearance`, `toGrid`,
-   `manageCharge`, `createStallTracker`), and `./comms.ts` (team radio:
+   `manageCharge`, `createStallTracker`), `./comms.ts` (team radio:
    `castFocusVote`, `focusTarget`, `castContact`, `latestContact`,
-   `resolveRoles`, `formationSlot`). No Phaser, no DOM, no Node APIs.
+   `resolveRoles`, `formationSlot`), and `./roles.ts` (squad roles:
+   `castClaim`, `castSlotHold`, `collectClaims`, `myRole`,
+   `latestSlotHold`, `createRoleTracker`, `roleGoal`). No Phaser, no DOM,
+   no Node APIs.
    Two refinements: (a) robots loaded through the in-game importer
    (Menu → IMPORT, exhibition only) must be **single-file** — value imports
    cannot be resolved from a blob module, so inline any helpers you need;
    (b) `./brain.ts`, `./genome.ts`, and sibling-robot imports
    (`./hunter`, …) are internal-only: shipped robots are multi-file, user
-   robots stay within `../sim/*` + `./common.ts` + `./comms.ts`.
+   robots stay within `../sim/*` + `./common.ts` + `./comms.ts` + `./roles.ts`.
 4. **No throwing.** Exceptions are caught and your robot idles that tick — but a
    robot that throws constantly is just parked scrap. Guard your math.
 5. **State in closures.** Module-level mutable state is shared across matches;
