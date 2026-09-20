@@ -22,7 +22,7 @@ import { isColorblind, teamColorFor } from './accessibility';
 import { BIG_MUZZLE, RECOIL_A, RECOIL_B, SPAWN_A, SPAWN_B, TREADS_A, TREADS_B } from './art/anim';
 import { CHASSIS_V2 } from './art/chassis';
 import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_LAMP_B, DECOR_VENT } from './art/decor';
-import { FLOOR_A, FLOOR_B, FLOOR_C, FLOOR_D } from './art/floor';
+import { FLOOR_A, FLOOR_B, FLOOR_C, FLOOR_D, FLOOR_E, FLOOR_F, FLOOR_G } from './art/floor';
 import { BOOM_1, BOOM_2, BOOM_3, BOOM_4, CHARGE_AURA, RING_FX } from './art/fx';
 import { LOGO_BAR, PANEL_TILE, SKILL_ICONS, UI_ICONS } from './art/menu';
 import { validateArt } from './art/validate';
@@ -375,6 +375,13 @@ function floorTileAt(tx: number, ty: number): PixelMap {
     const edge = tx < 2 || tx > 57 || ty < 2 || ty > 37;
     if (edge && (tx + ty) % 5 === 0) return FLOOR_C;
     if ((tx * 7 + ty * 13) % 29 === 0) return FLOOR_D;
+    // Low-frequency noise variants E/F/G mixed into the A field.
+    // Deterministic hash of tile coords (no RNG — floor must bake identically every run).
+    const h = (tx * 73856093) ^ (ty * 19349663);
+    const r = ((h % 100) + 100) % 100;
+    if (r < 2) return FLOOR_E;
+    if (r < 4) return FLOOR_F;
+    if (r < 6) return FLOOR_G;
     return FLOOR_A;
 }
 
