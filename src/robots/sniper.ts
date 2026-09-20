@@ -151,9 +151,10 @@ export function createWithParams(overrides?: Partial<SniperParams>): RobotContro
             towerTurn = aimTurret(self.tower, shot, p.turretGain);
             const inRange = foe.distance < self.stats.gunRange;
             const onTarget = aimed(self.tower, shot, p.aimTol);
-            // The longest shots and kiting parting shots wait for a full
-            // bank; otherwise the gun speaks whenever it bears.
-            const holdForBank = foe.distance > self.stats.gunRange * p.bankRangeFrac || rushed;
+            // Only the longest shots wait for a full bank. When rushed,
+            // holding fire for a bank is suicide: snap parting shots
+            // whenever the gun bears instead.
+            const holdForBank = foe.distance > self.stats.gunRange * p.bankRangeFrac && !rushed;
             fire = inRange && onTarget && (!holdForBank || self.charged);
             charge = inRange && !fire ? manageCharge(self.charged, onTarget && !holdForBank) : false;
         }

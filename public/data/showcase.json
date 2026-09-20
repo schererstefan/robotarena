@@ -20,10 +20,10 @@
    },
    "stats": {
     "before": {
-     "wins": 32,
-     "losses": 30,
+     "wins": 30,
+     "losses": 32,
      "draws": 2,
-     "winRate": 0.515625,
+     "winRate": 0.484375,
      "games": 64
     },
     "after": {
@@ -149,10 +149,10 @@
      "games": 64
     },
     "after": {
-     "wins": 54,
-     "losses": 10,
+     "wins": 52,
+     "losses": 12,
      "draws": 0,
-     "winRate": 0.84375,
+     "winRate": 0.8125,
      "games": 64
     }
    },
@@ -264,17 +264,17 @@
    },
    "stats": {
     "before": {
-     "wins": 28,
-     "losses": 36,
+     "wins": 24,
+     "losses": 40,
      "draws": 0,
-     "winRate": 0.4375,
+     "winRate": 0.375,
      "games": 64
     },
     "after": {
-     "wins": 47,
-     "losses": 14,
+     "wins": 45,
+     "losses": 16,
      "draws": 3,
-     "winRate": 0.7578125,
+     "winRate": 0.7265625,
      "games": 64
     }
    },
@@ -326,17 +326,17 @@
    },
    "stats": {
     "before": {
-     "wins": 22,
-     "losses": 42,
+     "wins": 32,
+     "losses": 32,
      "draws": 0,
-     "winRate": 0.34375,
+     "winRate": 0.5,
      "games": 64
     },
     "after": {
-     "wins": 30,
-     "losses": 34,
+     "wins": 33,
+     "losses": 31,
      "draws": 0,
-     "winRate": 0.46875,
+     "winRate": 0.515625,
      "games": 64
     }
    },
@@ -449,17 +449,17 @@
    },
    "stats": {
     "before": {
-     "wins": 17,
-     "losses": 47,
+     "wins": 16,
+     "losses": 48,
      "draws": 0,
-     "winRate": 0.265625,
+     "winRate": 0.25,
      "games": 64
     },
     "after": {
-     "wins": 32,
-     "losses": 32,
+     "wins": 30,
+     "losses": 34,
      "draws": 0,
-     "winRate": 0.5,
+     "winRate": 0.46875,
      "games": 64
     }
    },
