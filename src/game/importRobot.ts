@@ -50,6 +50,10 @@ export function resolveLineupEntry(id: string): RobotEntry {
 
 /** Sprite id for menus/battles: imports reuse a generic scout look. */
 export function displayRobotId(id: string): string {
+    // Hillclimb variants (e.g. hunter-hc1) share base chassis art:
+    // the registry only bakes the 8 base chassis, so map -hcN -> base.
+    const base = id.replace(/-hc\d+$/, "");
+    if (getRobot(base) !== undefined) return base;
     return getRobot(id) !== undefined ? id : 'wanderer';
 }
 
