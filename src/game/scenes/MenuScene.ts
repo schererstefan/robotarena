@@ -18,7 +18,7 @@ import {
     loadHistory,
     winRates,
 } from '../history';
-import { COLORS, FONTS } from '../theme';
+import { COLORS, FONT_STACKS, FONTS } from '../theme';
 import { isColorblind, isReducedMotion, setColorblind, setReducedMotion, teamColor } from '../accessibility';
 import { displayRobotId, getImported, importRobotFromFile, importRobotFromUrl } from '../importRobot';
 import { FocusNav, type NavTarget } from '../nav';
@@ -357,7 +357,7 @@ export class MenuScene extends Scene {
             const x = 92 + col * 96;
             const y = 78 + row * 104;
             panel.add(this.add.image(x, y, key).setScale(4));
-            panel.add(this.add.text(x, y + 44, key, { ...FONTS.monoSmall, fontSize: '10px' }).setOrigin(0.5, 0));
+            panel.add(this.add.text(x, y + 44, key, FONTS.monoSmall).setOrigin(0.5, 0));
         });
         this.artPreview = panel;
     };
@@ -951,19 +951,19 @@ export class MenuScene extends Scene {
         const panel = document.createElement('div');
         panel.style.cssText =
             'background:#141a21;border:2px solid #2b3542;padding:24px;width:440px;max-width:90vw;' +
-            "font-family:Menlo,Consolas,'Courier New',monospace;";
+            `font-family:${FONT_STACKS.body};line-height:1.3;`;
         panel.innerHTML =
-            `<div style="color:#e8edf2;font-size:14px;margin-bottom:12px;">${REPLAY_DIALOG.title}</div>` +
-            `<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">${REPLAY_DIALOG.prompt}</div>` +
+            `<div style="color:#e8edf2;font-size:20px;margin-bottom:12px;">${REPLAY_DIALOG.title}</div>` +
+            `<div style="color:#9aa7b4;font-size:18px;margin-bottom:8px;">${REPLAY_DIALOG.prompt}</div>` +
             `<input type="text" spellcheck="false" placeholder="${REPLAY_DIALOG.placeholder}" ` +
             'style="width:100%;box-sizing:border-box;background:#0b0e12;border:1px solid #2b3542;' +
-            'color:#e8edf2;padding:8px;font-family:inherit;font-size:12px;" />' +
-            '<div class="replay-error" style="color:#ff5d5d;font-size:12px;min-height:18px;margin-top:6px;"></div>' +
+            'color:#e8edf2;padding:8px;font-family:inherit;font-size:18px;" />' +
+            '<div class="replay-error" style="color:#ff5d5d;font-size:18px;min-height:24px;margin-top:6px;"></div>' +
             '<div style="display:flex;gap:8px;margin-top:8px;">' +
             `<button class="replay-watch" style="flex:1;background:${COLORS.panelHoverCss};border:2px solid #ffb340;` +
-            `color:#e8edf2;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${REPLAY_DIALOG.watch}</button>` +
+            `color:#e8edf2;padding:12px;font-family:inherit;font-size:18px;cursor:pointer;">${REPLAY_DIALOG.watch}</button>` +
             '<button class="replay-cancel" style="flex:1;background:#141a21;border:2px solid #2b3542;' +
-            `color:#9aa7b4;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${COMMON.cancel}</button>` +
+            `color:#9aa7b4;padding:12px;font-family:inherit;font-size:18px;cursor:pointer;">${COMMON.cancel}</button>` +
             '</div>';
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
@@ -1033,7 +1033,7 @@ export class MenuScene extends Scene {
         const panel = document.createElement('div');
         panel.style.cssText =
             'background:#141a21;border:2px solid #2b3542;padding:24px;width:460px;max-width:90vw;' +
-            "font-family:Menlo,Consolas,'Courier New',monospace;";
+            `font-family:${FONT_STACKS.body};line-height:1.3;`;
         const slotOptions = this.lineupIds
             .map((id, i) => {
                 const name = getRobot(id)?.meta.name ?? IMPORT_DIALOG.unknownName;
@@ -1041,25 +1041,25 @@ export class MenuScene extends Scene {
             })
             .join('');
         panel.innerHTML =
-            `<div style="color:#e8edf2;font-size:14px;margin-bottom:4px;">${IMPORT_DIALOG.title}</div>` +
-            `<div style="color:${COLORS.goldCss};font-size:12px;margin-bottom:12px;">${IMPORT_DIALOG.warning}</div>` +
-            `<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">${IMPORT_DIALOG.fileLabel}</div>` +
+            `<div style="color:#e8edf2;font-size:20px;margin-bottom:4px;">${IMPORT_DIALOG.title}</div>` +
+            `<div style="color:${COLORS.goldCss};font-size:18px;margin-bottom:12px;">${IMPORT_DIALOG.warning}</div>` +
+            `<div style="color:#9aa7b4;font-size:18px;margin-bottom:8px;">${IMPORT_DIALOG.fileLabel}</div>` +
             '<input type="file" accept=".js,.mjs" class="import-file" ' +
-            'style="width:100%;box-sizing:border-box;color:#e8edf2;font-family:inherit;font-size:12px;margin-bottom:8px;" />' +
-            `<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">${IMPORT_DIALOG.urlLabel}</div>` +
+            'style="width:100%;box-sizing:border-box;color:#e8edf2;font-family:inherit;font-size:18px;margin-bottom:8px;" />' +
+            `<div style="color:#9aa7b4;font-size:18px;margin-bottom:8px;">${IMPORT_DIALOG.urlLabel}</div>` +
             `<input type="text" spellcheck="false" placeholder="${IMPORT_DIALOG.urlPlaceholder}" class="import-url" ` +
             'style="width:100%;box-sizing:border-box;background:#0b0e12;border:1px solid #2b3542;' +
-            'color:#e8edf2;padding:8px;font-family:inherit;font-size:12px;margin-bottom:8px;" />' +
-            `<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">${IMPORT_DIALOG.slotLabel}</div>` +
+            'color:#e8edf2;padding:8px;font-family:inherit;font-size:18px;margin-bottom:8px;" />' +
+            `<div style="color:#9aa7b4;font-size:18px;margin-bottom:8px;">${IMPORT_DIALOG.slotLabel}</div>` +
             `<select class="import-slot" style="width:100%;box-sizing:border-box;background:#0b0e12;border:1px solid #2b3542;` +
-            'color:#e8edf2;padding:8px;font-family:inherit;font-size:12px;margin-bottom:8px;">' +
+            'color:#e8edf2;padding:8px;font-family:inherit;font-size:18px;margin-bottom:8px;">' +
             `${slotOptions}</select>` +
-            '<div class="import-status" style="color:#ff5d5d;font-size:12px;min-height:18px;margin-top:6px;"></div>' +
+            '<div class="import-status" style="color:#ff5d5d;font-size:18px;min-height:24px;margin-top:6px;"></div>' +
             '<div style="display:flex;gap:8px;margin-top:8px;">' +
             `<button class="import-go" style="flex:1;background:${COLORS.panelHoverCss};border:2px solid #ffb340;` +
-            `color:#e8edf2;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${IMPORT_DIALOG.import}</button>` +
+            `color:#e8edf2;padding:12px;font-family:inherit;font-size:18px;cursor:pointer;">${IMPORT_DIALOG.import}</button>` +
             '<button class="import-cancel" style="flex:1;background:#141a21;border:2px solid #2b3542;' +
-            `color:#9aa7b4;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${COMMON.cancel}</button>` +
+            `color:#9aa7b4;padding:12px;font-family:inherit;font-size:18px;cursor:pointer;">${COMMON.cancel}</button>` +
             '</div>';
         overlay.appendChild(panel);
         document.body.appendChild(overlay);

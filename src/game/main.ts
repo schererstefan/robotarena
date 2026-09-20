@@ -35,4 +35,24 @@ const StartGame = (parent: string) => {
     return new Game({ ...config, parent });
 };
 
+/**
+ * Font-ready gate: Phaser canvas text rasterizes glyphs at creation
+ * time, so scenes must boot only after the bundled pixel fonts arrive —
+ * otherwise titles stick in the fallback stack forever. Resolves on a
+ * timeout (and on any error) so boot never hangs on fonts.
+ */
+export async function ensureFontsReady(timeoutMs = 2000): Promise<void> {
+    try {
+        if (typeof document === 'undefined' || document.fonts?.load === undefined) return;
+        const loaded = Promise.all([
+            document.fonts.load('16px "Press Start 2P"'),
+            document.fonts.load('16px "VT323"'),
+        ]).then(() => undefined);
+        const timeout = new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
+        await Promise.race([loaded, timeout]);
+    } catch {
+        // Fall back to the system stacks; the game stays playable.
+    }
+}
+
 export default StartGame;
