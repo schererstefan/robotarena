@@ -12,11 +12,9 @@ import {
     workshopDownloaded,
     workshopSummary,
 } from '../strings';
-import { COLORS, FONTS } from '../theme';
+import { COLORS, FONT_STACKS, FONTS } from '../theme';
 import { copyText, downloadText } from '../ui';
 import { checkRobotSource, suggestFilename, WORKSHOP_TEMPLATE, workshopPassed } from '../workshop';
-
-const MONO = "Menlo,Consolas,'Courier New',monospace";
 
 export class WorkshopScene extends Scene {
     private overlay: HTMLDivElement | null = null;
@@ -59,17 +57,17 @@ export class WorkshopScene extends Scene {
         const panel = document.createElement('div');
         panel.style.cssText =
             'background:#141a21;border:2px solid #2b3542;padding:20px 24px;width:880px;max-width:94vw;' +
-            `max-height:92vh;overflow-y:auto;font-family:${MONO};`;
+            `max-height:92vh;overflow-y:auto;font-family:${FONT_STACKS.body};line-height:1.3;`;
         overlay.appendChild(panel);
         document.body.appendChild(overlay);
         this.overlay = overlay;
 
         const title = document.createElement('div');
-        title.style.cssText = 'color:#e8edf2;font-size:14px;margin-bottom:4px;';
+        title.style.cssText = 'color:#e8edf2;font-size:20px;margin-bottom:4px;';
         title.textContent = WORKSHOP.title;
         panel.appendChild(title);
         const sub = document.createElement('div');
-        sub.style.cssText = 'color:#9aa7b4;font-size:12px;margin-bottom:10px;';
+        sub.style.cssText = 'color:#9aa7b4;font-size:18px;margin-bottom:10px;';
         sub.textContent = WORKSHOP.panelSub;
         panel.appendChild(sub);
 
@@ -78,7 +76,7 @@ export class WorkshopScene extends Scene {
         area.spellcheck = false;
         area.style.cssText =
             'width:100%;box-sizing:border-box;height:300px;background:#0b0e12;border:1px solid #2b3542;' +
-            `color:#e8edf2;padding:12px;font-family:${MONO};font-size:12px;line-height:1.5;` +
+            `color:#e8edf2;padding:12px;font-family:${FONT_STACKS.body};font-size:18px;line-height:1.4;` +
             'white-space:pre;tab-size:4;resize:vertical;';
         // Keep keystrokes (including ESC) inside the editor.
         area.addEventListener('keydown', (event) => event.stopPropagation());
@@ -87,17 +85,17 @@ export class WorkshopScene extends Scene {
         this.area = area;
 
         const summary = document.createElement('div');
-        summary.style.cssText = 'font-size:12px;margin:10px 0 6px;';
+        summary.style.cssText = 'font-size:18px;margin:10px 0 6px;';
         panel.appendChild(summary);
         this.summary = summary;
 
         const checksBox = document.createElement('div');
-        checksBox.style.cssText = 'font-size:12px;margin-bottom:10px;';
+        checksBox.style.cssText = 'font-size:18px;margin-bottom:10px;';
         panel.appendChild(checksBox);
         this.checksBox = checksBox;
 
         const status = document.createElement('div');
-        status.style.cssText = 'color:#9aa7b4;font-size:12px;min-height:18px;margin-bottom:8px;';
+        status.style.cssText = 'color:#9aa7b4;font-size:18px;min-height:24px;margin-bottom:8px;';
         panel.appendChild(status);
         this.status = status;
 
@@ -129,7 +127,7 @@ export class WorkshopScene extends Scene {
         button.style.cssText =
             `flex:1;background:${accent ? COLORS.panelHoverCss : COLORS.panelCss};` +
             `border:2px solid ${accent ? '#ffb340' : '#2b3542'};color:#e8edf2;padding:12px;` +
-            'font-family:inherit;font-size:12px;cursor:pointer;';
+            'font-family:inherit;font-size:18px;cursor:pointer;';
         button.addEventListener('click', () => {
             unlockAudio();
             playClick();
