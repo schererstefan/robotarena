@@ -50,3 +50,53 @@ export function tiebreakWinner(snaps: RobotSnapshot[], a: string, b: string): st
 export function roundName(roundIndex: number, roundCount: number): string {
     return roundNameFor(roundIndex, roundCount);
 }
+
+// ---- Cross-scene session ----------------------------------------------------
+// Bracket matches play out in the Battle scene, which tears down the
+// Tournament scene. The live bracket survives the trip in this store:
+// TournamentScene saves before launching a battle, BattleScene settles the
+// result on match end, and TournamentScene resumes (or finishes) on return.
+
+export interface TournamentSession {
+    size: 4 | 8;
+    entrants: string[];
+    rounds: BracketMatch[][];
+    seedBase: number;
+    matchCounter: number;
+}
+
+let session: TournamentSession | null = null;
+
+/** Deep-copied save: later scene edits never alias the stored bracket. */
+export function saveTournamentSession(next: TournamentSession): void {
+    session = {
+        size: next.size,
+        entrants: [...next.entrants],
+        rounds: next.rounds.map((round) => round.map((slot) => ({ ...slot }))),
+        seedBase: next.seedBase,
+        matchCounter: next.matchCounter,
+    };
+}
+
+/** Live stored reference (or null); callers restore then re-save on change. */
+export function loadTournamentSession(): TournamentSession | null {
+    return session;
+}
+
+export function clearTournamentSession(): void {
+    session = null;
+}
+
+/**
+ * Record a watched battle into the stored bracket. Idempotent per slot:
+ * a re-settle (rematch replayed the same slot) keeps the first result.
+ */
+export function settleTournamentMatch(round: number, index: number, winner: string, draw: boolean, ticks: number): void {
+    const stored = session;
+    if (!stored) return;
+    const slot = stored.rounds[round]?.[index];
+    if (!slot || slot.winner) return;
+    slot.winner = winner;
+    slot.draw = draw;
+    slot.ticks = ticks;
+}

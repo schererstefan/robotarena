@@ -33,6 +33,7 @@ import { bulletColor, isReducedMotion, teamColor, teamCss } from '../accessibili
 import { recordDailyResult, recordMatch } from '../history';
 import { displayRobotId, isImportedId, resolveLineupEntry } from '../importRobot';
 import { createPilotController, PilotInput } from '../pilot';
+import { settleTournamentMatch, tiebreakWinner } from '../tournament';
 import {
     BATTLE,
     battleTutorialTitle,
@@ -64,6 +65,8 @@ import {
     showcaseResultsLine,
     showcaseTag,
     speedLabel,
+    TOURNAMENT,
+    tournamentTag,
     tsFilename,
     type CopyStep,
 } from '../strings';
@@ -613,6 +616,8 @@ export class BattleScene extends Scene {
         else if (this.request.showcase !== undefined) {
             const reel = this.request.showcase.reel;
             tags.push(showcaseTag(reel ? reel.index : null, reel ? reel.codes.length : 0));
+        } else if (this.request.tournament !== undefined) {
+            tags.push(tournamentTag(this.request.tournament.label));
         }
         if (this.exhibition) {
             const parts = [...(this.customMatch ? [BATTLE.tagCustom] : []), ...modifierCodes(this.request.modifiers)];
@@ -661,7 +666,12 @@ export class BattleScene extends Scene {
         // left, T0 plate, minimap, T1 plate, then PAUSE + SPEED right.
         this.stepButton = makeButton(this, 195, 740, 100, 36, BATTLE.step, () => this.stepOnce(), 0, 44);
         this.stepButton.setEnabled(false);
-        makeButton(this, 80, 740, 100, 36, COMMON.menu, () => this.scene.start('Menu'), 0, 44);
+        if (this.request.tournament !== undefined) {
+            // Abandon the battle: the unsettled slot stays open on the bracket.
+            makeButton(this, 80, 740, 100, 36, TOURNAMENT.bracket, () => this.scene.start('Tournament'), 0, 44);
+        } else {
+            makeButton(this, 80, 740, 100, 36, COMMON.menu, () => this.scene.start('Menu'), 0, 44);
+        }
         this.buildPlates();
         this.input.on('pointerdown', this.onAnyPointer);
         // Named handlers, removed on shutdown: the keyboard plugin is global
@@ -2351,6 +2361,17 @@ export class BattleScene extends Scene {
                 seed: this.request.seed,
             });
         }
+        // Tournament battles settle into the stored bracket here (not on
+        // button press) so MENU/BRACKET can't drop a watched result. Draws
+        // use the same damage tiebreak as headless settling.
+        const tourney = this.request.tournament;
+        if (tourney !== undefined) {
+            const idA = this.request.lineupIds[0] ?? '';
+            const idB = this.request.lineupIds[1] ?? '';
+            const winner =
+                result.winner === 0 ? idA : result.winner === 1 ? idB : tiebreakWinner(this.match.robotSnapshots, idA, idB);
+            settleTournamentMatch(tourney.round, tourney.index, winner, result.winner !== 0 && result.winner !== 1, result.tick);
+        }
         stopMusic();
         if (result.winner === -1) {
             playDraw();
@@ -2482,7 +2503,18 @@ export class BattleScene extends Scene {
         };
         const buildButtons = (): void => {
             this.resultsReady = true;
-            if (showcase?.reel) {
+            if (tourney !== undefined) {
+                const toBracket = (): void => {
+                    this.scene.start('Tournament');
+                };
+                makeButton(this, 412, 566, 170, 44, COMMON.next, () => this.scene.start('Tournament', { autoWatch: true }), 21, 0, {
+                    tier: 'primary',
+                });
+                makeButton(this, 612, 566, 170, 44, TOURNAMENT.bracket, toBracket, 21);
+                this.resultsPrimary = () => this.scene.start('Tournament', { autoWatch: true });
+                this.resultsSecondary = toBracket;
+                hintKeys(resultsKeysHint(COMMON.next, TOURNAMENT.bracket));
+            } else if (showcase?.reel) {
                 this.showReelButtons(showcase.reel);
             } else if (showcase !== undefined) {
                 makeButton(this, 412, 566, 170, 44, BATTLE.rematch, doRematch, 21, 0, { tier: 'primary' });

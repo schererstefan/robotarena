@@ -95,6 +95,12 @@ export interface BattleRequest {
      * without it the battle is a single showcase watch or VS compare.
      */
     showcase?: { botId: string; reel?: { codes: string[]; index: number } };
+    /**
+     * Tournament bracket slot. The result settles into the stored bracket
+     * on match end; results offer NEXT (auto-watch) and BRACKET. Recorded
+     * in history like any bot-vs-bot battle.
+     */
+    tournament?: { round: number; index: number; label: string };
 }
 
 const CX = 512;

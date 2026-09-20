@@ -440,6 +440,11 @@ export function showcaseTag(index: number | null, total: number): string {
     return index === null ? BATTLE.tagShowcase : `${BATTLE.tagShowcase} ${index + 1}/${total}`;
 }
 
+/** HUD tag for a tournament battle ("TOURNEY SEMIFINAL 1/2"). */
+export function tournamentTag(label: string): string {
+    return `TOURNEY ${label}`;
+}
+
 /** Results caption for showcase battles (never recorded, like replays). */
 export function showcaseResultsLine(): string {
     return `${BATTLE.tagShowcase} - NOT RECORDED`;
@@ -587,11 +592,14 @@ export function resultRow(
 
 export const TOURNAMENT = {
     title: 'TOURNAMENT',
-    subtitle: 'single elimination - bots only, headless sim',
+    subtitle: 'single elimination - watch every battle',
     sizeLabels: ['4 BOTS', '8 BOTS'],
     run: 'RUN TOURNAMENT',
     runAgain: 'RUN AGAIN',
     lineup: 'LINEUP',
+    watchNext: 'WATCH NEXT',
+    simRest: 'SIM REST',
+    bracket: 'BRACKET',
     roundFinal: 'FINAL',
     roundSemifinal: 'SEMIFINAL',
     roundQuarterfinal: 'QUARTERFINAL',

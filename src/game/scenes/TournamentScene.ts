@@ -1,12 +1,14 @@
 // Tournament scene: single-elim bracket (4/8 bots) of bot-vs-bot matches.
-// Matches run headless in the client with a capped tick budget per frame so
-// the UI stays responsive; the bracket redraws as each match settles.
+// Each match plays out visibly in the Battle scene; the live bracket rides
+// in the tournament session store across the transition. SIM REST settles
+// the remaining matches headless for a quick result.
 
 import { Scene } from 'phaser';
 import { getRobot, ROBOTS } from '../../robots/registry';
 import { Match } from '../../sim/engine';
 import { loadoutCode } from '../../sim/skills';
 import { unlockAudio, playClick, toggleMuted } from '../audio';
+import { CALLSIGNS, defaultSkin } from '../customize';
 import {
     bracketedLabel,
     bracketResultText,
@@ -18,12 +20,20 @@ import {
     tourneySeedLabel,
 } from '../strings';
 import { COLORS, FONTS } from '../theme';
-import { initialRound, nextRound, roundName, tiebreakWinner, type BracketMatch } from '../tournament';
+import {
+    clearTournamentSession,
+    initialRound,
+    loadTournamentSession,
+    nextRound,
+    roundName,
+    saveTournamentSession,
+    tiebreakWinner,
+    type BracketMatch,
+} from '../tournament';
 import { transition } from '../ui';
+import type { BattleRequest } from './MenuScene';
 
 const CX = 512;
-/** Headless sim budget per frame: a full 8-bot bracket settles in seconds. */
-const TICKS_PER_FRAME = 300;
 const DEFAULT_8 = ['rusher', 'turret', 'orbiter', 'wanderer', 'hunter', 'rusher', 'turret', 'orbiter'];
 
 interface LiveMatch {
@@ -45,9 +55,15 @@ export class TournamentScene extends Scene {
     private bracketObjects: Phaser.GameObjects.GameObject[] = [];
     private sizeButtons: Array<{ setLabel: (label: string) => void }> = [];
     private statusText: Phaser.GameObjects.Text | null = null;
+    private autoWatch = false;
+    private pendingAutoWatch = false;
 
     constructor() {
         super('Tournament');
+    }
+
+    init(data?: { autoWatch?: boolean }): void {
+        this.autoWatch = data?.autoWatch === true;
     }
 
     create(): void {
@@ -63,7 +79,10 @@ export class TournamentScene extends Scene {
         this.bracketObjects = [];
         this.sizeButtons = [];
         this.statusText = null;
-        this.buildSetup();
+        this.pendingAutoWatch = false;
+        if (!this.resumeSession()) {
+            this.buildSetup();
+        }
         this.input.on('pointerdown', this.onAnyPointer);
         this.input.keyboard?.on('keydown-M', this.onMuteKey);
         this.events.once('shutdown', () => {
@@ -72,16 +91,11 @@ export class TournamentScene extends Scene {
     }
 
     update(): void {
-        if (this.mode !== 'running' || !this.live) return;
-        let steps = 0;
-        while (steps < TICKS_PER_FRAME && !this.live.match.result.over) {
-            this.live.match.step();
-            steps += 1;
-        }
-        if (this.live.match.result.over) {
-            this.settleLive();
-        } else {
-            this.statusText?.setText(this.liveStatus(this.live.match.result.tick));
+        // NEXT auto-watches from the results screen: launch one frame after
+        // the bracket rebuild so the scene transition happens outside create.
+        if (this.pendingAutoWatch) {
+            this.pendingAutoWatch = false;
+            if (this.mode === 'running') this.watchPending();
         }
     }
 
@@ -195,14 +209,110 @@ export class TournamentScene extends Scene {
     }
 
     // ---- Bracket run ------------------------------------------------------
+    /** Restore a live bracket after a watched battle (or menu detour). */
+    private resumeSession(): boolean {
+        const stored = loadTournamentSession();
+        if (!stored) return false;
+        this.size = stored.size;
+        this.entrants = [...stored.entrants];
+        this.rounds = stored.rounds;
+        this.seedBase = stored.seedBase;
+        this.matchCounter = stored.matchCounter;
+        this.mode = 'running';
+        this.live = null;
+        this.ensureNextRound();
+        if (!this.pendingSlot()) {
+            this.mode = 'done';
+            clearTournamentSession();
+        } else {
+            this.pendingAutoWatch = this.autoWatch;
+        }
+        this.rebuildBracket();
+        return true;
+    }
+
+    private saveSession(): void {
+        saveTournamentSession({
+            size: this.size,
+            entrants: [...this.entrants],
+            rounds: this.rounds,
+            seedBase: this.seedBase,
+            matchCounter: this.matchCounter,
+        });
+    }
+
+    /** Total rounds for the bracket size (labels stay put as rounds fill). */
+    private totalRounds(): number {
+        return this.size === 8 ? 3 : 2;
+    }
+
+    /** First unsettled slot across existing rounds (rounds fill in order). */
+    private pendingSlot(): { round: number; index: number } | null {
+        for (let r = 0; r < this.rounds.length; r += 1) {
+            const round = this.rounds[r] as BracketMatch[];
+            const index = round.findIndex((m) => !m.winner);
+            if (index >= 0) return { round: r, index };
+        }
+        return null;
+    }
+
+    /** Pair the next round once the last one settles (watch path). */
+    private ensureNextRound(): void {
+        const last = this.rounds[this.rounds.length - 1];
+        if (!last || last.length === 0 || !last.every((m) => m.winner)) return;
+        const next = nextRound(last);
+        if (next) {
+            this.rounds.push(next);
+            this.saveSession();
+        }
+    }
+
     private startTournament(): void {
         this.clearSetup();
         this.mode = 'running';
         this.seedBase = (Math.random() * 0x7fffffff) | 0;
         this.matchCounter = 0;
         this.rounds = [initialRound([...this.entrants])];
-        this.startMatch(0, 0);
-        this.rebuildBracket();
+        this.saveSession();
+        this.watchPending();
+    }
+
+    /** Launch the next unsettled match visibly in the Battle scene. */
+    private watchPending(): void {
+        const slot = this.pendingSlot();
+        if (!slot || this.mode !== 'running') return;
+        const match = (this.rounds[slot.round] as BracketMatch[])[slot.index] as BracketMatch;
+        const round = this.rounds[slot.round] as BracketMatch[];
+        const lineupIds = [match.a, match.b];
+        const seed = (this.seedBase + this.matchCounter * 0x9e3779b9) >>> 0;
+        this.matchCounter += 1;
+        this.saveSession();
+        this.scene.start('Battle', {
+            teamSize: 1,
+            lineupIds,
+            loadouts: lineupIds.map((id) => ({ ...(getRobot(id)?.loadout ?? {}) })),
+            skins: lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i, (i < 1 ? 0 : 1) as 0 | 1)),
+            trails: true,
+            seed,
+            arena: 'open',
+            modifiers: {},
+            tournament: {
+                round: slot.round,
+                index: slot.index,
+                label: `${roundName(slot.round, this.totalRounds())} ${slot.index + 1}/${round.length}`,
+            },
+        } satisfies BattleRequest);
+    }
+
+    /** Settle every remaining match headless (keeps the old instant path). */
+    private simRest(): void {
+        const slot = this.pendingSlot();
+        if (!slot || this.mode !== 'running') return;
+        this.startMatch(slot.round, slot.index);
+        while (this.mode === 'running' && this.live) {
+            this.live.match.runToEnd();
+            this.settleLive();
+        }
     }
 
     private startMatch(round: number, index: number): void {
@@ -250,6 +360,7 @@ export class TournamentScene extends Scene {
                 this.startMatch(this.rounds.length - 1, 0);
             } else {
                 this.mode = 'done';
+                clearTournamentSession();
             }
         }
         this.rebuildBracket();
@@ -259,7 +370,7 @@ export class TournamentScene extends Scene {
         const live = this.live;
         if (!live) return '';
         const round = this.rounds[live.round] as BracketMatch[];
-        return liveStatusText(roundName(live.round, this.rounds.length), live.index, round.length, tick);
+        return liveStatusText(roundName(live.round, this.totalRounds()), live.index, round.length, tick);
     }
 
     private champion(): string | null {
@@ -305,7 +416,7 @@ export class TournamentScene extends Scene {
 
         this.rounds.forEach((round, r) => {
             const x = columns[r] as number;
-            this.trackBracket(this.add.text(x, 108, roundName(r, this.rounds.length), FONTS.monoSmall).setOrigin(0.5));
+            this.trackBracket(this.add.text(x, 108, roundName(r, this.totalRounds()), FONTS.monoSmall).setOrigin(0.5));
             round.forEach((slot, i) => {
                 const pos = (positions[r] as Array<{ x: number; y: number }>)[i] as { x: number; y: number };
                 const isLive = this.live !== null && this.live.round === r && this.live.index === i;
@@ -364,6 +475,10 @@ export class TournamentScene extends Scene {
                 this.mode = 'setup';
                 this.buildSetup();
             });
+            this.bracketButton(CX + 240, 726, 200, 36, COMMON.menu, () => this.scene.start('Menu'));
+        } else if (this.pendingSlot()) {
+            this.bracketButton(CX - 240, 726, 200, 36, TOURNAMENT.watchNext, () => this.watchPending());
+            this.bracketButton(CX, 726, 200, 36, TOURNAMENT.simRest, () => this.simRest());
             this.bracketButton(CX + 240, 726, 200, 36, COMMON.menu, () => this.scene.start('Menu'));
         } else {
             this.bracketButton(CX, 726, 200, 36, COMMON.menu, () => this.scene.start('Menu'));
