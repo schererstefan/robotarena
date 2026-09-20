@@ -2847,10 +2847,25 @@ console.log('comms');
     check('survivors re-resolve distinct roles', trioRoles[0] !== null && trioRoles[1] !== null && trioRoles[0] !== trioRoles[1], `roles=${JSON.stringify(trioRoles)}`);
     const solo = createRoleTracker().update({ tick: 0, self: { id: 0, x: 200, y: 300 }, allies: [], inbox: [] });
     check('tracker idles in 1v1', solo.role === null && solo.radio === null);
-    const goalFoe = roleGoal({ self: { x: 480, y: 320 }, allies: [], foes: [{ x: 600, y: 320, distance: 120 }] }, ROLE_POINT, 3, 170);
+    const goalFoe = roleGoal({ self: { id: 0, x: 480, y: 320 }, allies: [], foes: [{ id: 3, x: 600, y: 320, distance: 120 }], inbox: [] }, ROLE_POINT, 3, 170);
     check('slot goal rings the foe', Math.abs(goalFoe.x - 600) < 0.001 && Math.abs(goalFoe.y - 150) < 0.001);
-    const goalBlind = roleGoal({ self: { x: 400, y: 320 }, allies: [{ x: 560, y: 320 }], foes: [] }, 1, 3, 170);
+    const goalBlind = roleGoal({ self: { id: 0, x: 400, y: 320 }, allies: [{ id: 1, x: 560, y: 320 }], foes: [], inbox: [] }, 1, 3, 170);
     check('blind slot goal rings the team centroid', Math.abs(goalBlind.x - 627.224) < 0.01 && Math.abs(goalBlind.y - 405) < 0.01);
+    const goalVoted = roleGoal(
+        {
+            self: { id: 0, x: 480, y: 320 },
+            allies: [{ id: 1, x: 500, y: 320 }],
+            foes: [
+                { id: 5, x: 600, y: 320, distance: 120 },
+                { id: 7, x: 480, y: 480, distance: 160 },
+            ],
+            inbox: [ballot(1, 7)],
+        },
+        ROLE_POINT,
+        3,
+        170,
+    );
+    check('slot goal anchors the voted foe', Math.abs(goalVoted.x - 480) < 0.001 && Math.abs(goalVoted.y - 310) < 0.001);
     // Wired bots: hunter votes reach a mate, ghost contacts reach a mate.
     const wiredLog: MailboxEntry[] = [];
     const wiredHunter = new Match(

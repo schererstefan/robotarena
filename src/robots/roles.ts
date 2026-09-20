@@ -30,7 +30,7 @@
 // will settle different maps.
 
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
-import { formationSlot, resolveRoles, type RoleBid } from './comms';
+import { focusTarget, formationSlot, resolveRoles, type RoleBid } from './comms';
 import type { InboxMessage, OutboxMessage } from '../sim/types';
 
 /** Trio role ids: point leads, wings take the flank slots. */
@@ -163,9 +163,10 @@ export interface RoleSense {
 
 /** Narrow sense surface for slot goals (SenseState is assignable). */
 export interface RoleGoalSense {
-    self: { x: number; y: number };
-    allies: Array<{ x: number; y: number }>;
-    foes: Array<{ x: number; y: number; distance: number }>;
+    self: { id: number; x: number; y: number };
+    allies: Array<{ id: number; x: number; y: number }>;
+    foes: Array<{ id: number; x: number; y: number; distance: number }>;
+    inbox: InboxMessage[];
 }
 
 /**
@@ -289,8 +290,12 @@ export function createRoleTracker(opts?: RoleTrackerOptions): RoleTracker {
 
 /**
  * Where role `role` should stand this tick: formation slot `role` of
- * `slots` around the nearest visible foe, or around the live-team
- * centroid while blind (shared knowledge, so blind mates cohere).
+ * `slots` around the team's focus-vote target when it is in the caller's
+ * own cone (a shared anchor, so mates ring the same foe instead of each
+ * chasing its own nearest), else around the nearest visible foe, else
+ * around the live-team centroid while blind (shared knowledge, so blind
+ * mates cohere). Own-cone confirmation still gates firing — this only
+ * steadies the formation anchor.
  */
 export function roleGoal(
     sense: RoleGoalSense,
@@ -301,12 +306,19 @@ export function roleGoal(
     let anchorX = sense.self.x;
     let anchorY = sense.self.y;
     if (sense.foes.length > 0) {
-        let nearest = sense.foes[0] as { x: number; y: number; distance: number };
+        let anchor = sense.foes[0] as RoleGoalSense['foes'][number];
         for (const foe of sense.foes) {
-            if (foe.distance < nearest.distance) nearest = foe;
+            if (foe.distance < anchor.distance) anchor = foe;
         }
-        anchorX = nearest.x;
-        anchorY = nearest.y;
+        if (sense.inbox.length > 0) {
+            const liveSenders = new Set(sense.allies.map((a) => a.id));
+            liveSenders.add(sense.self.id);
+            const voted = focusTarget(sense.inbox, liveSenders, new Set(sense.foes.map((f) => f.id)));
+            const votedFoe = voted !== null ? sense.foes.find((f) => f.id === voted) : undefined;
+            if (votedFoe !== undefined) anchor = votedFoe;
+        }
+        anchorX = anchor.x;
+        anchorY = anchor.y;
     } else {
         const xs = [sense.self.x, ...sense.allies.map((a) => a.x)];
         const ys = [sense.self.y, ...sense.allies.map((a) => a.y)];
