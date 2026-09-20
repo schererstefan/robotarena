@@ -573,7 +573,7 @@ export const WORKSHOP_CHECKS = {
         label: 'exports a create() factory',
     },
     intentShape: {
-        label: 'update returns an Intent (throttle/turn/towerTurn/fire/charge)',
+        label: 'update returns known Intent fields only (all optional)',
     },
     imports: {
         label: 'imports only sim helpers (../sim/*, ./common)',

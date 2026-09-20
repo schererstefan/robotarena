@@ -21,8 +21,8 @@ import {
     winRates,
 } from '../src/game/history';
 import { ROBOTS } from '../src/robots/registry';
-import { computeStats, loadoutCode, loadoutCost, sanitizeLoadout, type SkillLoadout } from '../src/sim/skills';
-import type { Intent, RobotController, SenseState } from '../src/sim/types';
+import { computeStats, loadoutCode, loadoutCost, sanitizeLoadout, SKILL_DEFS, type SkillLoadout } from '../src/sim/skills';
+import { ROBOT_API_VERSION, type Intent, type RobotController, type SenseState } from '../src/sim/types';
 import { initialRound, nextRound, roundName, tiebreakWinner } from '../src/game/tournament';
 
 let failures = 0;
@@ -44,11 +44,7 @@ function runMatch(ids: string[], teams: Array<0 | 1>, seed: number, loadouts?: S
         return { team: teams[i] as 0 | 1, controller: entry.create(), loadout: { ...loadout } };
     });
     const match = new Match(lineups, seed, { arena, modifiers });
-    let guard = 0;
-    while (!match.result.over && guard <= MAX_TICKS_TOTAL + 10) {
-        match.step();
-        guard += 1;
-    }
+    match.runToEnd();
     return match;
 }
 
@@ -107,6 +103,31 @@ console.log('clamping');
     }
     check('garbage intents do not crash the match', match.result.tick > 0);
     check(`per-tick displacement within physics (max ${maxStep.toFixed(2)})`, maxStep <= MAX_SPEED * DT + 2.5);
+
+    // Optional-with-default: a bare `{}` must behave exactly like explicit
+    // zeros, and a partial `{ fire: true }` like its expanded form.
+    const entry = ROBOTS[0];
+    if (!entry) throw new Error('no robots registered');
+    const duel = (update: () => Intent): Match => {
+        const m = new Match(
+            [
+                { team: 0, controller: { meta: entry.meta, update } },
+                { team: 1, controller: entry.create(), loadout: { ...entry.loadout } },
+            ],
+            7,
+        );
+        m.runToEnd();
+        return m;
+    };
+    const bare = duel(() => ({}));
+    const explicit = duel(() => ({ throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false }));
+    check('bare {} intent finishes the match', bare.result.over);
+    check('bare {} equals explicit zeros', fingerprint(bare) === fingerprint(explicit));
+    const snap = duel(() => ({ fire: true }));
+    const snapFull = duel(() => ({ throttle: 0, turn: 0, towerTurn: 0, fire: true, charge: false }));
+    check('partial intent equals its expanded form', fingerprint(snap) === fingerprint(snapFull));
+    const nil = duel(() => undefined as unknown as Intent);
+    check('undefined intent idles safely', nil.result.over && nil.result.tick > 0);
 }
 
 // --- 3. Error isolation: throwing robots idle instead of killing the match --
@@ -588,11 +609,99 @@ console.log('actives');
     check('hooked bots trigger actives in-match', sawCooldown);
 }
 
+// --- 4c. Contract hardening: API version, runToEnd, catalog ceilings, perf --
+console.log('contract');
+{
+    check('robot API version exports as 1', ROBOT_API_VERSION === 1);
+    check(
+        'skill catalog within the 15-skill codec ceiling',
+        SKILL_DEFS.length <= 15,
+        `${SKILL_DEFS.length}/15 skills`,
+    );
+    check(
+        'every skill rank within the 3-rank codec ceiling',
+        SKILL_DEFS.every((def) => def.maxRank <= 3),
+        `max=${Math.max(...SKILL_DEFS.map((def) => def.maxRank))}`,
+    );
+
+    const hunterEntry = ROBOTS.find((r) => r.meta.id === 'hunter');
+    const orbiterEntry = ROBOTS.find((r) => r.meta.id === 'orbiter');
+    if (!hunterEntry || !orbiterEntry) throw new Error('missing hunter/orbiter');
+    const fresh = (): Match =>
+        new Match(
+            [
+                { team: 0, controller: hunterEntry.create(), loadout: { ...hunterEntry.loadout } },
+                { team: 1, controller: orbiterEntry.create(), loadout: { ...orbiterEntry.loadout } },
+            ],
+            11,
+        );
+    const ended = fresh();
+    ended.runToEnd();
+    check('runToEnd finishes the match', ended.result.over);
+    const capped = fresh();
+    capped.runToEnd(10);
+    check('runToEnd respects maxGuard', !capped.result.over && capped.result.tick === 11, `tick=${capped.result.tick}`);
+
+    // Perf gate (wall-clock, tests+review only — never enforced in-engine,
+    // where timing would break determinism). Each bot duels hunter for 900
+    // ticks after a 60-tick JIT warmup; only the bot's own update() calls
+    // are timed. Mean budget 0.1 ms; any single tick above 10 ms is a
+    // pathological spike, not a slow machine (GC pauses stay well under it).
+    const MEAN_BUDGET_MS = 0.1;
+    const SPIKE_BUDGET_MS = 10;
+    let worstMean = 0;
+    let worstMeanId = '';
+    let worstSpike = 0;
+    let worstSpikeId = '';
+    for (const bot of ROBOTS) {
+        const inner = bot.create();
+        const samples: number[] = [];
+        let ticks = 0;
+        const timed: RobotController = {
+            ...inner,
+            update: (sense: SenseState): Intent => {
+                const start = performance.now();
+                const out = inner.update(sense);
+                ticks += 1;
+                if (ticks > 60) samples.push(performance.now() - start);
+                return out;
+            },
+        };
+        const duel = new Match(
+            [
+                { team: 0, controller: timed, loadout: { ...bot.loadout } },
+                { team: 1, controller: hunterEntry.create(), loadout: { ...hunterEntry.loadout } },
+            ],
+            5,
+        );
+        for (let i = 0; i < 960 && !duel.result.over; i += 1) duel.step();
+        const mean = samples.reduce((sum, s) => sum + s, 0) / Math.max(1, samples.length);
+        const spike = samples.reduce((max, s) => Math.max(max, s), 0);
+        if (mean > worstMean) {
+            worstMean = mean;
+            worstMeanId = bot.meta.id;
+        }
+        if (spike > worstSpike) {
+            worstSpike = spike;
+            worstSpikeId = bot.meta.id;
+        }
+    }
+    check(
+        `per-robot mean update under 0.1 ms (worst ${worstMeanId} ${worstMean.toFixed(4)} ms)`,
+        worstMean < MEAN_BUDGET_MS,
+    );
+    check(
+        `no single-tick spike above 10 ms (worst ${worstSpikeId} ${worstSpike.toFixed(2)} ms)`,
+        worstSpike < SPIKE_BUDGET_MS,
+    );
+}
+
 // --- 5. Soak: 1v1 round-robin, 2v2, 3v3 (every arena) -----------------------
 console.log('soak');
 {
     const ids = ROBOTS.map((r) => r.meta.id);
     const seeds = [11, 22, 33];
+    console.log(`       baseline: ${ids.length} bots x ${seeds.length} seeds x ${ARENA_IDS.length} arenas (counts dynamic)`);
     let games = 0;
     let totalErrors = 0;
     for (const arena of ARENA_IDS) {
@@ -1023,6 +1132,19 @@ console.log('workshop');
         workshopPassed(checkRobotSource(`${WORKSHOP_TEMPLATE}\n// Math.random fetch document are all banned\n/* eval("x") */`)),
     );
     check('unusable id falls back to my-robot.ts', suggestFilename('export const meta = { id: "Nope!" };') === 'my-robot.ts');
+    // Intent fields are optional: partial returns pass, unknown keys fail.
+    const partial = WORKSHOP_TEMPLATE.replace(
+        'return { throttle: 0.6, turn: 0, towerTurn: 0.8, fire: false, charge: false };',
+        'return { throttle: 0.6, towerTurn: 0.8 };',
+    ).replace(
+        'return { throttle: 1, turn: 0, towerTurn, fire: Math.abs(diff) < 0.07, charge: false };',
+        'return { throttle: 1, towerTurn, fire: Math.abs(diff) < 0.07 };',
+    );
+    check('partial Intent passes intent-shape', !failed(partial, 'intent-shape'));
+    check(
+        'typo field fails intent-shape',
+        failed(WORKSHOP_TEMPLATE.replace('towerTurn: 0.8', 'towerTurn: 0.8, throtle: 1'), 'intent-shape'),
+    );
 }
 
 // --- 9. Team sensor sharing: 30-tick delayed position-only blips ---------

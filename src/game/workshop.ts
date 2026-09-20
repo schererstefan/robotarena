@@ -225,13 +225,28 @@ export function checkRobotSource(source: string): WorkshopCheck[] {
         detail: '',
     });
 
-    const intentFields = ['throttle', 'turn', 'towerTurn', 'fire', 'charge'];
-    const missingFields = intentFields.filter((field) => !tokenPresent(code, field));
+    // Intent fields are optional-with-default, so a partial return like
+    // `{ fire: true }` is legal. What fails is an UNKNOWN field inside a
+    // returned object literal that otherwise looks like an Intent (it names
+    // at least one known field) — almost always a typo'd key.
+    const knownIntent = new Set(['throttle', 'turn', 'towerTurn', 'fire', 'charge', 'dash', 'emp']);
+    const unknownIntent: string[] = [];
+    for (const literal of code.matchAll(/return\s*\{([^}]*)\}/g)) {
+        const keys = new Set<string>();
+        for (const part of (literal[1] ?? '').split(',')) {
+            const key = /^\s*([A-Za-z_]\w*)\s*(?::|$)/.exec(part)?.[1];
+            if (key) keys.add(key);
+        }
+        if (![...keys].some((key) => knownIntent.has(key))) continue;
+        for (const key of keys) {
+            if (!knownIntent.has(key) && !unknownIntent.includes(key)) unknownIntent.push(key);
+        }
+    }
     checks.push({
         id: 'intent-shape',
         label: WORKSHOP_CHECKS.intentShape.label,
-        pass: missingFields.length === 0,
-        detail: missingDetail(missingFields),
+        pass: unknownIntent.length === 0,
+        detail: unknownSkillDetail(unknownIntent),
     });
 
     const badImports = importSpecifiers(source).filter(

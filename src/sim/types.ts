@@ -94,21 +94,25 @@ export interface SenseState {
     rand: Rand;
 }
 
+/** Robot/controller contract version. Robots may export `api?: number` (default 1). */
+export const ROBOT_API_VERSION = 1;
+
 export interface Intent {
-    /** -1 (full reverse) .. 1 (full throttle). Clamped by the engine. */
-    throttle: number;
-    /** -1 (hard left) .. 1 (hard right) chassis turn. Clamped by the engine. */
-    turn: number;
-    /** -1 (counter-clockwise) .. 1 (clockwise) tower rotation. Clamped. */
-    towerTurn: number;
-    /** Attempt to fire. Only fires when cooldown is 0. */
-    fire: boolean;
+    /** -1 (full reverse) .. 1 (full throttle). Clamped by the engine. Optional, defaults to 0. */
+    throttle?: number;
+    /** -1 (hard left) .. 1 (hard right) chassis turn. Clamped by the engine. Optional, defaults to 0. */
+    turn?: number;
+    /** -1 (counter-clockwise) .. 1 (clockwise) tower rotation. Clamped. Optional, defaults to 0. */
+    towerTurn?: number;
+    /** Attempt to fire. Only fires when cooldown is 0. Optional, defaults to false. */
+    fire?: boolean;
     /**
      * Hold to bank charge (requires the charger skill). Charging slows drive
      * to 75% and decays when released. Firing consumes banked charge for
      * bonus damage: damage x (1 + charge x (mult - 1)).
+     * Optional, defaults to false.
      */
-    charge: boolean;
+    charge?: boolean;
     /**
      * Trigger the dash burst (2.5x top speed for 12 ticks). Only fires when
      * `dashCd` is 0; triggering starts the 8 s cooldown. Optional.
@@ -122,10 +126,12 @@ export interface Intent {
     emp?: boolean;
 }
 
-export const IDLE_INTENT: Intent = { throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false, dash: false, emp: false };
+export const IDLE_INTENT: Required<Intent> = { throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false, dash: false, emp: false };
 
 export interface RobotController {
     meta: RobotMeta;
+    /** Contract version this controller targets. Defaults to ROBOT_API_VERSION. */
+    api?: number;
     /** Default skill loadout suggestion. Sanitized and budget-capped. */
     loadout?: SkillLoadout;
     /** Called once when the robot spawns. Optional. */

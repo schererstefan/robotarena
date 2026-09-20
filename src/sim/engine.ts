@@ -119,7 +119,7 @@ export interface MatchOptions {
     modifiers?: MatchModifiers;
 }
 
-function sanitizeIntent(raw: unknown): Intent {
+function sanitizeIntent(raw: unknown): Required<Intent> {
     if (typeof raw !== 'object' || raw === null) return { ...IDLE_INTENT };
     const r = raw as Partial<Intent>;
     return {
@@ -280,7 +280,7 @@ export class Match {
         // they apply the same tick. Positions are pre-move for every robot.
         this.robots.forEach((robot, i) => {
             if (!robot.alive) return;
-            const intent = intents[i] as Intent;
+            const intent = intents[i] as Required<Intent>;
             if (intent.dash === true && robot.dashCd <= 0) {
                 robot.dashCd = DASH_COOLDOWN_TICKS;
                 robot.dashUntil = this.tick + DASH_DURATION_TICKS;
@@ -298,7 +298,7 @@ export class Match {
         // 3. Drive + towers + charge.
         this.robots.forEach((robot, i) => {
             if (!robot.alive) return;
-            const intent = intents[i] as Intent;
+            const intent = intents[i] as Required<Intent>;
             const canCharge = robot.stats.chargeMult > 1;
             const charging = intent.charge && canCharge && robot.cooldown <= 0;
             if (charging) {
@@ -331,7 +331,7 @@ export class Match {
         // 4. Fire guns.
         this.robots.forEach((robot, i) => {
             if (!robot.alive) return;
-            const intent = intents[i] as Intent;
+            const intent = intents[i] as Required<Intent>;
             if (intent.fire && robot.cooldown <= 0) {
                 robot.cooldown = robot.stats.cooldownTicks;
                 robot.shotsFired += 1;
@@ -358,6 +358,19 @@ export class Match {
         if (this.tick >= MAX_TICKS) this.suddenDeath();
         this.tick += 1;
         this.checkEnd();
+    }
+
+    /**
+     * Step until the match ends. `maxGuard` bounds the step count so a
+     * stuck match cannot hang a harness; the default covers the full
+     * sudden-death tail with slack.
+     */
+    runToEnd(maxGuard: number = MAX_TICKS_TOTAL + 10): void {
+        let guard = 0;
+        while (!this.over && guard <= maxGuard) {
+            this.step();
+            guard += 1;
+        }
     }
 
     /** True when the viewer's sensor cone currently covers the target. */
@@ -406,7 +419,7 @@ export class Match {
                 bearing: Math.atan2(s.y - robot.y, s.x - robot.x),
             });
         }
-        shared.sort((a, b) => a.distance - b.distance);
+        shared.sort((a, b) => a.distance - b.distance || a.id - b.id);
         return shared;
     }
 
@@ -447,9 +460,9 @@ export class Match {
                 });
             }
         }
-        foes.sort((a, b) => a.distance - b.distance);
+        foes.sort((a, b) => a.distance - b.distance || a.id - b.id);
         allies.sort((a, b) => a.id - b.id);
-        scout.sort((a, b) => a.distance - b.distance);
+        scout.sort((a, b) => a.distance - b.distance || a.id - b.id);
         this.recordAllySightings(robot);
         const shared = this.sharedSightings(robot, new Set(foes.map((f) => f.id)));
         return {

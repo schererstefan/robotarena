@@ -36,6 +36,11 @@ export function create(): RobotController {
 }
 ```
 
+The controller contract is versioned: `ROBOT_API_VERSION` (currently `1`,
+exported from `src/sim/types.ts`). Controllers may set the optional `api`
+field to the version they target; it defaults to the current version and is
+currently informational only — the engine never changes behavior on it.
+
 Then register it in `src/robots/registry.ts` (one import + one entry) and in
 `src/robots/sources.ts` (one `?raw` import + one entry, for in-game export).
 
@@ -66,15 +71,18 @@ tower onto a blip bearing converts it into a full sighting.
 
 ## What you return: `Intent`
 
-| Field       | Meaning                                                        |
-| ----------- | -------------------------------------------------------------- |
-| `throttle`  | `-1` (full reverse) to `1` (full speed). Clamped.              |
-| `turn`      | `-1` (hard left) to `1` (hard right) chassis turn. Clamped.    |
-| `towerTurn` | `-1` (counter-clockwise) to `1` (clockwise) tower spin. Clamped. |
-| `fire`      | `true` to shoot. Only fires when `cooldown` is `0`.            |
-| `charge`    | Hold to bank charge (charger skill only). Slows drive to 75%.  |
-| `dash`      | `true` to dash (2.5× top speed, 12 ticks). 8 s cooldown. Optional, defaults `false`. |
-| `emp`       | `true` to pulse EMP (foes in 220 u slowed to 45% for 3 s). 12 s cooldown. Optional, defaults `false`. |
+Every field is optional-with-default: return only what you need
+(`{ fire: true }` is a complete Intent) and the engine fills the rest.
+
+| Field       | Default | Meaning                                                        |
+| ----------- | ------- | -------------------------------------------------------------- |
+| `throttle`  | `0`     | `-1` (full reverse) to `1` (full speed). Clamped.              |
+| `turn`      | `0`     | `-1` (hard left) to `1` (hard right) chassis turn. Clamped.    |
+| `towerTurn` | `0`     | `-1` (counter-clockwise) to `1` (clockwise) tower spin. Clamped. |
+| `fire`      | `false` | `true` to shoot. Only fires when `cooldown` is `0`.            |
+| `charge`    | `false` | Hold to bank charge (charger skill only). Slows drive to 75%.  |
+| `dash`      | `false` | `true` to dash (2.5× top speed, 12 ticks). 8 s cooldown.       |
+| `emp`       | `false` | `true` to pulse EMP (foes in 220 u slowed to 45% for 3 s). 12 s cooldown. |
 
 Missing, `NaN`, or non-numeric fields are treated as `0`/`false`. Out-of-range
 values are clamped. There is no way to exceed your loadout's stats.

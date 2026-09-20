@@ -70,12 +70,16 @@ function validMeta(raw: unknown): RobotMeta | null {
 
 function validIntent(raw: unknown): boolean {
     if (!isRecord(raw)) return false;
+    // Every Intent field is optional-with-default: missing is fine, present
+    // must be the right type (the engine clamps ranges downstream).
     for (const field of ['throttle', 'turn', 'towerTurn']) {
-        if (typeof raw[field] !== 'number' || !Number.isFinite(raw[field] as number)) return false;
+        const value = raw[field];
+        if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value))) return false;
     }
-    if (typeof raw['fire'] !== 'boolean' || typeof raw['charge'] !== 'boolean') return false;
-    if (raw['dash'] !== undefined && typeof raw['dash'] !== 'boolean') return false;
-    if (raw['emp'] !== undefined && typeof raw['emp'] !== 'boolean') return false;
+    for (const field of ['fire', 'charge', 'dash', 'emp']) {
+        const value = raw[field];
+        if (value !== undefined && typeof value !== 'boolean') return false;
+    }
     return true;
 }
 

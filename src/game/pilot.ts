@@ -4,7 +4,7 @@
 
 import { aimTurret } from '../robots/common';
 import type { SkillLoadout } from '../sim/skills';
-import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
+import { ROBOT_API_VERSION, type Intent, type RobotController, type RobotMeta, type SenseState } from '../sim/types';
 
 /**
  * Mutable input state owned by the scene and read fresh on every sim tick.
@@ -56,5 +56,5 @@ export function createPilotController(
             charge: input.charging,
         };
     };
-    return { meta, loadout, update };
+    return { meta, api: ROBOT_API_VERSION, loadout, update };
 }
