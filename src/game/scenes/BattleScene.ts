@@ -2,7 +2,7 @@
 // arena with pixel-art sprites. Static layers are built once; per-frame work
 // is sprite transforms plus one small dynamic Graphics (cones + trails).
 
-import { Scene } from 'phaser';
+import { BlendModes, Scene } from 'phaser';
 import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DASH_COOLDOWN_TICKS, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, MAX_TICKS, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import { angleDiff, clamp, wrapAngle } from '../../sim/math';
@@ -24,6 +24,7 @@ import {
     playSting,
     playSuddenDeath,
     playWin,
+    startBattleLoop,
     stopMusic,
     toggleMuted,
     unlockAudio,
@@ -242,6 +243,20 @@ export class BattleScene extends Scene {
     private plateHead: Phaser.GameObjects.Text[] = [];
     private plateRows: Phaser.GameObjects.Text[][] = [];
     private lastPlateTick = -99;
+    /** Pooled ADD-blend muzzle halos (one per robot, 90 ms with muzzleLife). */
+    private halos: Phaser.GameObjects.Image[] = [];
+    /** Damage-rate accumulator feeding the battle-drum intensity. */
+    private dmgAcc = 0;
+    /**
+     * Cinematic filters: persistent danger vignette + arena grade (≤2
+     * fullscreen passes), transient explode glow, per-aura glows (≤6).
+     * WebGL-only + auto-quality-gated; Canvas degrades to the same info.
+     */
+    private fxVignette: Phaser.Filters.Vignette | null = null;
+    private fxGrade: Phaser.Filters.ColorMatrix | null = null;
+    private fxBloom: Phaser.Filters.Glow | null = null;
+    private auraGlow: Array<Phaser.Filters.Glow | null> = [];
+    private lastGradeFrac = -1;
     private mapG!: Phaser.GameObjects.Graphics;
     private pilot: PilotInput | null = null;
     private obstacles: ArenaObstacle[] = [];
@@ -335,6 +350,13 @@ export class BattleScene extends Scene {
         this.plateHead = [];
         this.plateRows = [];
         this.lastPlateTick = -99;
+        this.halos = [];
+        this.dmgAcc = 0;
+        this.fxVignette = null;
+        this.fxGrade = null;
+        this.fxBloom = null;
+        this.auraGlow = [];
+        this.lastGradeFrac = -1;
         this.firstBlood = false;
         this.trails = [];
         this.lastTrailTick = -1;
@@ -470,7 +492,10 @@ export class BattleScene extends Scene {
             stripe.setVisible(skin.finish === 'Stripe');
             this.stripes.push(stripe);
             const aura = this.add.image(0, 0, 'charge_aura').setScale(2.5).setDepth(3).setVisible(false);
+            aura.setBlendMode(BlendModes.ADD);
             this.auras.push(aura);
+            this.auraGlow.push(null);
+            this.halos.push(this.add.image(0, 0, 'halo').setScale(2.2).setDepth(8).setVisible(false).setBlendMode(BlendModes.ADD));
             this.chassis.push(body);
             this.towers.push(tower);
             this.hubs.push(hub);
@@ -646,13 +671,26 @@ export class BattleScene extends Scene {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown-N', this.onStepKey);
             this.input.keyboard?.off('keydown-F', this.onDebugKey);
+            stopMusic();
+            this.clearFilters();
         });
 
         if (this.request.tutorial === true) this.buildTutorial();
 
         this.syncSprites(this.match.robotSnapshots, this.match.bulletSnapshots, 0);
         this.drawDynamic(this.match.robotSnapshots);
+        this.syncFilters();
+        startBattleLoop(() => this.musicIntensity());
         playBattleStart();
+    }
+
+    /** Drum intensity: alive-ratio (0.6) + damage-rate (0.4), floored warm. */
+    private musicIntensity(): number {
+        const snaps = this.match.robotSnapshots;
+        let aliveN = 0;
+        for (const s of snaps) if (s.alive) aliveN += 1;
+        const aliveRatio = snaps.length > 0 ? aliveN / snaps.length : 0;
+        return clamp(aliveRatio * 0.6 + Math.min(this.dmgAcc / 60, 1) * 0.4 + 0.15, 0, 1);
     }
 
     /** Any key skips the staged intro (no-op once it has finished). */
@@ -710,6 +748,8 @@ export class BattleScene extends Scene {
         if (this.qualityTimer >= 60) {
             this.qualityTimer = 0;
             this.autoQuality();
+            // Auto-quality kill-switch for the cinematic filter layer.
+            this.syncFilters();
             if (this.debugText.visible) this.refreshDebugText();
         }
         // Pilot aim follows the pointer (game coords minus the arena offset),
@@ -771,6 +811,8 @@ export class BattleScene extends Scene {
         this.tickFlicker(dt);
         this.tickSkulls(dt);
         this.syncSdRing();
+        this.syncDangerVignette(snaps, dt);
+        if (this.dmgAcc > 0) this.dmgAcc *= Math.exp(-dt * 0.8);
         this.syncSprites(snaps, bullets, dt);
         this.drawDynamic(snaps);
         this.syncHud(snaps, bullets);
@@ -957,6 +999,7 @@ export class BattleScene extends Scene {
             }
             if (s.health < p.health) {
                 const dmg = Math.round(p.health - s.health);
+                this.dmgAcc += dmg;
                 if (!s.alive) {
                     this.spawnDamageNumber(cx, cy - 18, dmg, 'kill');
                 } else if (this.match.result.suddenDeath && topDealer < 0) {
@@ -1091,6 +1134,12 @@ export class BattleScene extends Scene {
         this.sdRing.setScale(Math.max(circle.r, 1) / SD_RING_R);
         this.sdRing.setTint(frac > 0.66 ? COLORS.team[0] : frac > 0.33 ? COLORS.danger : COLORS.white);
         this.sdRing.setAlpha(this.match.result.suddenDeath ? 0.85 : 0.45);
+        // SD grade cross-tween: re-saturate only when the bucket moves.
+        const bucket = Math.round(frac * 20);
+        if (bucket !== this.lastGradeFrac) {
+            this.lastGradeFrac = bucket;
+            this.applyGrade(frac);
+        }
     }
 
     /**
@@ -1142,6 +1191,144 @@ export class BattleScene extends Scene {
         g.strokeCircle(x, y, 7);
     }
 
+    /**
+     * Filters are allowed only at full quality on a renderer that supports
+     * them (feature-detected: Canvas has no filter lists). Everything is
+     * wrapped so a missing API degrades to the unfiltered render.
+     */
+    private filtersAllowed(): boolean {
+        if (this.quality !== 0) return false;
+        try {
+            const fl = this.cameras.main.filters?.internal;
+            return !!fl && typeof fl.addVignette === 'function';
+        } catch {
+            return false;
+        }
+    }
+
+    /** Add gated filters (idempotent) or tear them down under load/Canvas. */
+    private syncFilters(): void {
+        if (!this.filtersAllowed()) {
+            this.clearFilters();
+            return;
+        }
+        try {
+            const internal = this.cameras.main.filters.internal;
+            if (!this.fxVignette) {
+                this.fxVignette = internal.addVignette(0.5, 0.5, 0.55, 0, 0xff2a2a);
+            }
+            if (!this.fxGrade) {
+                this.fxGrade = internal.addColorMatrix();
+                this.lastGradeFrac = -1;
+                this.applyGrade(1);
+            }
+        } catch {
+            this.fxVignette = null;
+            this.fxGrade = null;
+        }
+        // Charged-aura glows (≤6, one per robot max): attached once, the
+        // aura image itself gates visibility (charging only).
+        this.auras.forEach((aura, i) => {
+            if (this.auraGlow[i]) return;
+            try {
+                const afl = aura.filters?.internal;
+                if (afl && typeof afl.addGlow === 'function') {
+                    this.auraGlow[i] = afl.addGlow(0xffd28a, 2, 0);
+                }
+            } catch {
+                // Canvas: per-object filters unsupported, ADD blend remains.
+            }
+        });
+    }
+
+    /** Remove + null every filter (auto-quality gate, shutdown, Canvas). */
+    private clearFilters(): void {
+        this.clearBloom();
+        try {
+            const internal = this.cameras.main.filters?.internal;
+            if (internal) {
+                if (this.fxVignette) internal.remove(this.fxVignette);
+                if (this.fxGrade) internal.remove(this.fxGrade);
+            }
+        } catch {
+            // Already gone (Canvas/headless): nothing to release.
+        }
+        this.fxVignette = null;
+        this.fxGrade = null;
+        this.lastGradeFrac = -1;
+        this.auras.forEach((aura, i) => {
+            const glow = this.auraGlow[i];
+            if (!glow) return;
+            try {
+                aura.filters?.internal?.remove(glow);
+            } catch {
+                // Already gone.
+            }
+            this.auraGlow[i] = null;
+        });
+    }
+
+    /** Arena grade: warm `open` / cool `blocks`, SD cross-tween saturating. */
+    private applyGrade(sdFrac: number): void {
+        const cm = this.fxGrade?.colorMatrix;
+        if (!cm) return;
+        cm.reset();
+        if (this.request.arena === 'blocks') {
+            cm.saturate(0.94).hue(-8);
+        } else {
+            cm.saturate(1.08).brightness(0.03).hue(6);
+        }
+        if (sdFrac < 1) cm.saturate(1 + (1 - sdFrac) * 0.6);
+    }
+
+    /** Low-HP danger vignette: lerped by HP, snapped under reduced motion. */
+    private syncDangerVignette(snaps: RobotSnapshot[], dt: number): void {
+        if (!this.fxVignette) return;
+        let frac = 1;
+        if (this.pilot) {
+            const s0 = snaps[0];
+            frac = s0 && s0.alive ? Math.max(s0.health, 0) / s0.maxHealth : 1;
+        } else {
+            for (const s of snaps) {
+                if (!s.alive) continue;
+                frac = Math.min(frac, Math.max(s.health, 0) / s.maxHealth);
+            }
+        }
+        const target = frac < 0.5 ? (0.5 - frac) * 1.4 : 0;
+        if (this.reducedMotion) {
+            this.fxVignette.strength = target;
+        } else {
+            this.fxVignette.strength += (target - this.fxVignette.strength) * Math.min(dt * 3, 1);
+        }
+    }
+
+    /**
+     * Transient explode-only bloom (~200 ms). Phaser 4.2 ships no Bloom
+     * controller, so a fullscreen Glow stands in: strength tween-decayed,
+     * removed exactly once (leak-free), gated like every other filter.
+     */
+    private fireBloom(): void {
+        if (this.reducedMotion || !this.filtersAllowed() || this.fxBloom) return;
+        try {
+            const glow = this.cameras.main.filters.internal.addGlow(0xfff2cc, 4, 0);
+            this.fxBloom = glow;
+            this.tweens.add({ targets: glow, outerStrength: 0, duration: 200, ease: 'Cubic.easeOut' });
+            this.time.delayedCall(210, () => this.clearBloom());
+        } catch {
+            this.fxBloom = null;
+        }
+    }
+
+    private clearBloom(): void {
+        if (!this.fxBloom) return;
+        try {
+            this.cameras.main.filters.internal.remove(this.fxBloom);
+        } catch {
+            // Already gone.
+        }
+        this.fxBloom = null;
+    }
+
     /** True when (tx,ty) sits inside s's sensor cone (victim-centered arcs). */
     private coneCovers(s: RobotSnapshot, tx: number, ty: number): boolean {
         const dx = tx - s.x;
@@ -1166,6 +1353,7 @@ export class BattleScene extends Scene {
         this.fireRing(cx, cy, true);
         this.killZoom();
         this.placeSkull(cx, cy);
+        this.fireBloom();
         playExplosion(snap.x);
         // Framed explosion from the pool (6 slots for 6 robots max), then a
         // persistent per-archetype wreck. The fallback allocates only if a
@@ -1611,13 +1799,20 @@ export class BattleScene extends Scene {
                 .setRotation(0)
                 .setAlpha(introAlpha);
             if (ring) ring.setVisible(visible).setPosition(px, py).setAlpha(introAlpha);
-            // Muzzle flash.
+            // Muzzle flash + pooled ADD halo (90 ms, alongside muzzleLife).
             const muzzle = this.muzzles[i] as Phaser.GameObjects.Image;
             const show = visible && (this.muzzleLife[i] as number) > 0;
+            const halo = this.halos[i] as Phaser.GameObjects.Image;
             muzzle.setVisible(show);
+            halo.setVisible(show);
             if (show) {
-                muzzle.setPosition(cx + Math.cos(aim) * 30, cy + Math.sin(aim) * 30);
+                const hx = cx + Math.cos(aim) * 30;
+                const hy = cy + Math.sin(aim) * 30;
+                muzzle.setPosition(hx, hy);
                 muzzle.setRotation(aim);
+                halo.setPosition(hx, hy);
+                halo.setAlpha(0.8);
+                if (!this.reducedMotion) halo.setScale(2.2 + 0.5 * ((this.muzzleLife[i] as number) / 0.09));
             }
             // Health bar + name.
             const frac = Math.max(s.health, 0) / s.maxHealth;
@@ -2153,6 +2348,7 @@ export class BattleScene extends Scene {
 
         const snaps = this.match.robotSnapshots;
         const rowObjs: Phaser.GameObjects.Text[] = [];
+        const skullObjs: Phaser.GameObjects.Image[] = [];
         snaps.forEach((s, i) => {
             const y = 274 + i * 30;
             const skin = this.request.skins[i] as SlotSkin;
@@ -2167,6 +2363,12 @@ export class BattleScene extends Scene {
                 text.setAlpha(0);
             }
             rowObjs.push(code, text);
+            // Skull icon paired with dead rows (icons never stand alone).
+            if (!s.alive) {
+                const skull = this.add.image(214, y, uiIconKey('skull')).setDepth(20);
+                if (!R) skull.setAlpha(0);
+                skullObjs.push(skull);
+            }
             const hit = this.add.rectangle(512, y, 560, 26).setDepth(20);
             hit.setInteractive({ useHandCursor: true });
             hit.on('pointerdown', () => this.exportRobot(s.id));
@@ -2272,12 +2474,13 @@ export class BattleScene extends Scene {
         const finish = (): void => {
             if (finished) return;
             finished = true;
-            this.tweens.killTweensOf([backdrop, titleObj, subObj, ...rowObjs, mvpObj, trophy, hintObj, ...replayObjs]);
+            this.tweens.killTweensOf([backdrop, titleObj, subObj, ...rowObjs, ...skullObjs, mvpObj, trophy, hintObj, ...replayObjs]);
             backdrop.setAlpha(0.94);
             titleObj.setScale(1).setAlpha(1).setY(196);
             subObj.setAlpha(1);
             tagObj?.setAlpha(1);
             for (const o of rowObjs) o.setAlpha(1).setX(232);
+            for (const o of skullObjs) o.setAlpha(1);
             mvpObj.setAlpha(1);
             trophy.setAlpha(1);
             hintObj.setAlpha(1);
@@ -2301,6 +2504,7 @@ export class BattleScene extends Scene {
                 delay: 320 + k * 60,
             });
         });
+        if (skullObjs.length > 0) this.tweens.add({ targets: skullObjs, alpha: 1, duration: 200, delay: 340 });
         const tailT = 320 + snaps.length * 60;
         this.time.delayedCall(tailT, () => {
             if (!finished) this.tweens.add({ targets: [mvpObj, trophy, hintObj], alpha: 1, duration: 150 });

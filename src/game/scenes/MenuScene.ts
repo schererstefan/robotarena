@@ -1,13 +1,13 @@
 // Main menu: mode select, per-slot robot picker with sprite previews,
 // cosmetic skins, and per-slot skill loadouts (symmetric point budgets).
 
-import { Scene } from 'phaser';
+import { BlendModes, Scene } from 'phaser';
 import { getRobot, ROBOTS } from '../../robots/registry';
 import { modifierCodes, type ArenaId, type MatchModifiers } from '../../sim/constants';
 import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { artRegistry, chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
-import { isMuted, playClick, playConfirm, playError, toggleMuted, unlockAudio } from '../audio';
+import { isMuted, playClick, playConfirm, playError, startMenuAmbience, stopMusic, toggleMuted, unlockAudio } from '../audio';
 import {
     clearDailyBoard,
     clearHistory,
@@ -211,6 +211,12 @@ export class MenuScene extends Scene {
                 this.tweens.add({ targets: obj, scale: obj === titleObj ? 1 : 2, duration: 260, delay, ease: 'Back.easeOut' });
             }
         }
+        // Menu title glow (static: kept in both motion modes when supported).
+        try {
+            titleObj.filters?.internal?.addGlow(0xffd23f, 2, 0);
+        } catch {
+            // Canvas: no per-object filters; the gold title stands alone.
+        }
 
         [1, 2, 3].forEach((size, i) => {
             const btn = this.navButton(CX - 150 + i * 150, 136, 130, 42, '', () => this.setMode(size), 0, 44);
@@ -238,6 +244,14 @@ export class MenuScene extends Scene {
         this.navButton(CX - 290, 684, 270, 50, MENU.randomizeSkins, () => this.randomizeSkins(), 0, 0, { tier: 'ghost' });
         this.navButton(CX, 684, 270, 50, MENU.startBattle, () => this.startBattle(), 0, 0, { tier: 'primary' });
         this.navButton(CX + 290, 684, 270, 50, MENU.pilot, () => this.startPilot(), 0, 0, { tier: 'ghost' });
+        // START shine sweep (Phaser 4.2 ships no Shine controller, so a
+        // tweened highlight bar stands in): 4 s cycle, static under reduced
+        // motion (hidden — the primary tier carries the emphasis instead).
+        if (!isReducedMotion()) {
+            const shine = this.add.rectangle(CX - 135, 684, 26, 46, 0xffffff, 0).setDepth(1).setBlendMode(BlendModes.ADD);
+            this.tweens.add({ targets: shine, x: CX + 135, duration: 900, delay: 1200, ease: 'Quad.easeInOut', repeat: -1, repeatDelay: 3100 });
+            this.tweens.add({ targets: shine, alpha: 0.22, duration: 450, delay: 1200, yoyo: true, repeat: -1, repeatDelay: 3550, ease: 'Sine.easeInOut' });
+        }
         this.trailsButton = this.navButton(CX - 350, 728, 140, 26, '', () => this.toggleTrails());
         this.muteButton = this.navButton(CX - 210, 728, 140, 26, '', () => this.toggleMute());
         this.navButton(CX - 70, 728, 140, 26, MENU.watchReplay, () => this.openReplayDialog());
@@ -296,7 +310,9 @@ export class MenuScene extends Scene {
             this.closeReplayDialog();
             this.closeImportDialog();
             this.stopTicker();
+            stopMusic();
         });
+        startMenuAmbience();
     }
 
     private onAnyPointer = (): void => {

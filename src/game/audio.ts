@@ -103,8 +103,10 @@ export function toggleMuted(): boolean {
     return muted;
 }
 
-/** Stop the battle loop before result stingers (Phase 6 owns the loop). */
+/** Stop every music source (battle loop + ambience) + reset the duck. */
 export function stopMusic(): void {
+    stopBattleLoop();
+    stopAmbience();
     if (ctx === null || musicBus === null) return;
     musicBus.gain.cancelScheduledValues(ctx.currentTime);
     musicBus.gain.setValueAtTime(1, ctx.currentTime);
@@ -256,6 +258,7 @@ export function playExplosion(x: number = ARENA_WIDTH / 2): void {
     noise(0.45, level(0.25), 2500, 120, 0, 'sfx', pan);
     tone('sine', 70, 24, 0.9, 0.2, 0.1, 'sfx', pan);
     noise(0.8, 0.1, 300, 60, 0.1, 'sfx', pan);
+    duckMusic();
 }
 
 /** Dash whoosh: rising air + a light lift tone. */
@@ -354,4 +357,96 @@ export function playLose(): void {
 export function playDraw(): void {
     tone('triangle', 493.88, 493.88, 0.15, 0.16, 0, 'music');
     tone('triangle', 440.0, 440.0, 0.22, 0.16, 0.16, 'music');
+}
+
+// ---- Music: battle-drum lookahead scheduler + menu ambience --------------
+// The scheduler ticks on a 25 ms interval and renders up to 120 ms ahead,
+// so drums stay on-grid under frame hitches. Density follows the intensity
+// callback (alive-ratio + damage-rate, supplied render-side by the scene).
+// Every scheduling pass checks `muted`; scenes stop the loop on shutdown.
+
+const MUSIC_BPM = 132;
+const SCHED_INTERVAL_MS = 25;
+const SCHED_AHEAD_S = 0.12;
+
+let battleTimer: ReturnType<typeof setInterval> | null = null;
+let battleStep = 0;
+let battleNextAt = 0;
+let battleIntensity: () => number = () => 0.5;
+let ambienceTimer: ReturnType<typeof setInterval> | null = null;
+
+/** −6 dB duck on explosions: the kit yields, never stacks. */
+function duckMusic(): void {
+    if (ctx === null || musicBus === null || muted) return;
+    const t = ctx.currentTime;
+    musicBus.gain.cancelScheduledValues(t);
+    musicBus.gain.setValueAtTime(0.5, t);
+    musicBus.gain.linearRampToValueAtTime(1, t + 0.5);
+}
+
+export function startBattleLoop(intensity: () => number): void {
+    stopBattleLoop();
+    battleIntensity = intensity;
+    battleStep = 0;
+    battleNextAt = 0;
+    battleTimer = setInterval(scheduleBattle, SCHED_INTERVAL_MS);
+}
+
+export function stopBattleLoop(): void {
+    if (battleTimer !== null) {
+        clearInterval(battleTimer);
+        battleTimer = null;
+    }
+}
+
+function scheduleBattle(): void {
+    if (ctx === null || muted || musicBus === null) return;
+    if (battleNextAt < ctx.currentTime) battleNextAt = ctx.currentTime + 0.05;
+    const sixteenth = 60 / MUSIC_BPM / 4;
+    while (battleNextAt < ctx.currentTime + SCHED_AHEAD_S) {
+        scheduleStep(battleStep, Math.max(battleNextAt - ctx.currentTime, 0));
+        battleNextAt += sixteenth;
+        battleStep = (battleStep + 1) % 16;
+    }
+}
+
+/** One 16th step: kick on quarters, hats widening with heat, tom stabs. */
+function scheduleStep(step: number, delay: number): void {
+    const k = clamp(battleIntensity(), 0, 1);
+    if (step % 4 === 0) {
+        tone('sine', 150, 40, 0.12, 0.22 + 0.2 * k, delay, 'music');
+        noise(0.03, 0.06, 3000, 800, delay, 'music');
+    }
+    if (step % 2 === 0) {
+        if (k > 0.3) noise(0.04, 0.05 + 0.05 * k, 8000, 5000, delay, 'music');
+    } else if (k > 0.7) {
+        noise(0.03, 0.05, 9000, 6000, delay, 'music');
+    }
+    if ((step === 10 || step === 14) && k > 0.5) {
+        tone('triangle', 220, 90, 0.12, 0.16, delay, 'music');
+    }
+}
+
+/** Menu ambience: a slow detuned pad (A2–C#4), re-triggered every 2 s. */
+export function startMenuAmbience(): void {
+    stopAmbience();
+    schedulePad();
+    ambienceTimer = setInterval(schedulePad, 2000);
+}
+
+export function stopAmbience(): void {
+    if (ambienceTimer !== null) {
+        clearInterval(ambienceTimer);
+        ambienceTimer = null;
+    }
+}
+
+const PAD_NOTES = [110, 164.81, 220, 277.18];
+
+function schedulePad(): void {
+    if (ctx === null || muted) return;
+    for (const hz of PAD_NOTES) {
+        tone('triangle', hz * 0.99, hz, 1.8, 0.035, Math.random() * 0.3, 'music');
+        tone('sine', hz * 1.01, hz, 1.8, 0.03, Math.random() * 0.3, 'music');
+    }
 }

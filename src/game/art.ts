@@ -440,6 +440,25 @@ function bakeSdRing(scene: Scene): void {
     texture.refresh();
 }
 
+/** Muzzle halo: warm radial sprite for the pooled ADD-blend halos (16×16). */
+function bakeHalo(scene: Scene): void {
+    if (scene.textures.exists('halo')) {
+        bakedKeys.add('halo');
+        return;
+    }
+    const texture = scene.textures.createCanvas('halo', 16, 16);
+    if (!texture) return;
+    bakedKeys.add('halo');
+    const context = texture.getContext();
+    const grad = context.createRadialGradient(8, 8, 1, 8, 8, 8);
+    grad.addColorStop(0, 'rgba(255,242,204,1)');
+    grad.addColorStop(0.4, 'rgba(255,210,138,0.6)');
+    grad.addColorStop(1, 'rgba(255,210,138,0)');
+    context.fillStyle = grad;
+    context.fillRect(0, 0, 16, 16);
+    texture.refresh();
+}
+
 /** Per-block one-time bake key (all blocks layout rects are 90×90). */
 export function blockKey(w: number, h: number): string {
     return `block_${w}x${h}`;
@@ -510,6 +529,7 @@ export function ensureArtTextures(scene: Scene): void {
     bakeArenaFloor(scene);
     bakeScorch(scene);
     bakeSdRing(scene);
+    bakeHalo(scene);
     if (debugArtRequested()) {
         const ms = (nowMs() - t0).toFixed(1);
         const issues = validateArt();
