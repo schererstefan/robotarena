@@ -13,7 +13,9 @@
     "eval:smoke": "npm run eval:build && node /tmp/robotarena-eval.cjs --mode smoke --out eval/out-smoke",
     "eval:rr": "npm run eval:build && node /tmp/robotarena-eval.cjs --mode rr --jobs 8 --out eval/out-rr",
     "eval:ladder": "npm run eval:build && node /tmp/robotarena-eval.cjs --mode ladder --jobs 8 --out eval/out-ladder",
-    "eval:full": "npm run eval:build && node /tmp/robotarena-eval.cjs --mode full --jobs 8 --out eval/out-full"
+    "eval:full": "npm run eval:build && node /tmp/robotarena-eval.cjs --mode full --jobs 8 --out eval/out-full",
+    "tune:build": "esbuild tools/hillclimb/tune.ts --bundle --platform=node --format=esm --outfile=/tmp/robotarena-tune.mjs --log-level=warning",
+    "tune": "npm run tune:build && node /tmp/robotarena-tune.mjs"
   },
   "devDependencies": {
     "typescript": "~5.7.2",

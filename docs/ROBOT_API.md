@@ -188,7 +188,7 @@ initial headings).
 
 ## Built-in robots
 
-Eight bots ship in `src/robots/` (registry order is append-only: replay codes
+Eight base bots ship in `src/robots/` (registry order is append-only: replay codes
 index into it). Study them before writing your own.
 
 | Bot | Style | Default build |
@@ -201,6 +201,7 @@ index into it). Study them before writing your own.
 | Sniper | Camps a deep backfield anchor; charged long-range shots, retreats when rushed. | `SCN2 MRK2 CHG1 DDY1` |
 | Brawler | Plated bruiser; walks the gun into the clinch and rams through. | `OVR2 TRG2 PLT2` |
 | Ghost | Hit-and-run scout: strikes on a ready gun, breaks away on cooldown. | `OVR2 GYR2 WND1 SCT1` |
+| Hunter HC1 | Hillclimb champion bred from hunter (run 20260920-002309). | `TRG2 CHG1 PLT2 NRP1` |
 
 ## Test your robot
 

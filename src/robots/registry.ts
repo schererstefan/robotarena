@@ -11,6 +11,7 @@ import { create as createRusher, loadout as rusherLoadout, meta as rusherMeta } 
 import { create as createSniper, loadout as sniperLoadout, meta as sniperMeta } from './sniper';
 import { create as createTurret, loadout as turretLoadout, meta as turretMeta } from './turret';
 import { create as createWanderer, loadout as wandererLoadout, meta as wandererMeta } from './wanderer';
+import { create as createHunterHc1, loadout as hunterHc1Loadout, meta as hunterHc1Meta } from './hunter-hc1';
 
 export interface RobotEntry {
     meta: RobotMeta;
@@ -29,6 +30,7 @@ export const ROBOTS: RobotEntry[] = [
     { meta: sniperMeta, loadout: sniperLoadout, create: createSniper },
     { meta: brawlerMeta, loadout: brawlerLoadout, create: createBrawler },
     { meta: ghostMeta, loadout: ghostLoadout, create: createGhost },
+    { meta: hunterHc1Meta, loadout: hunterHc1Loadout, create: createHunterHc1 },
 ];
 
 export function getRobot(id: string): RobotEntry | undefined {

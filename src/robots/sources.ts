@@ -9,6 +9,7 @@ import rusherSrc from '../robots/rusher.ts?raw';
 import sniperSrc from '../robots/sniper.ts?raw';
 import turretSrc from '../robots/turret.ts?raw';
 import wandererSrc from '../robots/wanderer.ts?raw';
+import hunterHc1Src from '../robots/hunter-hc1.ts?raw';
 
 export const ROBOT_SOURCES: Record<string, string> = {
     brawler: brawlerSrc,
@@ -19,4 +20,5 @@ export const ROBOT_SOURCES: Record<string, string> = {
     sniper: sniperSrc,
     turret: turretSrc,
     wanderer: wandererSrc,
+    'hunter-hc1': hunterHc1Src,
 };
