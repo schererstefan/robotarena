@@ -2865,6 +2865,38 @@ console.log('comms');
     for (let i = 0; i < 400 && !wiredHunter.result.over; i += 1) wiredHunter.step();
     const hunterVotes = wiredLog.flatMap((e) => e.inbox).filter((m) => m.kind === 'focus');
     check('hunter focus votes reach its mate', hunterVotes.length > 0 && hunterVotes.every((m) => m.foe === 2 || m.foe === 3), `votes=${hunterVotes.length}`);
+    // Hunter trio: two hunters + a listener settle distinct slots live while
+    // focus votes keep chaining on the shared radio.
+    interface FullMailEntry {
+        tick: number;
+        inbox: Array<{ kind: string; role: number; slot: number; bid: number; foe: number; from: number; sent: number }>;
+    }
+    const fullmail = (log: FullMailEntry[]): RobotController => ({
+        meta: { id: 'fullmail', name: 'Fullmail', author: 'test', version: '0', description: '' },
+        update: (sense: SenseState): Intent => {
+            log.push({ tick: sense.tick, inbox: sense.inbox.map((m) => ({ kind: m.kind, role: m.role, slot: m.slot, bid: m.bid, foe: m.foe, from: m.from, sent: m.sent })) });
+            return {};
+        },
+    });
+    const trioMailLog: FullMailEntry[] = [];
+    const wiredTrio = new Match(
+        [
+            { team: 0, controller: cleanEntry.create(), loadout: { ...cleanEntry.loadout } },
+            { team: 0, controller: cleanEntry.create(), loadout: { ...cleanEntry.loadout } },
+            { team: 0, controller: fullmail(trioMailLog) },
+            { team: 1, controller: sitter('a') },
+            { team: 1, controller: sitter('b') },
+            { team: 1, controller: sitter('c') },
+        ],
+        5,
+    );
+    for (let i = 0; i < 400 && !wiredTrio.result.over; i += 1) wiredTrio.step();
+    const trioMail = trioMailLog.flatMap((e) => e.inbox);
+    const trioHolds = trioMail.filter((m) => m.kind === 'slot');
+    const trioVotes = trioMail.filter((m) => m.kind === 'focus');
+    const heldRoles = new Set(trioHolds.map((m) => m.role));
+    check('hunter trio heartbeats distinct slots', trioHolds.length > 0 && heldRoles.size === 2, `holds=${trioHolds.length} roles=${[...heldRoles]}`);
+    check('trio focus votes still chain', trioVotes.length > 0, `votes=${trioVotes.length}`);
     const ghostEntry = ROBOTS.find((r) => r.meta.id === 'ghost');
     if (!ghostEntry) throw new Error('no ghost');
     const ghostLog: MailboxEntry[] = [];
