@@ -26,7 +26,7 @@ import { parseOnlineBoard } from '../src/game/onlineBoard';
 import { parseShowcaseManifest } from '../src/game/showcase';
 import { resimReplay } from './eval/resim';
 import { castContact, castFocusVote, focusTarget, formationSlot, latestContact, resolveRoles } from '../src/robots/comms';
-import { castClaim, castSlotHold, collectClaims, HOLD_BONUS, latestSlotHold, myRole, preferenceBid, roleSlot, ROLE_POINT } from '../src/robots/roles';
+import { castClaim, castSlotHold, collectClaims, createRoleTracker, HOLD_BONUS, latestSlotHold, liveTeamIds, myRole, preferenceBid, rankByMidfield, roleGoal, roleSlot, ROLE_POINT, type RoleSense } from '../src/robots/roles';
 import { ROBOTS } from '../src/robots/registry';
 import { canonicalStringify, defaultGenome, genomeDefFor, genomeHash, genomeLoadout, sha256Hex, validateGenome, type Genome } from '../src/robots/genome';
 import { BRAIN_DEFAULTS, BRAIN_PRESETS, createBrain, pickTarget as brainPickTarget, safeCircleFor, type BrainParams } from '../src/robots/brain';
@@ -2799,6 +2799,58 @@ console.log('comms');
     check('other slots are ignored', latestSlotHold([holdMsg(1, 2, 100)], 1, 110) === null);
     const point = roleSlot(ROLE_POINT, 3, 480, 320, 100);
     check('point role takes the north slot', Math.abs(point.x - 480) < 0.001 && Math.abs(point.y - 220) < 0.001);
+    // Role behavior: ranking, tracker convergence, death re-resolve, goals.
+    check('live team ids sort ascending', JSON.stringify(liveTeamIds(1, [{ id: 2 }, { id: 0 }])) === '[0,1,2]');
+    const rankMates = [{ id: 1, x: 300, y: 300 }, { id: 2, x: 100, y: 300 }];
+    check('midfield ranking leads with the closest mate', JSON.stringify(rankByMidfield(0, 200, 300, rankMates)) === '[1,0,2]');
+    // Three trackers with 6-tick delayed delivery, engine-style (cap 4).
+    const trioMates = [
+        { id: 0, x: 200, y: 300 },
+        { id: 1, x: 300, y: 300 },
+        { id: 2, x: 100, y: 300 },
+    ];
+    const trioTrackers = trioMates.map(() => createRoleTracker());
+    const trioInFlight: Array<{ to: number; msg: RoleSense['inbox'][number]; arrive: number }> = [];
+    let trioDead = -1;
+    const trioStep = (tick: number): Array<number | null> =>
+        trioMates.map((mate, i) => {
+            if (mate.id === trioDead) return null;
+            const inbox = trioInFlight.filter((f) => f.to === mate.id && f.arrive <= tick).map((f) => f.msg).slice(-4);
+            const allies = trioMates.filter((m) => m.id !== mate.id && m.id !== trioDead);
+            const state = (trioTrackers[i] as ReturnType<typeof createRoleTracker>).update({ tick, self: mate, allies, inbox });
+            if (state.radio !== null) {
+                for (const other of trioMates) {
+                    if (other.id === mate.id || other.id === trioDead) continue;
+                    trioInFlight.push({ to: other.id, msg: { ...state.radio, from: mate.id, sent: tick }, arrive: tick + 6 });
+                }
+            }
+            return state.role;
+        });
+    let trioRoles: Array<number | null> = [null, null, null];
+    for (let t = 0; t < 30; t += 1) trioRoles = trioStep(t);
+    check('trio trackers converge on distinct roles', JSON.stringify(trioRoles) === '[1,0,2]', `roles=${JSON.stringify(trioRoles)}`);
+    // Heartbeats are sparse: settled trackers mostly yield radio to focus votes.
+    let holdCount = 0;
+    for (let t = 30; t < 66; t += 1) {
+        const mate = trioMates[0] as { id: number; x: number; y: number };
+        const inbox = trioInFlight.filter((f) => f.to === 0 && f.arrive <= t).map((f) => f.msg).slice(-4);
+        const state = (trioTrackers[0] as ReturnType<typeof createRoleTracker>).update({ tick: t, self: mate, allies: trioMates.slice(1), inbox });
+        if (state.radio !== null && state.radio.kind === 'slot') holdCount += 1;
+        for (const other of trioMates.slice(1)) {
+            if (state.radio !== null) trioInFlight.push({ to: other.id, msg: { ...state.radio, from: 0, sent: t }, arrive: t + 6 });
+        }
+    }
+    check('slot heartbeats stay sparse', holdCount >= 2 && holdCount <= 4, `holds=${holdCount}`);
+    // Death re-resolve: mate 2 drops; survivors re-settle distinct roles.
+    trioDead = 2;
+    for (let t = 66; t < 90; t += 1) trioRoles = trioStep(t);
+    check('survivors re-resolve distinct roles', trioRoles[0] !== null && trioRoles[1] !== null && trioRoles[0] !== trioRoles[1], `roles=${JSON.stringify(trioRoles)}`);
+    const solo = createRoleTracker().update({ tick: 0, self: { id: 0, x: 200, y: 300 }, allies: [], inbox: [] });
+    check('tracker idles in 1v1', solo.role === null && solo.radio === null);
+    const goalFoe = roleGoal({ self: { x: 480, y: 320 }, allies: [], foes: [{ x: 600, y: 320, distance: 120 }] }, ROLE_POINT, 3, 170);
+    check('slot goal rings the foe', Math.abs(goalFoe.x - 600) < 0.001 && Math.abs(goalFoe.y - 150) < 0.001);
+    const goalBlind = roleGoal({ self: { x: 400, y: 320 }, allies: [{ x: 560, y: 320 }], foes: [] }, 1, 3, 170);
+    check('blind slot goal rings the team centroid', Math.abs(goalBlind.x - 627.224) < 0.01 && Math.abs(goalBlind.y - 405) < 0.01);
     // Wired bots: hunter votes reach a mate, ghost contacts reach a mate.
     const wiredLog: MailboxEntry[] = [];
     const wiredHunter = new Match(

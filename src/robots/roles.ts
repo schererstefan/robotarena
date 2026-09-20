@@ -29,6 +29,7 @@
 // positions over the radio link, never own-cone-only sightings), or mates
 // will settle different maps.
 
+import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
 import { formationSlot, resolveRoles, type RoleBid } from './comms';
 import type { InboxMessage, OutboxMessage } from '../sim/types';
 
@@ -137,4 +138,180 @@ export function roleSlot(
     radius: number,
 ): { x: number; y: number } {
     return formationSlot(role, slots, anchorX, anchorY, radius);
+}
+
+// ---------------------------------------------------------------------------
+// Role behavior: take and keep formation slots, re-resolve on teammate death.
+// ---------------------------------------------------------------------------
+
+/** Formation ring radius around the anchor (keeps wings in gun range). */
+export const SLOT_RADIUS = 170;
+
+/** Slot heartbeat cadence in ticks (well inside the hold freshness window). */
+export const HOLD_EVERY = 12;
+
+/** Slot holds older than this are stale; the slot is free to re-claim. */
+export const HOLD_MAX_AGE = 30;
+
+/** Narrow sense surface the tracker needs (SenseState is assignable). */
+export interface RoleSense {
+    tick: number;
+    self: { id: number; x: number; y: number };
+    allies: Array<{ id: number; x: number; y: number }>;
+    inbox: InboxMessage[];
+}
+
+/** Narrow sense surface for slot goals (SenseState is assignable). */
+export interface RoleGoalSense {
+    self: { x: number; y: number };
+    allies: Array<{ x: number; y: number }>;
+    foes: Array<{ x: number; y: number; distance: number }>;
+}
+
+/**
+ * Live team ids from shared knowledge, ascending. radio-link allies are
+ * always exactly the living teammates, so this doubles as the liveness
+ * set for the auction — no separate death detection needed.
+ */
+export function liveTeamIds(selfId: number, allies: Array<{ id: number }>): number[] {
+    return [selfId, ...allies.map((a) => a.id)].sort((a, b) => a - b);
+}
+
+/**
+ * Teammate preference ranking, closest to midfield first, id breaks ties.
+ * Inputs (own + ally positions) are shared knowledge over the radio link,
+ * so every mate computes the identical order and the trio's top picks are
+ * distinct with no negotiation: rank 0 takes point, the rest take wings.
+ */
+export function rankByMidfield(
+    selfId: number, selfX: number, selfY: number,
+    allies: Array<{ id: number; x: number; y: number }>,
+): number[] {
+    const cx = ARENA_WIDTH / 2;
+    const cy = ARENA_HEIGHT / 2;
+    return [{ id: selfId, x: selfX, y: selfY }, ...allies]
+        .map((m) => ({ id: m.id, d: (m.x - cx) * (m.x - cx) + (m.y - cy) * (m.y - cy) }))
+        .sort((a, b) => (a.d === b.d ? a.id - b.id : a.d - b.d))
+        .map((m) => m.id);
+}
+
+export interface RoleState {
+    /** Settled role, or null while contended (caller keeps claiming). */
+    role: number | null;
+    /** Formation slot (1:1 with role); slots counts the live ring. */
+    slot: number;
+    slots: number;
+    /** Radio to send this tick, or null so the caller may vote focus. */
+    radio: OutboxMessage | null;
+}
+
+export interface RoleTracker {
+    readonly role: number | null;
+    update(sense: RoleSense): RoleState;
+}
+
+export interface RoleTrackerOptions {
+    roles?: number;
+    holdEvery?: number;
+}
+
+/**
+ * Fresh per-match role tracker (held role + live set live in the closure).
+ * Takes a formation slot via the claim auction, keeps it with heartbeats
+ * and an incumbency bidding bonus, and re-resolves from the midfield
+ * ranking whenever the live set changes (teammate death). With no allies
+ * (1v1) it stays idle — role null, radio null — so solo behavior is
+ * byte-identical with or without the tracker.
+ */
+export function createRoleTracker(opts?: RoleTrackerOptions): RoleTracker {
+    const roles = opts?.roles ?? SQUAD_ROLE_COUNT;
+    const holdEvery = opts?.holdEvery ?? HOLD_EVERY;
+    let held: number | null = null;
+    let lastLiveKey = '';
+    let fallback = 0;
+    let lastHoldSent = -Infinity;
+
+    function update(sense: RoleSense): RoleState {
+        const selfId = sense.self.id;
+        const live = liveTeamIds(selfId, sense.allies);
+        const n = live.length;
+        if (n <= 1) {
+            held = null;
+            lastLiveKey = '';
+            fallback = 0;
+            return { role: null, slot: 0, slots: 1, radio: null };
+        }
+        const liveKey = live.join(',');
+        if (liveKey !== lastLiveKey) {
+            // Live set changed (teammate death or first contact): drop the
+            // held slot and re-resolve from the shared ranking.
+            held = null;
+            fallback = 0;
+            lastLiveKey = liveKey;
+        }
+        const ranking = rankByMidfield(selfId, sense.self.x, sense.self.y, sense.allies);
+        const topRole = ranking.indexOf(selfId) % roles;
+        // Preference rotation: top pick first, then the rest in ring order,
+        // so a contested loser falls back to a distinct role deterministically.
+        const rotation: number[] = [];
+        for (let i = 0; i < roles; i += 1) rotation.push((topRole + i) % roles);
+        const sticking = held !== null;
+        const claimRole = sticking ? (held as number) : rotation[Math.min(fallback, roles - 1)] as number;
+        // Incumbents outbid every fresh top pick (max `roles`), so slots are
+        // kept through position shifts and only re-resolve on live-set change.
+        const bid = sticking ? roles + HOLD_BONUS : preferenceBid(rotation.indexOf(claimRole), roles);
+        const claims = collectClaims(sense.inbox, new Set(live), { from: selfId, role: claimRole, bid });
+        const role = myRole(claims, selfId);
+        if (role !== null) {
+            held = role;
+            fallback = 0;
+            let radio: OutboxMessage | null = null;
+            if (sense.tick - lastHoldSent >= holdEvery) {
+                radio = castSlotHold(role, role);
+                lastHoldSent = sense.tick;
+            }
+            return { role, slot: role, slots: n, radio };
+        }
+        // Lost the auction: hold nothing, advance the fallback, and rebid
+        // immediately so mates hear the bid this resolve counted.
+        held = null;
+        fallback = Math.min(fallback + 1, roles - 1);
+        return { role: null, slot: claimRole, slots: n, radio: castClaim(claimRole, bid) };
+    }
+
+    return {
+        get role(): number | null {
+            return held;
+        },
+        update,
+    };
+}
+
+/**
+ * Where role `role` should stand this tick: formation slot `role` of
+ * `slots` around the nearest visible foe, or around the live-team
+ * centroid while blind (shared knowledge, so blind mates cohere).
+ */
+export function roleGoal(
+    sense: RoleGoalSense,
+    role: number,
+    slots: number,
+    radius: number = SLOT_RADIUS,
+): { x: number; y: number } {
+    let anchorX = sense.self.x;
+    let anchorY = sense.self.y;
+    if (sense.foes.length > 0) {
+        let nearest = sense.foes[0] as { x: number; y: number; distance: number };
+        for (const foe of sense.foes) {
+            if (foe.distance < nearest.distance) nearest = foe;
+        }
+        anchorX = nearest.x;
+        anchorY = nearest.y;
+    } else {
+        const xs = [sense.self.x, ...sense.allies.map((a) => a.x)];
+        const ys = [sense.self.y, ...sense.allies.map((a) => a.y)];
+        anchorX = xs.reduce((a, b) => a + b, 0) / xs.length;
+        anchorY = ys.reduce((a, b) => a + b, 0) / ys.length;
+    }
+    return roleSlot(role, slots, anchorX, anchorY, radius);
 }
