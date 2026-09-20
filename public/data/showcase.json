@@ -7,7 +7,8 @@
    "baseBot": "brawler",
    "author": "RobotArena (hillclimb)",
    "seedLoadout": {
-    "overdrive": 2,
+    "overdrive": 1,
+    "gyro": 1,
     "trigger": 2,
     "plating": 2
    },
@@ -19,39 +20,39 @@
    },
    "stats": {
     "before": {
-     "wins": 42,
-     "losses": 22,
-     "draws": 0,
-     "winRate": 0.65625,
+     "wins": 32,
+     "losses": 30,
+     "draws": 2,
+     "winRate": 0.515625,
      "games": 64
     },
     "after": {
-     "wins": 53,
-     "losses": 7,
+     "wins": 49,
+     "losses": 11,
      "draws": 4,
-     "winRate": 0.859375,
+     "winRate": 0.796875,
      "games": 64
     }
    },
    "featuredReplays": [
     {
-     "label": "vs rusher (open, seed 1725761109)",
-     "code": "RA2-4SPX-0SAG-3BG0-6124-3011-005G-0",
+     "label": "vs turret (open, seed 85229582)",
+     "code": "RA2-418M-G070-3BG0-6124-4328-01WA-0",
      "outcome": "win"
     },
     {
-     "label": "vs rusher (open, seed 1725761109)",
-     "code": "RA2-4SPX-0SAG-3860-2201-R030-H3CE-0",
+     "label": "vs turret (open, seed 85229582)",
+     "code": "RA2-418M-G070-3886-4G01-R030-H3VP-0",
      "outcome": "win"
     },
     {
-     "label": "vs rusher (blocks, seed 1725761109)",
-     "code": "RA2-4SPX-0SAH-3BG0-6124-3011-0065-G",
+     "label": "vs turret (blocks, seed 85229582)",
+     "code": "RA2-418M-G071-3BG0-6124-4328-00M0-0",
      "outcome": "win"
     },
     {
-     "label": "vs rusher (blocks, seed 1725761109)",
-     "code": "RA2-4SPX-0SAH-3860-2201-R030-H2PB-0",
+     "label": "vs turret (blocks, seed 85229582)",
+     "code": "RA2-418M-G071-3886-4G01-R030-H2EE-0",
      "outcome": "win"
     }
    ],
@@ -67,9 +68,10 @@
    "baseBot": "ghost",
    "author": "RobotArena (hillclimb)",
    "seedLoadout": {
-    "overdrive": 2,
+    "overdrive": 1,
     "gyro": 2,
     "wideband": 1,
+    "plating": 1,
     "scout": 1
    },
    "champLoadout": {
@@ -80,17 +82,17 @@
    },
    "stats": {
     "before": {
-     "wins": 43,
-     "losses": 21,
+     "wins": 39,
+     "losses": 25,
      "draws": 0,
-     "winRate": 0.671875,
+     "winRate": 0.609375,
      "games": 64
     },
     "after": {
-     "wins": 55,
-     "losses": 9,
+     "wins": 56,
+     "losses": 8,
      "draws": 0,
-     "winRate": 0.859375,
+     "winRate": 0.875,
      "games": 64
     }
    },
@@ -128,10 +130,9 @@
    "baseBot": "hunter",
    "author": "RobotArena (hillclimb)",
    "seedLoadout": {
+    "overdrive": 2,
     "trigger": 2,
-    "marksman": 1,
-    "charger": 2,
-    "plating": 1
+    "plating": 2
    },
    "champLoadout": {
     "trigger": 2,
@@ -141,17 +142,17 @@
    },
    "stats": {
     "before": {
-     "wins": 41,
-     "losses": 23,
-     "draws": 0,
-     "winRate": 0.640625,
+     "wins": 28,
+     "losses": 34,
+     "draws": 2,
+     "winRate": 0.453125,
      "games": 64
     },
     "after": {
-     "wins": 56,
-     "losses": 8,
+     "wins": 54,
+     "losses": 10,
      "draws": 0,
-     "winRate": 0.875,
+     "winRate": 0.84375,
      "games": 64
     }
    },
@@ -190,8 +191,8 @@
    "author": "RobotArena (hillclimb)",
    "seedLoadout": {
     "overdrive": 2,
-    "gyro": 2,
-    "trigger": 1,
+    "servos": 1,
+    "trigger": 2,
     "plating": 1
    },
    "champLoadout": {
@@ -202,17 +203,17 @@
    },
    "stats": {
     "before": {
-     "wins": 12,
-     "losses": 52,
+     "wins": 31,
+     "losses": 33,
      "draws": 0,
-     "winRate": 0.1875,
+     "winRate": 0.484375,
      "games": 64
     },
     "after": {
-     "wins": 51,
-     "losses": 13,
+     "wins": 49,
+     "losses": 15,
      "draws": 0,
-     "winRate": 0.796875,
+     "winRate": 0.765625,
      "games": 64
     }
    },
@@ -250,8 +251,9 @@
    "baseBot": "rusher",
    "author": "RobotArena (hillclimb)",
    "seedLoadout": {
-    "overdrive": 3,
-    "trigger": 1,
+    "overdrive": 1,
+    "longscan": 1,
+    "trigger": 2,
     "plating": 2
    },
    "champLoadout": {
@@ -262,17 +264,17 @@
    },
    "stats": {
     "before": {
-     "wins": 17,
-     "losses": 47,
+     "wins": 28,
+     "losses": 36,
      "draws": 0,
-     "winRate": 0.265625,
+     "winRate": 0.4375,
      "games": 64
     },
     "after": {
-     "wins": 53,
-     "losses": 11,
-     "draws": 0,
-     "winRate": 0.828125,
+     "wins": 47,
+     "losses": 14,
+     "draws": 3,
+     "winRate": 0.7578125,
      "games": 64
     }
    },
@@ -311,7 +313,8 @@
    "author": "RobotArena (hillclimb)",
    "seedLoadout": {
     "longscan": 2,
-    "marksman": 2,
+    "trigger": 1,
+    "marksman": 1,
     "charger": 1,
     "deadeye": 1
    },
@@ -323,17 +326,17 @@
    },
    "stats": {
     "before": {
-     "wins": 26,
-     "losses": 38,
+     "wins": 22,
+     "losses": 42,
      "draws": 0,
-     "winRate": 0.40625,
+     "winRate": 0.34375,
      "games": 64
     },
     "after": {
-     "wins": 32,
-     "losses": 32,
+     "wins": 30,
+     "losses": 34,
      "draws": 0,
-     "winRate": 0.5,
+     "winRate": 0.46875,
      "games": 64
     }
    },
@@ -391,10 +394,10 @@
      "games": 64
     },
     "after": {
-     "wins": 43,
-     "losses": 21,
+     "wins": 35,
+     "losses": 29,
      "draws": 0,
-     "winRate": 0.671875,
+     "winRate": 0.546875,
      "games": 64
     }
    },
@@ -433,8 +436,10 @@
    "author": "RobotArena (hillclimb)",
    "seedLoadout": {
     "overdrive": 2,
-    "longscan": 2,
-    "wideband": 2
+    "longscan": 1,
+    "wideband": 1,
+    "trigger": 1,
+    "plating": 1
    },
    "champLoadout": {
     "trigger": 3,
@@ -444,17 +449,17 @@
    },
    "stats": {
     "before": {
-     "wins": 12,
-     "losses": 52,
+     "wins": 17,
+     "losses": 47,
      "draws": 0,
-     "winRate": 0.1875,
+     "winRate": 0.265625,
      "games": 64
     },
     "after": {
-     "wins": 33,
-     "losses": 30,
-     "draws": 1,
-     "winRate": 0.5234375,
+     "wins": 32,
+     "losses": 32,
+     "draws": 0,
+     "winRate": 0.5,
      "games": 64
     }
    },

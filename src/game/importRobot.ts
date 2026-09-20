@@ -17,6 +17,7 @@ import {
     importFetchHttp,
     importLoadFailed,
     importUpdateThrew,
+    importValueImports,
 } from './strings';
 import { checkRobotSource } from './workshop';
 
@@ -132,8 +133,9 @@ export function prepareModuleSource(source: string): { ok: true; code: string } 
         .filter((line) => !/^\s*import\s+type\b/.test(line))
         .join('\n');
     if (/\bimport\s*\(/.test(code)) return { ok: false, error: IMPORT_ERROR.dynamicImport };
-    if (/^\s*import\s+[^'";]*?from\s*['"]/m.test(code) || /^\s*import\s*['"]/m.test(code)) {
-        return { ok: false, error: IMPORT_ERROR.valueImports };
+    const valueImport = /^\s*import\s+(?:[^'";]*?\sfrom\s+)?['"]([^'"]+)['"]/m.exec(code);
+    if (valueImport) {
+        return { ok: false, error: importValueImports(valueImport[1] ?? IMPORT_ERROR.unknown) };
     }
     return { ok: true, code };
 }
@@ -187,7 +189,14 @@ export function validateAndRegister(module: unknown): ImportResult {
         return { ok: false, error: importUpdateThrew(error instanceof Error ? error.message : IMPORT_ERROR.unknown) };
     }
     const create: RobotFactory = () => {
-        const inner = (module['create'] as RobotFactory)();
+        let inner: RobotController;
+        try {
+            inner = (module['create'] as RobotFactory)();
+        } catch {
+            // A factory that passed the dry run but throws at match time
+            // degrades to a parked robot instead of breaking battle setup.
+            return { meta, loadout: { ...loadout }, update: () => ({ ...IDLE_INTENT }) };
+        }
         const innerUpdate = inner.update.bind(inner);
         return {
             ...inner,

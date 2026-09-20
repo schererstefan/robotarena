@@ -97,6 +97,7 @@ function loadRunManifest(runsDir: string, record: ChampionRecord): TuneManifest 
 }
 
 function toRecord(agg: { wins: number; losses: number; draws: number; mean: number; n: number }): ShowcaseRecord {
+    // winRate is the score-mean (wins + 0.5 * draws) / games, not win share.
     return { wins: agg.wins, losses: agg.losses, draws: agg.draws, winRate: agg.mean, games: agg.n };
 }
 

@@ -19,7 +19,7 @@ export const meta: RobotMeta = {
     description: 'Fast hit-and-run scout: darts in on a ready gun, vanishes on cooldown.',
 };
 
-export const loadout: SkillLoadout = { overdrive: 2, gyro: 2, wideband: 1, scout: 1 };
+export const loadout: SkillLoadout = { overdrive: 1, gyro: 2, wideband: 1, scout: 1, plating: 1 };
 
 /** Tunable knobs (genome §1.4 groups). Defaults = legacy behavior exactly. */
 export interface GhostParams {

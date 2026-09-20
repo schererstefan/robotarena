@@ -394,6 +394,11 @@ export class MenuScene extends Scene {
         if (lines.length === 0) return;
         const el = document.getElementById('marquee');
         if (!el) return;
+        // Reduced motion: static first headline, no auto-updating rotation.
+        if (isReducedMotion()) {
+            el.textContent = `${APP.marquee} - ${lines[0] as string}`;
+            return;
+        }
         let i = 0;
         const tick = (): void => {
             el.textContent = `${APP.marquee} - ${lines[i % lines.length] as string}`;

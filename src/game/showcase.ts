@@ -81,9 +81,9 @@ function isChampion(raw: unknown): raw is ShowcaseChampion {
     const board = raw['board'];
     if (board !== null) {
         if (!isRecord(board)) return false;
-        if (typeof board['elo'] !== 'number' || !Number.isFinite(board['elo'])) return false;
+        if (typeof board['elo'] !== 'number' || !Number.isFinite(board['elo']) || (board['elo'] as number) < 0) return false;
         for (const key of ['wins', 'losses', 'draws'] as const) {
-            if (typeof board[key] !== 'number' || !Number.isInteger(board[key])) return false;
+            if (typeof board[key] !== 'number' || !Number.isInteger(board[key]) || (board[key] as number) < 0) return false;
         }
     }
     return true;

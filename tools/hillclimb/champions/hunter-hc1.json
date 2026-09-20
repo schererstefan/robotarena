@@ -3,6 +3,7 @@
  "baseBot": "hunter",
  "runId": "20260920-002309",
  "genomeHash": "fc732fab4a3825147fe2aa340d7b686eac70831587a2769ce54843e509ed5ca1",
+ "genomeHashNote": "Legacy hash: computed under the pre-brain hunter def (9 params); the current def fills 7 brain.* defaults, so recomputation differs. Preserved intentionally to keep run 20260920-002309 linkage. Superseded by hunter-hc2.",
  "genome": {
   "genome_version": 1,
   "bot": "hunter",

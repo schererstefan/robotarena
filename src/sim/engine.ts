@@ -55,6 +55,15 @@ export interface SafeCircle {
     r: number;
 }
 
+/** A hostile controller's meta getter must not break snapshots. */
+function safeControllerName(controller: RobotController, id: number): string {
+    try {
+        return controller.meta?.name ?? `robot-${id}`;
+    } catch {
+        return `robot-${id}`;
+    }
+}
+
 interface Robot {
     id: number;
     team: 0 | 1;
@@ -290,7 +299,7 @@ export class Match {
         return this.robots.map((r) => ({
             id: r.id,
             team: r.team,
-            name: r.controller.meta?.name ?? `robot-${r.id}`,
+            name: safeControllerName(r.controller, r.id),
             x: r.x,
             y: r.y,
             heading: r.heading,

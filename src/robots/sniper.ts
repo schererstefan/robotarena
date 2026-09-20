@@ -17,7 +17,7 @@ export const meta: RobotMeta = {
     description: 'Camps backfield and lands charged long-range shots. Do not stand still.',
 };
 
-export const loadout: SkillLoadout = { marksman: 2, longscan: 2, charger: 1, deadeye: 1 };
+export const loadout: SkillLoadout = { longscan: 2, marksman: 1, charger: 1, deadeye: 1, trigger: 1 };
 
 /** Tunable knobs (genome §1.4 groups). Defaults = legacy behavior exactly. */
 export interface SniperParams {

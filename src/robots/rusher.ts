@@ -17,7 +17,7 @@ export const meta: RobotMeta = {
     description: 'Charges the nearest foe head-on. Simple, fast, and rude.',
 };
 
-export const loadout: SkillLoadout = { overdrive: 3, plating: 2, trigger: 1 };
+export const loadout: SkillLoadout = { overdrive: 1, longscan: 1, trigger: 2, plating: 2 };
 
 /** Tunable knobs (genome §1.4 groups). Defaults = legacy behavior exactly. */
 export interface RusherParams {
@@ -34,7 +34,7 @@ export interface RusherParams {
 export const RUSHER_DEFAULTS: RusherParams = {
     steerGain: 2.5,
     turretGain: 3,
-    aimTol: 0.07,
+    aimTol: 0.11,
     weaveRange: 200,
     weaveAmp: 0.5,
     weavePeriod: 18,

@@ -17,7 +17,7 @@ export const meta: RobotMeta = {
     description: 'Plated bruiser that walks its gun into knife-fight range. All pressure.',
 };
 
-export const loadout: SkillLoadout = { plating: 2, overdrive: 2, trigger: 2 };
+export const loadout: SkillLoadout = { overdrive: 1, gyro: 1, trigger: 2, plating: 2 };
 
 /** Tunable knobs (genome §1.4 groups). Defaults = legacy behavior exactly. */
 export interface BrawlerParams {

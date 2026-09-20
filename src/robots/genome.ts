@@ -72,7 +72,7 @@ export const PARAM_RANGES: Record<string, Record<string, ParamDef>> = {
         'brain.aggression': { type: 'float', min: 0, max: 2, default: 1 },
         'brain.focusBonus': { type: 'float', min: 0, max: 1, default: 0.3 },
         'brain.orbitDir': { type: 'enum', values: [-1, 1], default: 1 },
-        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { charger: 2, marksman: 1, trigger: 2, plating: 1 } },
+        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { overdrive: 2, trigger: 2, plating: 2 } },
     },
     orbiter: {
         'orbit.range': { type: 'float', min: 150, max: 500, default: 330 },
@@ -82,22 +82,22 @@ export const PARAM_RANGES: Record<string, Record<string, ParamDef>> = {
         'drive.orbitThrottle': { type: 'float', min: 0, max: 1, default: 0.9 },
         'drive.turnThrottle': { type: 'float', min: 0, max: 1, default: 0.3 },
         'steer.gain': { type: 'float', min: 1, max: 6, default: 2.5 },
-        'turret.gain': { type: 'float', min: 1, max: 6, default: 3 },
+        'turret.gain': { type: 'float', min: 1, max: 6, default: 4 },
         'fire.aimTol': { type: 'float', min: 0.01, max: 0.3, default: 0.07 },
         'target.policy': { type: 'enum', values: ['first', 'nearest', 'weakest', 'strongest'], default: 'first' },
         'search.scanTurn': { type: 'float', min: -1, max: 1, default: 0.8 },
-        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { gyro: 2, overdrive: 2, trigger: 1, plating: 1 } },
+        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { overdrive: 2, servos: 1, trigger: 2, plating: 1 } },
     },
     rusher: {
         'steer.gain': { type: 'float', min: 1, max: 6, default: 2.5 },
         'turret.gain': { type: 'float', min: 1, max: 6, default: 3 },
-        'fire.aimTol': { type: 'float', min: 0.01, max: 0.3, default: 0.07 },
+        'fire.aimTol': { type: 'float', min: 0.01, max: 0.3, default: 0.11 },
         'engage.weaveRange': { type: 'float', min: 0, max: 500, default: 200 },
         'weave.amp': { type: 'float', min: 0, max: 1.2, default: 0.5 },
         'weave.period': { type: 'float', min: 6, max: 40, default: 18 },
         'search.scanRate': { type: 'float', min: 0.5, max: 6, default: 2.4 },
         'target.policy': { type: 'enum', values: ['first', 'nearest', 'weakest', 'strongest'], default: 'first' },
-        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { overdrive: 3, plating: 2, trigger: 1 } },
+        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { overdrive: 1, longscan: 1, trigger: 2, plating: 2 } },
     },
     brawler: {
         'steer.gain': { type: 'float', min: 1, max: 6, default: 2.5 },
@@ -113,7 +113,7 @@ export const PARAM_RANGES: Record<string, Record<string, ParamDef>> = {
         'dash.maxRange': { type: 'float', min: 200, max: 800, default: 520 },
         'search.scanTurn': { type: 'float', min: -1, max: 1, default: 0.9 },
         'target.policy': { type: 'enum', values: ['first', 'nearest', 'weakest', 'strongest'], default: 'first' },
-        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { plating: 2, overdrive: 2, trigger: 2 } },
+        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { overdrive: 1, gyro: 1, trigger: 2, plating: 2 } },
     },
     sniper: {
         'anchor.xNear': { type: 'float', min: 0.05, max: 0.45, default: 0.24 },
@@ -131,7 +131,7 @@ export const PARAM_RANGES: Record<string, Record<string, ParamDef>> = {
         'fire.bankRangeFrac': { type: 'float', min: 0.3, max: 1, default: 0.75 },
         'turret.gain': { type: 'float', min: 1, max: 6, default: 3 },
         'target.policy': { type: 'enum', values: ['first', 'nearest', 'weakest', 'strongest'], default: 'first' },
-        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { marksman: 2, longscan: 2, charger: 1, deadeye: 1 } },
+        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { longscan: 2, marksman: 1, charger: 1, deadeye: 1, trigger: 1 } },
     },
     turret: {
         'anchor.xNear': { type: 'float', min: 0.05, max: 0.45, default: 0.32 },
@@ -160,7 +160,7 @@ export const PARAM_RANGES: Record<string, Record<string, ParamDef>> = {
         'drive.engageThrottle': { type: 'float', min: 0, max: 1, default: 0.5 },
         'search.scanTurn': { type: 'float', min: -1, max: 1, default: 1 },
         'target.policy': { type: 'enum', values: ['first', 'nearest', 'weakest', 'strongest'], default: 'first' },
-        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { longscan: 2, wideband: 2, overdrive: 2 } },
+        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { overdrive: 2, longscan: 1, wideband: 1, trigger: 1, plating: 1 } },
     },
     ghost: {
         'steer.gain': { type: 'float', min: 1, max: 6, default: 2.5 },
@@ -178,7 +178,7 @@ export const PARAM_RANGES: Record<string, Record<string, ParamDef>> = {
         'search.scanTurn': { type: 'float', min: -1, max: 1, default: 1 },
         'engage.breakRange': { type: 'float', min: 100, max: 600, default: 320 },
         'target.policy': { type: 'enum', values: ['first', 'nearest', 'weakest', 'strongest'], default: 'first' },
-        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { overdrive: 2, gyro: 2, wideband: 1, scout: 1 } },
+        loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { overdrive: 1, gyro: 2, wideband: 1, scout: 1, plating: 1 } },
     },
 };
 

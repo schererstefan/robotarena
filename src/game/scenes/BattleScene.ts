@@ -54,6 +54,8 @@ import {
     plateTotal,
     reelCountdown,
     reelExitCountdown,
+    resultsKeyHint,
+    resultsKeysHint,
     resultRow,
     resultsSub,
     resultsTitle,
@@ -130,6 +132,7 @@ export class BattleScene extends Scene {
     private nameTexts: Phaser.GameObjects.Text[] = [];
     private pipTexts: Phaser.GameObjects.Text[] = [];
     private pipCache: string[] = [];
+    private pipCdCache: Array<[number, number]> = [];
     private bullets: Phaser.GameObjects.Image[] = [];
     private muzzles: Phaser.GameObjects.Image[] = [];
     private particles: Particle[] = [];
@@ -211,6 +214,11 @@ export class BattleScene extends Scene {
     private pauseButton!: { setLabel: (label: string) => void };
     private stepButton!: { setLabel: (label: string) => void; setEnabled: (enabled: boolean) => void };
     private resultsShown = false;
+    /** Results keyboard: set once the results buttons exist. */
+    private resultsReady = false;
+    private resultsPrimary: (() => void) | null = null;
+    private resultsSecondary: (() => void) | null = null;
+    private resultsFinish: (() => void) | null = null;
     private trails: Array<Array<{ x: number; y: number }>> = [];
     private lastTrailTick = -1;
     private stripes: Phaser.GameObjects.Rectangle[] = [];
@@ -279,6 +287,10 @@ export class BattleScene extends Scene {
         this.paused = false;
         this.speed = 1;
         this.resultsShown = false;
+        this.resultsReady = false;
+        this.resultsPrimary = null;
+        this.resultsSecondary = null;
+        this.resultsFinish = null;
         this.chassis = [];
         this.towers = [];
         this.hubs = [];
@@ -287,6 +299,7 @@ export class BattleScene extends Scene {
         this.nameTexts = [];
         this.pipTexts = [];
         this.pipCache = [];
+        this.pipCdCache = [];
         this.bullets = [];
         this.muzzles = [];
         this.particles = [];
@@ -519,6 +532,7 @@ export class BattleScene extends Scene {
             // Cooldown readout: sweep dials (dyn) + D/E icons + seconds text.
             this.pipTexts.push(this.add.text(0, 0, '', FONTS.monoSmall).setOrigin(0.5).setDepth(9));
             this.pipCache.push('');
+            this.pipCdCache.push([-1, -1]);
             this.prevDashReady.push(true);
             this.prevEmpReady.push(true);
             this.iconDash.push(this.add.image(0, 0, uiIconKey('dash')).setDepth(9).setAlpha(0.9));
@@ -663,6 +677,9 @@ export class BattleScene extends Scene {
         this.input.keyboard?.on('keydown-N', this.onStepKey);
         this.input.keyboard?.on('keydown-F', this.onDebugKey);
         this.input.keyboard?.on('keydown', this.onIntroKey);
+        this.input.keyboard?.on('keydown-ENTER', this.onResultsConfirm);
+        this.input.keyboard?.on('keydown-X', this.onResultsExit);
+        this.input.keyboard?.on('keydown-ESC', this.onResultsExit);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-SPACE', this.onSpaceKey);
             this.input.keyboard?.off('keydown', this.onPilotKeyDown);
@@ -671,6 +688,9 @@ export class BattleScene extends Scene {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown-N', this.onStepKey);
             this.input.keyboard?.off('keydown-F', this.onDebugKey);
+            this.input.keyboard?.off('keydown-ENTER', this.onResultsConfirm);
+            this.input.keyboard?.off('keydown-X', this.onResultsExit);
+            this.input.keyboard?.off('keydown-ESC', this.onResultsExit);
             stopMusic();
             this.clearFilters();
         });
@@ -831,6 +851,22 @@ export class BattleScene extends Scene {
 
     private onStepKey = (): void => {
         this.stepOnce();
+    };
+
+    /** Results keyboard: Enter activates the primary button (NEXT/REMATCH). */
+    private onResultsConfirm = (): void => {
+        if (!this.resultsShown) return;
+        if (!this.resultsReady) {
+            this.resultsFinish?.();
+            return;
+        }
+        this.resultsPrimary?.();
+    };
+
+    /** Results keyboard: X/Escape activates EXIT/MENU. */
+    private onResultsExit = (): void => {
+        if (!this.resultsShown || !this.resultsReady) return;
+        this.resultsSecondary?.();
     };
 
     private onPilotKeyDown = (event: KeyboardEvent): void => {
@@ -1852,11 +1888,22 @@ export class BattleScene extends Scene {
             const pips = this.pipTexts[i] as Phaser.GameObjects.Text;
             pips.setVisible(plateOn).setPosition(cx, cy + 44);
             if (visible) {
-                const text = cooldownLabel(s.dashCd, s.empCd);
-                if (text !== this.pipCache[i]) {
-                    this.pipCache[i] = text;
-                    pips.setText(text);
-                    pips.setColor(dashReady && empReady ? '#7de08a' : '#9aa7b4');
+                // Numeric gate first: skip the label build (strings + closures)
+                // entirely when neither cooldown moved since last frame.
+                let cdCached = this.pipCdCache[i];
+                if (cdCached === undefined) {
+                    cdCached = [-1, -1];
+                    this.pipCdCache[i] = cdCached;
+                }
+                if (cdCached[0] !== s.dashCd || cdCached[1] !== s.empCd) {
+                    cdCached[0] = s.dashCd;
+                    cdCached[1] = s.empCd;
+                    const text = cooldownLabel(s.dashCd, s.empCd);
+                    if (text !== this.pipCache[i]) {
+                        this.pipCache[i] = text;
+                        pips.setText(text);
+                        pips.setColor(dashReady && empReady ? '#7de08a' : '#9aa7b4');
+                    }
                 }
                 // Ready pop on the false→true edge (motion-gated).
                 if (!this.reducedMotion && ((dashReady && !this.prevDashReady[i]) || (empReady && !this.prevEmpReady[i]))) {
@@ -2415,53 +2462,34 @@ export class BattleScene extends Scene {
         }
 
         const showcase = this.request.showcase;
+        const doRematch = (): void => {
+            this.scene.restart({
+                ...this.request,
+                seed: (Math.random() * 0x7fffffff) | 0,
+                replay: false,
+                daily: undefined,
+                tutorial: undefined,
+            });
+        };
+        const hintKeys = (hint: string): void => {
+            this.add.text(512, 614, hint, FONTS.monoSmall).setOrigin(0.5).setDepth(20);
+        };
         const buildButtons = (): void => {
+            this.resultsReady = true;
             if (showcase?.reel) {
                 this.showReelButtons(showcase.reel);
             } else if (showcase !== undefined) {
-                makeButton(
-                    this,
-                    412,
-                    566,
-                    170,
-                    44,
-                    BATTLE.rematch,
-                    () => {
-                        this.scene.restart({
-                            ...this.request,
-                            seed: (Math.random() * 0x7fffffff) | 0,
-                            replay: false,
-                            daily: undefined,
-                            tutorial: undefined,
-                        });
-                    },
-                    21,
-                    0,
-                    { tier: 'primary' },
-                );
+                makeButton(this, 412, 566, 170, 44, BATTLE.rematch, doRematch, 21, 0, { tier: 'primary' });
                 makeButton(this, 612, 566, 170, 44, BATTLE.exitShowcase, () => this.scene.start('Showcase'), 21);
+                this.resultsPrimary = doRematch;
+                this.resultsSecondary = () => this.scene.start('Showcase');
+                hintKeys(resultsKeysHint(BATTLE.rematch, BATTLE.exitShowcase));
             } else {
-                makeButton(
-                    this,
-                    412,
-                    566,
-                    170,
-                    44,
-                    BATTLE.rematch,
-                    () => {
-                        this.scene.restart({
-                            ...this.request,
-                            seed: (Math.random() * 0x7fffffff) | 0,
-                            replay: false,
-                            daily: undefined,
-                            tutorial: undefined,
-                        });
-                    },
-                    21,
-                    0,
-                    { tier: 'primary' },
-                );
+                makeButton(this, 412, 566, 170, 44, BATTLE.rematch, doRematch, 21, 0, { tier: 'primary' });
                 makeButton(this, 612, 566, 170, 44, COMMON.menu, () => this.scene.start('Menu'), 21);
+                this.resultsPrimary = doRematch;
+                this.resultsSecondary = () => this.scene.start('Menu');
+                hintKeys(resultsKeysHint(BATTLE.rematch, COMMON.menu));
             }
         };
         if (R) {
@@ -2490,6 +2518,7 @@ export class BattleScene extends Scene {
                 buildButtons();
             }
         };
+        this.resultsFinish = finish;
         this.input.once('pointerdown', finish);
         this.tweens.add({ targets: backdrop, alpha: 0.94, duration: 150, ease: 'Quad.easeOut' });
         this.tweens.add({ targets: titleObj, scale: 1, alpha: 1, y: 196, duration: 180, delay: 120, ease: 'Cubic.easeIn' });
@@ -2534,6 +2563,12 @@ export class BattleScene extends Scene {
             makeButton(this, 412, 566, 170, 44, COMMON.next, () => this.advanceReel(), 21, 0, { tier: 'primary' });
         }
         makeButton(this, hasNext ? 612 : 512, 566, 170, 44, BATTLE.exitShowcase, () => this.scene.start('Showcase'), 21);
+        this.resultsPrimary = () => this.advanceReel();
+        this.resultsSecondary = () => this.scene.start('Showcase');
+        this.add
+            .text(512, 614, hasNext ? resultsKeysHint(COMMON.next, BATTLE.exitShowcase) : resultsKeyHint(BATTLE.exitShowcase), FONTS.monoSmall)
+            .setOrigin(0.5)
+            .setDepth(20);
         // 4 s skippable auto-advance: NEXT jumps ahead immediately, EXIT
         // leaves, otherwise the reel plays through (out at the end).
         const label = this.add.text(512, 528, '', FONTS.monoSmall).setOrigin(0.5).setDepth(20);

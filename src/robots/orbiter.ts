@@ -16,7 +16,7 @@ export const meta: RobotMeta = {
     description: 'Circle-strafes at mid range. Hard to hit, always annoying.',
 };
 
-export const loadout: SkillLoadout = { gyro: 2, overdrive: 2, trigger: 1, plating: 1 };
+export const loadout: SkillLoadout = { overdrive: 2, servos: 1, trigger: 2, plating: 1 };
 
 export type TargetPolicy = 'first' | 'nearest' | 'weakest' | 'strongest';
 
@@ -43,7 +43,7 @@ export const ORBITER_DEFAULTS: OrbiterParams = {
     orbitThrottle: 0.9,
     turnThrottle: 0.3,
     steerGain: 2.5,
-    turretGain: 3,
+    turretGain: 4,
     aimTol: 0.07,
     scanTurn: 0.8,
     targetPolicy: 'first',

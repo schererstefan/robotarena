@@ -292,7 +292,6 @@ export function importDoneNotice(robotName: string, slot: number): string {
 export const IMPORT_ERROR = {
     tooLarge: 'file too large (256 KB max)',
     dynamicImport: 'dynamic import() is not allowed',
-    valueImports: 'value imports cannot be resolved — ship a dependency-free module',
     noCreate: 'module must export a create() factory',
     badMeta: 'module must export a meta object (id, name, author, version, description)',
     badLoadout: 'loadout could not be sanitized',
@@ -315,6 +314,10 @@ export function importCreateThrew(message: string): string {
 
 export function importUpdateThrew(message: string): string {
     return `update() threw on the dry run: ${message}`;
+}
+
+export function importValueImports(specifier: string): string {
+    return `value import '${specifier}' cannot be resolved — ship a single-file module (see rule 3)`;
 }
 
 export function importLoadFailed(message: string): string {
@@ -450,6 +453,16 @@ export function reelCountdown(secondsLeft: number): string {
 /** Reel auto-exit countdown on the last code ("EXIT IN 3..."). */
 export function reelExitCountdown(secondsLeft: number): string {
     return `EXIT IN ${secondsLeft}...`;
+}
+
+/** Results-screen key hints ("ENTER: REMATCH - X: MENU"). */
+export function resultsKeysHint(primaryLabel: string, secondaryLabel: string): string {
+    return `ENTER: ${primaryLabel} - X: ${secondaryLabel}`;
+}
+
+/** Single-action results hint ("ENTER/X: EXIT"). */
+export function resultsKeyHint(label: string): string {
+    return `ENTER/X: ${label}`;
 }
 
 /** Seed readout with match tags ("SEED 42 - DAILY - EXHIBITION 2X"). */

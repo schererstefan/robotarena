@@ -17,7 +17,7 @@ export const meta: RobotMeta = {
     description: 'Roams on random waypoints and snaps shots at whatever it sees.',
 };
 
-export const loadout: SkillLoadout = { longscan: 2, wideband: 2, overdrive: 2 };
+export const loadout: SkillLoadout = { overdrive: 2, longscan: 1, wideband: 1, trigger: 1, plating: 1 };
 
 /** Tunable knobs (genome §1.4 groups). Defaults = legacy behavior exactly. */
 export interface WandererParams {

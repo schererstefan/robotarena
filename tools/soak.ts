@@ -79,7 +79,7 @@ console.log('determinism');
     const a = runMatch(['hunter', 'orbiter'], [0, 1], 1234);
     const b = runMatch(['hunter', 'orbiter'], [0, 1], 1234);
     check('identical fingerprint for identical seed', fingerprint(a) === fingerprint(b));
-    // Wanderer draws from the shared RNG stream, so its matches must diverge.
+    // Wanderer draws from its per-(robot,tick) RNG stream, so its matches must diverge by seed.
     const d = runMatch(['wanderer', 'rusher'], [0, 1], 1234);
     const e = runMatch(['wanderer', 'rusher'], [0, 1], 999);
     check('seed affects RNG-drawing robots', fingerprint(d) !== fingerprint(e));
@@ -2872,9 +2872,13 @@ console.log('brain');
         check('brain genes change behavior', fingerprint(wild) !== refFp);
     }
     // No 1v1 regression vs pre-brain: per-foe wins, both arenas/sides/seeds.
+    // Factory-pure comparison under a pinned loadout: the brain-vs-legacy
+    // interaction with a loadout is balance-eval territory (see eval:rr),
+    // while this check guards the Phase 7 factory conversion itself.
     {
         const hunterEntry = ROBOTS.find((r) => r.meta.id === 'hunter');
         if (!hunterEntry) throw new Error('no hunter');
+        const pinnedLoadout: SkillLoadout = { charger: 2, marksman: 1, trigger: 2, plating: 1 };
         const foes = ROBOTS.filter((r) => r.meta.id !== 'hunter');
         let regressed: string[] = [];
         for (const foe of foes) {
@@ -2886,12 +2890,12 @@ console.log('brain');
                             const lineups: LineupEntry[] =
                                 order === 0
                                     ? [
-                                          { team: 0, controller: make(), loadout: { ...hunterEntry.loadout } },
+                                          { team: 0, controller: make(), loadout: { ...pinnedLoadout } },
                                           { team: 1, controller: foe.create(), loadout: { ...foe.loadout } },
                                       ]
                                     : [
                                           { team: 0, controller: foe.create(), loadout: { ...foe.loadout } },
-                                          { team: 1, controller: make(), loadout: { ...hunterEntry.loadout } },
+                                          { team: 1, controller: make(), loadout: { ...pinnedLoadout } },
                                       ];
                             const m = new Match(lineups, seed, { arena });
                             m.runToEnd();
@@ -2954,16 +2958,18 @@ console.log('pinned-codes');
 {
     // rusher vs turret, seed 4242, open, default builds — one code per
     // format, both describing the same match (winner 1 @ tick 278).
+    // Re-pinned for the Final-review rusher aimTol rebalance (deterministic
+    // re-sim x2; outcome unchanged, only transient fields moved).
     const pins: Array<{ format: string; code: string; fp: string }> = [
         {
             format: 'RA2',
             code: 'RA2-4000-2290-3860-2200-4328-0091-0',
-            fp: 'open|{}|1@278|OVR3 TRG1 PLT2,130,0,0,700.4557315973328,470.07610164335085,0.5555900725572009,0.5593158544906753,0,72,6,20,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,28,723.7647032190188,485.5903480620281,-2.6541348199916794,-2.572682348031272,1,132,12,18,0,0,0,0|',
+            fp: 'open|{}|1@278|OVR3 TRG1 PLT2,130,0,0,700.4557315973328,470.07610164335085,0.5555900725572009,0.5593158544906753,0,72,6,18,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,28,723.7647032190188,485.5903480620281,-2.6541348199916794,-2.572682348031272,1,132,12,18,0,0,0,0|',
         },
         {
             format: 'RA1',
             code: 'RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MjQyLCJ0IjoxLCJsIjpbInJ1c2hlciIsInR1cnJldCJdLCJvIjpbIjA6Myw1OjEsODoyIiwiMjoxLDM6Miw1OjIsNjoxIl0sImEiOiJvcGVuIiwibSI6IiJ9',
-            fp: 'open|{}|1@278|OVR3 TRG1 PLT2,130,0,0,700.4557315973328,470.07610164335085,0.5555900725572009,0.5593158544906753,0,72,6,20,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,28,723.7647032190188,485.5903480620281,-2.6541348199916794,-2.572682348031272,1,132,12,18,0,0,0,0|',
+            fp: 'open|{}|1@278|OVR3 TRG1 PLT2,130,0,0,700.4557315973328,470.07610164335085,0.5555900725572009,0.5593158544906753,0,72,6,18,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,28,723.7647032190188,485.5903480620281,-2.6541348199916794,-2.572682348031272,1,132,12,18,0,0,0,0|',
         },
     ];
     for (const pin of pins) {

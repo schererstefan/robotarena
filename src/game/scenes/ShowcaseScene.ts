@@ -10,6 +10,7 @@ import { decodeReplay } from '../../sim/replay';
 import { loadoutCode, type SkillLoadout } from '../../sim/skills';
 import { playClick, toggleMuted, unlockAudio } from '../audio';
 import { CALLSIGNS, defaultSkin } from '../customize';
+import { FocusNav, type NavTarget } from '../nav';
 import { fetchOnlineBoard, type OnlineBoard } from '../onlineBoard';
 import { loadShowcase, type ShowcaseChampion, type ShowcaseManifest } from '../showcase';
 import {
@@ -34,6 +35,14 @@ const CARD_W = 480;
 const CARD_H = 130;
 /** Board rows shown before the overflow marker (17 threats fit anyway). */
 const BOARD_ROWS = 17;
+/**
+ * Gallery cards rendered (2 columns x 4 rows fit above MENU). The emitter
+ * ships one champion per base bot (latestPerBase), so 8 is the contract;
+ * the slice is defense against a hand-edited manifest colliding with MENU.
+ */
+const GALLERY_MAX = 8;
+/** Compare-overlay replay rows before the buttons would leave the panel. */
+const OVERLAY_REPLAYS = 10;
 
 export class ShowcaseScene extends Scene {
     private tab: 'gallery' | 'board' = 'gallery';
@@ -49,6 +58,9 @@ export class ShowcaseScene extends Scene {
     private overlayObjects: Phaser.GameObjects.GameObject[] = [];
     private tabButtons: Button[] = [];
     private compareId: string | null = null;
+    private nav!: FocusNav;
+    private navFrame: NavTarget[] = [];
+    private navContent: NavTarget[] = [];
 
     constructor() {
         super('Showcase');
@@ -68,9 +80,13 @@ export class ShowcaseScene extends Scene {
         this.overlayObjects = [];
         this.tabButtons = [];
         this.compareId = null;
+        this.navFrame = [];
+        this.navContent = [];
+        this.nav = new FocusNav(this);
         this.buildFrame();
         this.renderTab();
         void loadShowcase().then((manifest) => {
+            if (!this.scene.isActive('Showcase')) return;
             this.manifest = manifest;
             this.manifestTried = true;
             if (this.compareId === null) this.renderTab();
@@ -78,15 +94,26 @@ export class ShowcaseScene extends Scene {
         this.input.on('pointerdown', this.onAnyPointer);
         this.input.keyboard?.on('keydown-M', this.onMuteKey);
         this.input.keyboard?.on('keydown-ESC', this.onEscapeKey);
+        this.input.keyboard?.on('keydown', this.onNavKey);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown-ESC', this.onEscapeKey);
+            this.input.keyboard?.off('keydown', this.onNavKey);
         });
     }
 
     private onAnyPointer = (): void => {
         unlockAudio();
         playClick();
+        this.nav.hideRing();
+    };
+
+    private onNavKey = (event: KeyboardEvent): void => {
+        const active = document.activeElement;
+        if (active instanceof HTMLInputElement || active instanceof HTMLSelectElement || active instanceof HTMLTextAreaElement) {
+            return;
+        }
+        this.nav.handleKey(event);
     };
 
     private onMuteKey = (): void => {
@@ -110,14 +137,29 @@ export class ShowcaseScene extends Scene {
         return obj;
     }
 
+    /** makeButton plus a keyboard-focus target at the same bounds. */
+    private navButton(x: number, y: number, w: number, h: number, label: string, onClick: () => void): Button {
+        this.navFrame.push({ x, y, w, h, activate: onClick });
+        return makeButton(this, x, y, w, h, label, onClick);
+    }
+
+    /** Card/row control plus a content (per-tab) keyboard-focus target. */
+    private navContentTarget(x: number, y: number, w: number, h: number, onClick: () => void): void {
+        this.navContent.push({ x, y, w, h, activate: onClick });
+    }
+
+    private restoreNav(): void {
+        if (this.compareId === null) this.nav.setTargets([...this.navFrame, ...this.navContent]);
+    }
+
     private buildFrame(): void {
         this.trackFrame(this.add.text(CX, 40, SHOWCASE.title, FONTS.title).setOrigin(0.5));
         this.trackFrame(this.add.text(CX, 82, SHOWCASE.subtitle, FONTS.small).setOrigin(0.5));
-        const gallery = makeButton(this, CX - 120, 124, 200, 36, '', () => this.setTab('gallery'));
-        const board = makeButton(this, CX + 120, 124, 200, 36, '', () => this.setTab('board'));
+        const gallery = this.navButton(CX - 120, 124, 200, 36, '', () => this.setTab('gallery'));
+        const board = this.navButton(CX + 120, 124, 200, 36, '', () => this.setTab('board'));
         this.tabButtons = [gallery, board];
         this.refreshTabLabels();
-        makeButton(this, CX, 740, 200, 36, COMMON.menu, () => this.scene.start('Menu'));
+        this.navButton(CX, 740, 200, 36, COMMON.menu, () => this.scene.start('Menu'));
     }
 
     private refreshTabLabels(): void {
@@ -138,12 +180,14 @@ export class ShowcaseScene extends Scene {
         this.tabObjects = [];
         for (const btn of this.cardButtons) btn.destroy();
         this.cardButtons = [];
+        this.navContent = [];
     }
 
     private renderTab(): void {
         this.clearTab();
         if (this.tab === 'gallery') this.renderGallery();
         else this.renderBoard();
+        this.restoreNav();
     }
 
     // ---- Gallery ----------------------------------------------------------
@@ -154,7 +198,7 @@ export class ShowcaseScene extends Scene {
             this.trackTab(this.add.text(CX, 400, SHOWCASE.noData, FONTS.body).setOrigin(0.5));
             return;
         }
-        manifest.champions.forEach((champ, i) => {
+        manifest.champions.slice(0, GALLERY_MAX).forEach((champ, i) => {
             const col = i % 2;
             const row = Math.floor(i / 2);
             const x = col === 0 ? CX - 256 : CX + 256;
@@ -175,11 +219,15 @@ export class ShowcaseScene extends Scene {
         const boardLine = champ.board ? onlineRow(champ.board.elo, champ.board.wins, champ.board.losses, champ.board.draws) : SHOWCASE.unrated;
         this.trackTab(this.add.text(x - 225, y + 2, boardLine, FONTS.monoSmall).setOrigin(0, 0.5));
         const by = y + 40;
-        this.cardButtons.push(
-            makeButton(this, x - 150, by, 150, 30, SHOWCASE.watchReel, () => this.watchReel(champ)),
-            makeButton(this, x + 10, by, 170, 30, SHOWCASE.versus, () => this.watchVersus(champ)),
-            makeButton(this, x + 160, by, 110, 30, SHOWCASE.compare, () => this.openCompare(champ.botId)),
-        );
+        const specs: Array<[number, number, string, () => void]> = [
+            [x - 150, 150, SHOWCASE.watchReel, () => this.watchReel(champ)],
+            [x + 10, 170, SHOWCASE.versus, () => this.watchVersus(champ)],
+            [x + 160, 110, SHOWCASE.compare, () => this.openCompare(champ.botId)],
+        ];
+        for (const [bx, bw, label, onClick] of specs) {
+            this.cardButtons.push(makeButton(this, bx, by, bw, 30, label, onClick));
+            this.navContentTarget(bx, by, bw, 30, onClick);
+        }
     }
 
     // ---- Compare overlay --------------------------------------------------
@@ -219,8 +267,9 @@ export class ShowcaseScene extends Scene {
             rate.setColor(COLORS.goldCss);
         }
         // Featured replays.
+        const overlayNav: NavTarget[] = [];
         track(this.add.text(CX, 272, SHOWCASE.replaysTitle, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
-        champ.featuredReplays.forEach((rep, i) => {
+        champ.featuredReplays.slice(0, OVERLAY_REPLAYS).forEach((rep, i) => {
             const y = 300 + i * 30;
             const bg = track(this.add.rectangle(CX, y, 680, 26, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(50));
             track(this.add.text(CX - 325, y, showcaseReplayLine(rep.label, rep.outcome), FONTS.monoSmall).setOrigin(0, 0.5).setDepth(50));
@@ -228,8 +277,9 @@ export class ShowcaseScene extends Scene {
             bg.on('pointerover', () => bg.setStrokeStyle(1, COLORS.team[0]));
             bg.on('pointerout', () => bg.setStrokeStyle(1, COLORS.panelEdge));
             bg.on('pointerdown', () => this.watchCode(rep.code, champ.botId));
+            overlayNav.push({ x: CX, y, w: 680, h: 26, activate: () => this.watchCode(rep.code, champ.botId) });
         });
-        const listEnd = 300 + champ.featuredReplays.length * 30;
+        const listEnd = 300 + Math.min(champ.featuredReplays.length, OVERLAY_REPLAYS) * 30;
         const mkOverlay = (x: number, label: string, onClick: () => void): void => {
             const bg = track(this.add.rectangle(x, listEnd + 44, 200, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
             track(this.add.text(x, listEnd + 44, label, FONTS.button).setOrigin(0.5).setDepth(50));
@@ -237,16 +287,19 @@ export class ShowcaseScene extends Scene {
             bg.on('pointerover', () => bg.setStrokeStyle(2, COLORS.team[0]));
             bg.on('pointerout', () => bg.setStrokeStyle(2, COLORS.panelEdge));
             bg.on('pointerdown', onClick);
+            overlayNav.push({ x, y: listEnd + 44, w: 200, h: 40, activate: onClick });
         };
         mkOverlay(CX - 220, SHOWCASE.watchReel, () => this.watchReel(champ));
         mkOverlay(CX, SHOWCASE.versus, () => this.watchVersus(champ));
         mkOverlay(CX + 220, SHOWCASE.close, () => this.closeCompare());
+        this.nav.setTargets(overlayNav);
     }
 
     private closeCompare(): void {
         for (const obj of this.overlayObjects) obj.destroy();
         this.overlayObjects = [];
         this.compareId = null;
+        this.nav.setTargets([...this.navFrame, ...this.navContent]);
     }
 
     // ---- Board tab --------------------------------------------------------
@@ -292,6 +345,7 @@ export class ShowcaseScene extends Scene {
                 bg.on('pointerover', () => bg.setStrokeStyle(1, COLORS.team[0]));
                 bg.on('pointerout', () => bg.setStrokeStyle(1, COLORS.panelEdge));
                 bg.on('pointerdown', () => this.watchCode(row.showcaseCode, row.botId));
+                this.navContentTarget(CX + 250, y, 110, 22, () => this.watchCode(row.showcaseCode, row.botId));
             }
         });
         if (rows.length > shown.length) {

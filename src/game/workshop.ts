@@ -241,9 +241,22 @@ export function checkRobotSource(source: string): WorkshopCheck[] {
         'strafe', 'moveX', 'moveY', 'moveMode', 'aimMode', 'aimTarget', 'aimLead', 'fireMode', 'radio',
     ]);
     const unknownIntent: string[] = [];
-    for (const literal of code.matchAll(/return\s*\{([^}]*)\}/g)) {
+    for (const m of code.matchAll(/return\s*\{/g)) {
+        // Top-level keys only: brace-count past nested literals so an inline
+        // radio object doesn't read as unknown Intent keys (strings and
+        // comments are already stripped).
+        let depth = 1;
+        let i = (m.index ?? 0) + m[0].length;
+        let top = '';
+        while (i < code.length && depth > 0) {
+            const ch = code[i] as string;
+            i += 1;
+            if (ch === '{') depth += 1;
+            else if (ch === '}') depth -= 1;
+            else if (depth === 1) top += ch;
+        }
         const keys = new Set<string>();
-        for (const part of (literal[1] ?? '').split(',')) {
+        for (const part of top.split(',')) {
             const key = /^\s*([A-Za-z_]\w*)\s*(?::|$)/.exec(part)?.[1];
             if (key) keys.add(key);
         }

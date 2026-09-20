@@ -256,6 +256,12 @@ Modded matches replay exactly via the same replay codes.
    `manageCharge`, `createStallTracker`), and `./comms.ts` (team radio:
    `castFocusVote`, `focusTarget`, `castContact`, `latestContact`,
    `resolveRoles`, `formationSlot`). No Phaser, no DOM, no Node APIs.
+   Two refinements: (a) robots loaded through the in-game importer
+   (Menu → IMPORT, exhibition only) must be **single-file** — value imports
+   cannot be resolved from a blob module, so inline any helpers you need;
+   (b) `./brain.ts`, `./genome.ts`, and sibling-robot imports
+   (`./hunter`, …) are internal-only: shipped robots are multi-file, user
+   robots stay within `../sim/*` + `./common.ts` + `./comms.ts`.
 4. **No throwing.** Exceptions are caught and your robot idles that tick — but a
    robot that throws constantly is just parked scrap. Guard your math.
 5. **State in closures.** Module-level mutable state is shared across matches;
@@ -292,14 +298,14 @@ index into it). Study them before writing your own.
 
 | Bot | Style | Default build |
 | --- | ----- | ------------- |
-| Rusher | Charges the nearest foe head-on, weaving while it closes. | `OVR3 TRG1 PLT2` |
+| Rusher | Charges the nearest foe head-on, weaving while it closes. | `OVR1 SCN1 TRG2 PLT2` |
 | Turret | Parks on a defensive anchor, spins its tower, leads shots. | `SRV1 SCN2 TRG2 MRK1` |
-| Orbiter | Circle-strafes at mid range. | `OVR2 GYR2 TRG1 PLT1` |
-| Wanderer | Roams random waypoints, snaps shots at whatever it sees. | `OVR2 SCN2 WND2` |
-| Hunter | Adaptive brain: pursues, kites, flanks, retreats, and focuses with its team. | `TRG2 MRK1 CHG2 PLT1` |
-| Sniper | Camps a deep backfield anchor; charged long-range shots, retreats when rushed. | `SCN2 MRK2 CHG1 DDY1` |
-| Brawler | Plated bruiser; walks the gun into the clinch and rams through. | `OVR2 TRG2 PLT2` |
-| Ghost | Hit-and-run scout: strikes on a ready gun, breaks away on cooldown. | `OVR2 GYR2 WND1 SCT1` |
+| Orbiter | Circle-strafes at mid range. | `OVR2 SRV1 TRG2 PLT1` |
+| Wanderer | Roams random waypoints, snaps shots at whatever it sees. | `OVR2 SCN1 WND1 TRG1 PLT1` |
+| Hunter | Adaptive brain: pursues, kites, flanks, retreats, and focuses with its team. | `OVR2 TRG2 PLT2` |
+| Sniper | Camps a deep backfield anchor; charged long-range shots, retreats when rushed. | `SCN2 TRG1 MRK1 CHG1 DDY1` |
+| Brawler | Plated bruiser; walks the gun into the clinch and rams through. | `OVR1 GYR1 TRG2 PLT2` |
+| Ghost | Hit-and-run scout: strikes on a ready gun, breaks away on cooldown. | `OVR1 GYR2 WND1 PLT1 SCT1` |
 | Hunter HC1 | Hillclimb champion bred from hunter (run 20260920-002309). | `TRG2 CHG1 PLT2 NRP1` |
 | Rusher HC1 | Hillclimb champion bred from rusher (run 20260920-010027). | `SCN2 TRG1 PLT2 NRP1` |
 | Orbiter HC1 | Hillclimb champion bred from orbiter (run 20260920-010338). | `TRG2 CHG1 PLT2 NRP1` |

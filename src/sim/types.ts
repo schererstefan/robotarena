@@ -325,9 +325,9 @@ export interface Intent {
      */
     fireMode?: 0 | 1;
     /**
-     * One team radio message this tick (delivered 6 ticks late, Phase 6
-     * routes it; until then the engine accepts and drops it). Unknown kinds
-     * are dropped by sanitize. Optional, defaults to null.
+     * One team radio message this tick (delivered 6 ticks late via the
+     * Phase 6 router). Unknown kinds are dropped by sanitize. Optional,
+     * defaults to null.
      */
     radio?: OutboxMessage | null;
 }

@@ -20,7 +20,7 @@ export const meta: RobotMeta = {
     description: 'Adaptive hunter: pursues, kites, flanks, and focuses with its team.',
 };
 
-export const loadout: SkillLoadout = { charger: 2, marksman: 1, trigger: 2, plating: 1 };
+export const loadout: SkillLoadout = { overdrive: 2, trigger: 2, plating: 2 };
 
 export type TargetPolicy = 'first' | 'nearest' | 'weakest' | 'strongest';
 
