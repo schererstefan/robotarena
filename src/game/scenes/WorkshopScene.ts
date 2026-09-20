@@ -149,7 +149,7 @@ export class WorkshopScene extends Scene {
         const passed = checks.filter((check) => check.pass).length;
         const ok = workshopPassed(checks);
         this.summary.textContent = workshopSummary(suggestFilename(source), passed, checks.length);
-        this.summary.style.color = ok ? '#7de08a' : COLORS.goldCss;
+        this.summary.style.color = ok ? COLORS.accentCss : COLORS.goldCss;
         this.checksBox.replaceChildren();
         for (const check of checks) {
             const row = document.createElement('div');

@@ -40,13 +40,28 @@ export const CALLSIGNS = [
     'TURING',
 ];
 
-export function defaultSkin(callsign: string, slot: number): SlotSkin {
-    const paint = PAINTS[slot % PAINTS.length]!;
-    return { callsign, paint: paint.hex, paintCss: paint.css, finish: 'Solid' };
+/**
+ * Paints banned per team: each reads as the ENEMY team color (both
+ * palettes), so default/random skins never impersonate the other side.
+ * Amber team bans Sky (near enemy cyan); cyan team bans Gold (near amber).
+ */
+const ENEMY_PAINT: Record<0 | 1, string> = { 0: 'Sky', 1: 'Gold' };
+
+function teamPaints(team: 0 | 1): Array<{ hex: number; css: string; name: string }> {
+    return PAINTS.filter((paint) => paint.name !== ENEMY_PAINT[team]);
 }
 
-export function randomSkin(callsign: string): SlotSkin {
-    const paint = PAINTS[(Math.random() * PAINTS.length) | 0]!;
+export function defaultSkin(callsign: string, slot: number, team: 0 | 1): SlotSkin {
+    const paints = teamPaints(team);
+    const paint = paints[slot % paints.length]!;
+    // Shaped default finish (never plain Solid): Stripe/Ring alternate.
+    const finish = slot % 2 === 0 ? 'Stripe' : 'Ring';
+    return { callsign, paint: paint.hex, paintCss: paint.css, finish };
+}
+
+export function randomSkin(callsign: string, team: 0 | 1): SlotSkin {
+    const paints = teamPaints(team);
+    const paint = paints[(Math.random() * paints.length) | 0]!;
     const finish = FINISHES[(Math.random() * FINISHES.length) | 0]!;
     return { callsign, paint: paint.hex, paintCss: paint.css, finish };
 }

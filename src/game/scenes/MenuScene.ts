@@ -109,7 +109,7 @@ export class MenuScene extends Scene {
         { ...getRobot('orbiter')!.loadout },
     ];
     private skins: SlotSkin[] = ['hunter', 'orbiter'].map((id, i) =>
-        defaultSkin((getRobot(id)?.meta.name ?? id).toUpperCase(), i),
+        defaultSkin((getRobot(id)?.meta.name ?? id).toUpperCase(), i, (i < this.teamSize ? 0 : 1) as 0 | 1),
     );
     private trails = true;
     private arena: ArenaId = 'open';
@@ -439,7 +439,7 @@ export class MenuScene extends Scene {
             teamSize: 1,
             lineupIds: [...lineupIds],
             loadouts: lineupIds.map((id) => ({ ...(getRobot(id)?.loadout ?? {}) })),
-            skins: lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
+            skins: lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i, (i < 1 ? 0 : 1) as 0 | 1)),
             trails: this.trails,
             seed: dailySeed(date),
             arena: 'open',
@@ -458,7 +458,7 @@ export class MenuScene extends Scene {
             const id = this.lineupIds[i] ?? (defaults[i] as string);
             nextIds.push(id);
             const entry = ROBOTS.find((r) => r.meta.id === id) ?? ROBOTS[0]!;
-            nextSkins.push(this.skins[i] ?? defaultSkin(entry.meta.name.toUpperCase(), i));
+            nextSkins.push(this.skins[i] ?? defaultSkin(entry.meta.name.toUpperCase(), i, (i < size ? 0 : 1) as 0 | 1));
             nextLoadouts.push(this.loadouts[i] ?? { ...entry.loadout });
         }
         this.lineupIds = nextIds;
@@ -494,7 +494,7 @@ export class MenuScene extends Scene {
     }
 
     private randomizeSkins(): void {
-        this.skins = this.skins.map((skin) => randomSkin(skin.callsign));
+        this.skins = this.skins.map((skin, i) => randomSkin(skin.callsign, (i < this.teamSize ? 0 : 1) as 0 | 1));
         this.rebuildSlots();
     }
 
@@ -815,7 +815,7 @@ export class MenuScene extends Scene {
             teamSize: 1,
             lineupIds,
             loadouts: lineupIds.map((id) => ({ ...(getRobot(id)?.loadout ?? {}) })),
-            skins: lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
+            skins: lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i, (i < 1 ? 0 : 1) as 0 | 1)),
             trails: this.trails,
             seed: TUTORIAL_SEED,
             arena: 'open',
@@ -925,7 +925,7 @@ export class MenuScene extends Scene {
                 teamSize: data.teamSize,
                 lineupIds: [...data.lineupIds],
                 loadouts: data.loadouts.map((l) => ({ ...l })),
-                skins: data.lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
+                skins: data.lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i, (i < data.teamSize ? 0 : 1) as 0 | 1)),
                 trails: this.trails,
                 seed: data.seed,
                 arena: data.arena ?? 'open',
@@ -1261,7 +1261,7 @@ export class MenuScene extends Scene {
             teamSize: data.teamSize,
             lineupIds: [...data.lineupIds],
             loadouts: data.loadouts.map((l) => ({ ...l })),
-            skins: data.lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
+            skins: data.lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i, (i < data.teamSize ? 0 : 1) as 0 | 1)),
             trails: this.trails,
             seed: data.seed,
             arena: data.arena ?? 'open',

@@ -29,7 +29,9 @@ export const COLORS = {
     bullet: [0xffd28a, 0x9be7ff] as [number, number],
     dead: 0x4a545f,
     accent: 0x7de08a,
+    accentCss: '#7de08a',
     danger: 0xff5d5d,
+    dangerCss: '#ff5d5d',
 };
 
 const PIXEL = "'Press Start 2P', 'Courier New', monospace";

@@ -90,7 +90,12 @@ export function setReducedMotion(enabled: boolean): void {
 
 /** Team identity color (hex): default amber/cyan, or the CB-safe pair. */
 export function teamColor(team: 0 | 1): number {
-    return isColorblind() ? CB_TEAM[team] : COLORS.team[team];
+    return teamColorFor(team, isColorblind());
+}
+
+/** Team color for an explicit palette (bake-time variants need both). */
+export function teamColorFor(team: 0 | 1, colorblind: boolean): number {
+    return colorblind ? CB_TEAM[team] : COLORS.team[team];
 }
 
 /** Team identity color (css) for text tints. */

@@ -126,6 +126,12 @@ export function playClick(): void {
     tone('square', 1400, 1100, 0.035, 0.06);
 }
 
+/** Two-note kill sting (first blood). Phase 2 builds the full voice floor. */
+export function playSting(): void {
+    tone('square', 440, 440, 0.09, 0.14);
+    tone('square', 660, 660, 0.14, 0.14, 0.09);
+}
+
 export function playWin(): void {
     const notes = [523.25, 659.25, 783.99, 1046.5];
     notes.forEach((hz, i) => tone('triangle', hz, hz, 0.16, 0.18, i * 0.12));

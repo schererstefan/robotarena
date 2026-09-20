@@ -17,6 +17,7 @@
 // damage numbers, explosion flashes) instead of allocating mid-fight.
 
 import { Scene } from 'phaser';
+import { isColorblind, teamColorFor } from './accessibility';
 import { BIG_MUZZLE, RECOIL_A, RECOIL_B, SPAWN_A, SPAWN_B, TREADS_A, TREADS_B } from './art/anim';
 import { CHASSIS_V2 } from './art/chassis';
 import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_VENT } from './art/decor';
@@ -126,6 +127,17 @@ export function bakedTextureCount(): number {
 }
 
 function bake(scene: Scene, key: string, map: PixelMap): void {
+    bakeTinted(scene, key, map, EMPTY_RECOLOR);
+}
+
+const EMPTY_RECOLOR: Record<string, string> = {};
+
+/**
+ * Bake with per-char palette overrides. Team variants recolor ONLY `w`
+ * pixels to the team color — lenses, shading, and outlines are untouched,
+ * so identity survives dark tints and CB palettes.
+ */
+function bakeTinted(scene: Scene, key: string, map: PixelMap, recolor: Record<string, string>): void {
     if (scene.textures.exists(key)) {
         bakedKeys.add(key);
         return;
@@ -139,13 +151,56 @@ function bake(scene: Scene, key: string, map: PixelMap): void {
     context.clearRect(0, 0, width, height);
     map.forEach((row, y) => {
         for (let x = 0; x < row.length; x += 1) {
-            const color = PALETTE[row[x] as string];
+            const ch = row[x] as string;
+            const color = recolor[ch] ?? PALETTE[ch];
             if (color === undefined) continue;
             context.fillStyle = color;
             context.fillRect(x, y, 1, 1);
         }
     });
     texture.refresh();
+}
+
+/**
+ * Deterministic damage stamp over a char-map copy: a scorch blotch plus
+ * sparse crack seams on hull pixels only (w/l/m). Same dims, legal chars.
+ */
+export function damageStamp(map: PixelMap): PixelMap {
+    return map.map((row, y) =>
+        row
+            .split('')
+            .map((ch, x) => {
+                if (ch !== 'w' && ch !== 'l' && ch !== 'm') return ch;
+                if (x >= 4 && x <= 7 && y >= 9 && y <= 11) return ch === 'w' ? 'd' : 'k';
+                if ((x * 7 + y * 11) % 17 === 0) return 'k';
+                return ch;
+            })
+            .join(''),
+    );
+}
+
+function css(hex: number): string {
+    return `#${hex.toString(16).padStart(6, '0')}`;
+}
+
+/** Team-tinted chassis key (palette baked in: CB toggles stay correct). */
+export function chassisTeamKey(robotId: string, team: 0 | 1, damaged: boolean): string {
+    return `chassis_${robotId}_t${team}_${isColorblind() ? 'cb' : 'std'}${damaged ? '_dmg' : ''}`;
+}
+
+/** Bake per-team chassis variants (both palettes, clean + damaged). */
+function bakeTeamChassis(scene: Scene): void {
+    for (const [id, map] of Object.entries(CHASSIS_V2)) {
+        const dmg = damageStamp(map);
+        for (const team of [0, 1] as const) {
+            for (const cb of [false, true]) {
+                const recolor = { w: css(teamColorFor(team, cb)) };
+                const pal = cb ? 'cb' : 'std';
+                bakeTinted(scene, `chassis_${id}_t${team}_${pal}`, map, recolor);
+                bakeTinted(scene, `chassis_${id}_t${team}_${pal}_dmg`, dmg, recolor);
+            }
+        }
+    }
 }
 
 /** Deterministic floor pattern: mostly plate, with vents, hazards, accents. */
@@ -232,6 +287,7 @@ export function ensureArtTextures(scene: Scene): void {
     // Purged dead keys (Phase 0): tile_floor, panel_tile, tower dup-key.
     // tracer/ring_fx/treads_*/recoil_* stay: claimed by fidelity Phases 1-3.
     for (const { key, map } of artRegistry()) bake(scene, key, map);
+    bakeTeamChassis(scene);
     bakeArenaFloor(scene);
     if (debugArtRequested()) {
         const ms = (nowMs() - t0).toFixed(1);

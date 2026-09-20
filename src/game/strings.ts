@@ -404,6 +404,7 @@ export const BATTLE = {
     bannerExhibition: 'EXHIBITION MATCH',
     bannerExhibitionCustom: 'EXHIBITION MATCH - CUSTOM ROBOT',
     bannerSuddenDeath: 'SUDDEN DEATH',
+    bannerFirstBlood: 'FIRST BLOOD',
     bannerSoundOn: 'SOUND ON',
     bannerSoundOff: 'SOUND OFF',
     pause: 'PAUSE',
@@ -463,6 +464,11 @@ export function destroyedBanner(callsign: string): string {
     return `${callsign} DESTROYED`;
 }
 
+/** Kill credit with the killer's running KO count ("SCRAP DESTROYED — BOLT (2 KO)"). */
+export function killCreditBanner(victim: string, killer: string, ko: number): string {
+    return `${victim} DESTROYED — ${killer} (${ko} KO)`;
+}
+
 /** Team survival pips ("T1 ●●○   T2 ●●●"). */
 export function hudTeamPips(alive0: number, total0: number, alive1: number, total1: number): string {
     const pips = (alive: number, total: number): string => '●'.repeat(alive) + '○'.repeat(total - alive);
@@ -476,6 +482,11 @@ export function cooldownPips(dashReady: boolean, empReady: boolean): string {
 
 export function damageText(dmg: number): string {
     return `-${dmg}`;
+}
+
+/** Regen tick ("+3", green tier). */
+export function healText(amount: number): string {
+    return `+${amount}`;
 }
 
 /** The pilot drives slot 0 (team 1), so the verdict names them. */

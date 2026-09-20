@@ -3,14 +3,14 @@
 // is sprite transforms plus one small dynamic Graphics (cones + trails).
 
 import { Scene } from 'phaser';
-import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DT, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import { clamp } from '../../sim/math';
 import { decodeReplay, encodeReplay } from '../../sim/replay';
 import { getRobot } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
-import { bakedTextureCount, chassisKey, ensureArtTextures, towerKey, wreckKey } from '../art';
-import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unlockAudio } from '../audio';
+import { bakedTextureCount, chassisTeamKey, ensureArtTextures, towerKey, wreckKey } from '../art';
+import { playClick, playExplosion, playHit, playShoot, playSting, playWin, toggleMuted, unlockAudio } from '../audio';
 import { bulletColor, isReducedMotion, teamColor, teamCss } from '../accessibility';
 import { recordDailyResult, recordMatch } from '../history';
 import { displayRobotId, isImportedId, resolveLineupEntry } from '../importRobot';
@@ -27,7 +27,9 @@ import {
     exhibitionResultsLine,
     exhibitionTag,
     formatClock,
+    healText,
     hudTeamPips,
+    killCreditBanner,
     reelCountdown,
     reelExitCountdown,
     resultRow,
@@ -53,6 +55,10 @@ const PARTICLE_POOL = 128;
 const DMG_POOL = 20;
 /** Pool audit: 6 robots max, so 6 explosion flashes can never exhaust. */
 const BOOM_POOL = 6;
+/** Shockwave rings (ring_fx): event-driven, 4 live max, never allocated. */
+const RING_POOL = 4;
+/** Tread frame swaps every 6 px traveled (distance-keyed, not timer). */
+const TREAD_SWAP_PX = 6;
 /** Auto-quality: particle spawn factor per level (HIGH/MED/LOW). */
 const QUALITY_FACTORS = [1, 0.5, 0.25];
 const QUALITY_NAMES = ['HIGH', 'MED', 'LOW'];
@@ -102,8 +108,33 @@ export class BattleScene extends Scene {
     private hudPips!: Phaser.GameObjects.Text;
     private hudTimer!: Phaser.GameObjects.Text;
     private banner!: Phaser.GameObjects.Text;
-    private bannerQueue: string[] = [];
+    private bannerQueue: Array<{ text: string; color: string }> = [];
     private bannerBusy = false;
+    private hitstop = 0;
+    private trauma = 0;
+    private traumaClean = true;
+    private rings: Phaser.GameObjects.Image[] = [];
+    private treads: Phaser.GameObjects.Image[] = [];
+    private treadAcc: number[] = [];
+    private treadLastX: number[] = [];
+    private treadLastY: number[] = [];
+    private treadFlip: boolean[] = [];
+    private damaged: boolean[] = [];
+    private hurtT: number[] = [];
+    private punchT: number[] = [];
+    private punchOn: boolean[] = [];
+    private healAcc: number[] = [];
+    private lastHealTick: number[] = [];
+    private firstBlood = false;
+    private robotIds: string[] = [];
+    private normalDamage = BULLET_DAMAGE;
+    private curBX: number[] = [];
+    private curBY: number[] = [];
+    private prevBX: number[] = [];
+    private prevBY: number[] = [];
+    private hotSlot: boolean[] = [];
+    private hotLive = false;
+    private lastMapTick = -99;
     private prev!: RobotSnapshot[];
     private acc = 0;
     private paused = false;
@@ -167,6 +198,30 @@ export class BattleScene extends Scene {
         this.particles = [];
         this.recoil = [];
         this.muzzleLife = [];
+        this.treads = [];
+        this.treadAcc = [];
+        this.treadLastX = [];
+        this.treadLastY = [];
+        this.treadFlip = [];
+        this.damaged = [];
+        this.hurtT = [];
+        this.punchT = [];
+        this.punchOn = [];
+        this.healAcc = [];
+        this.lastHealTick = [];
+        this.robotIds = [];
+        this.rings = [];
+        this.curBX = [];
+        this.curBY = [];
+        this.prevBX = [];
+        this.prevBY = [];
+        this.hotSlot = [];
+        this.hotLive = false;
+        this.lastMapTick = -99;
+        this.hitstop = 0;
+        this.trauma = 0;
+        this.traumaClean = true;
+        this.firstBlood = false;
         this.trails = [];
         this.lastTrailTick = -1;
         this.stripes = [];
@@ -256,12 +311,24 @@ export class BattleScene extends Scene {
         this.dyn = this.add.graphics().setDepth(2);
 
         // Robot sprite sets.
+        this.normalDamage = this.request.modifiers.doubleDamage === true ? BULLET_DAMAGE * 2 : BULLET_DAMAGE;
         this.match.robotSnapshots.forEach((snap, i) => {
             const skin = this.request.skins[i] as SlotSkin;
             const robotId = displayRobotId(this.request.lineupIds[i] as string);
-            const team = teamColor(snap.team);
-            const body = this.add.image(0, 0, chassisKey(robotId)).setScale(2).setDepth(4);
-            body.setTint(team);
+            this.robotIds.push(robotId);
+            // Bake-time team tint (w pixels only): no whole-sprite setTint.
+            const body = this.add.image(0, 0, chassisTeamKey(robotId, snap.team, false)).setScale(2).setDepth(4);
+            this.damaged.push(false);
+            this.hurtT.push(0);
+            this.punchT.push(0);
+            this.punchOn.push(false);
+            this.healAcc.push(0);
+            this.lastHealTick.push(-9999);
+            this.treads.push(this.add.image(0, 0, 'treads_a').setScale(2).setDepth(3.5));
+            this.treadAcc.push(0);
+            this.treadLastX.push(-9999);
+            this.treadLastY.push(-9999);
+            this.treadFlip.push(false);
             const tower = this.add.image(0, 0, towerKey(robotId)).setScale(2).setDepth(5);
             tower.setTint(skin.paint);
             const hub = this.add.image(0, 0, 'hub').setScale(2).setDepth(6);
@@ -305,8 +372,9 @@ export class BattleScene extends Scene {
                 tower.setScale(0.5).setAlpha(0);
                 hub.setScale(0.5).setAlpha(0);
                 stripe.setAlpha(0);
+                (this.treads[i] as Phaser.GameObjects.Image).setAlpha(0);
                 this.tweens.add({ targets: [body, tower, hub], scale: 2, alpha: 1, duration: 350, delay: i * 90, ease: 'Back.easeOut' });
-                this.tweens.add({ targets: stripe, alpha: 1, duration: 350, delay: i * 90 });
+                this.tweens.add({ targets: [stripe, this.treads[i] as Phaser.GameObjects.Image], alpha: 1, duration: 350, delay: i * 90 });
                 // Spawn ring pop at the spawn point.
                 const ring = this.add.image(AX + snap.x, AY + snap.y, 'spawn_a').setScale(2).setDepth(3).setAlpha(0.9);
                 this.time.delayedCall(i * 90, () => ring.setVisible(true));
@@ -320,6 +388,14 @@ export class BattleScene extends Scene {
         for (let i = 0; i < BULLET_POOL; i += 1) {
             this.bullets.push(this.add.image(-50, -50, 'bullet').setScale(2).setDepth(7).setVisible(false));
             this.bulletTeam.push(null);
+            this.curBX.push(-9999);
+            this.curBY.push(-9999);
+            this.prevBX.push(-9999);
+            this.prevBY.push(-9999);
+            this.hotSlot.push(false);
+        }
+        for (let i = 0; i < RING_POOL; i += 1) {
+            this.rings.push(this.add.image(-50, -50, 'ring_fx').setScale(2).setDepth(8).setVisible(false));
         }
         for (let i = 0; i < PARTICLE_POOL; i += 1) {
             const img = this.add.image(-50, -50, 'spark').setScale(2).setDepth(8).setVisible(false);
@@ -469,15 +545,22 @@ export class BattleScene extends Scene {
         }
         let stepped = false;
         if (!this.paused && !this.match.result.over) {
-            this.acc += dt * this.speed;
-            let steps = 0;
-            while (this.acc >= DT && steps < 12 && !this.match.result.over) {
-                this.match.step();
-                this.acc -= DT;
-                steps += 1;
+            // Hitstop: freeze acc (replay-safe: tick content unchanged, only
+            // pacing) for a beat on kills/charged hits. Skipped in reduced
+            // motion — the banner + wreck carry the event instead.
+            if (this.hitstop > 0) {
+                this.hitstop -= 1;
+            } else {
+                this.acc += dt * this.speed;
+                let steps = 0;
+                while (this.acc >= DT && steps < 12 && !this.match.result.over) {
+                    this.match.step();
+                    this.acc -= DT;
+                    steps += 1;
+                }
+                if (steps === 12) this.acc = 0;
+                stepped = steps > 0;
             }
-            if (steps === 12) this.acc = 0;
-            stepped = steps > 0;
         }
         // Snapshot once per frame; every helper below reuses these.
         const snaps = this.match.robotSnapshots;
@@ -498,6 +581,7 @@ export class BattleScene extends Scene {
         }
         this.updateParticles(dt);
         this.decayEffects(dt);
+        this.updateTrauma(dt);
         this.syncSprites(snaps, bullets);
         this.drawDynamic(snaps);
         this.syncHud(snaps);
@@ -657,7 +741,10 @@ export class BattleScene extends Scene {
             const cy = AY + s.y;
             if (s.shotsFired > p.shotsFired && s.alive) {
                 this.muzzleLife[i] = 0.09;
-                if (!this.reducedMotion) this.recoil[i] = 5;
+                if (!this.reducedMotion) {
+                    this.recoil[i] = 5;
+                    this.punchT[i] = 0.06;
+                }
                 (this.muzzles[i] as Phaser.GameObjects.Image)
                     .setTexture(p.charge > 0.4 ? 'muzzle_big' : 'muzzle')
                     .setScale(2 + Math.random() * 0.8);
@@ -665,18 +752,42 @@ export class BattleScene extends Scene {
                 playShoot();
             }
             if (s.health < p.health) {
-                this.spawnDamageNumber(cx, cy - 18, Math.round(p.health - s.health));
-                if (s.alive) {
-                    this.burst(cx, cy, 0xff5d5d, 6, 170, 300);
+                const dmg = Math.round(p.health - s.health);
+                if (!s.alive) {
+                    this.spawnDamageNumber(cx, cy - 18, dmg, 'kill');
+                } else if (this.match.result.suddenDeath && topDealer < 0) {
+                    this.spawnDamageNumber(cx, cy - 18, dmg, 'sd');
+                    this.hurtT[i] = 2;
+                } else if (dmg > this.normalDamage) {
+                    this.spawnDamageNumber(cx, cy - 18, dmg, 'charged');
+                    this.hurtT[i] = 2;
+                    this.burst(cx, cy, COLORS.danger, 6, 170, 300);
+                    this.addTrauma(0.35);
+                    this.fireRing(cx, cy, false);
+                    if (!this.reducedMotion) this.hitstop = Math.max(this.hitstop, 2);
+                    playHit();
+                } else {
+                    this.spawnDamageNumber(cx, cy - 18, dmg, 'hit');
+                    this.hurtT[i] = 2;
+                    this.burst(cx, cy, COLORS.danger, 6, 170, 300);
                     playHit();
                 }
                 if (topDealer >= 0 && topDealer !== i) {
                     const a = snaps[topDealer] as RobotSnapshot;
                     this.pushIndicator(s.x, s.y, a.x, a.y, a.team);
                 }
+            } else if (s.health > p.health && s.alive) {
+                // Regen (nanorepair) ticks fractional HP: batch to ≤1/s/robot.
+                this.healAcc[i] = (this.healAcc[i] as number) + (s.health - p.health);
+                const tick = this.match.result.tick;
+                if (tick - (this.lastHealTick[i] as number) >= 60 && (this.healAcc[i] as number) >= 1) {
+                    this.spawnDamageNumber(cx, cy - 18, Math.floor(this.healAcc[i] as number), 'heal');
+                    this.healAcc[i] = 0;
+                    this.lastHealTick[i] = tick;
+                }
             }
             if (p.alive && !s.alive) {
-                this.explode(i, cx, cy);
+                this.explode(i, cx, cy, topDealer);
             }
             if (s.alive && s.health <= 30 && s.health > 0 && this.match.result.tick % 12 === 0) {
                 this.burst(cx, cy - 10, COLORS.faintNum, 1, 30, -60);
@@ -685,50 +796,113 @@ export class BattleScene extends Scene {
         this.prev = snaps;
     }
 
-    private explode(i: number, cx: number, cy: number): void {
+    private explode(i: number, cx: number, cy: number, dealer: number): void {
         const snap = this.match.robotSnapshots[i] as RobotSnapshot;
-        const robotId = displayRobotId(this.request.lineupIds[i] as string);
+        const robotId = this.robotIds[i] as string;
         this.burst(cx, cy, teamColor(snap.team), 22, 260, 200);
         this.burst(cx, cy, COLORS.white, 8, 140, 100);
-        if (!this.reducedMotion) this.cameras.main.shake(180, 0.006);
+        this.burst(cx, cy, COLORS.faintNum, 4, 60, -120);
+        // Staged kill: trauma kick + hitstop + a ≤90 ms camera flash (all
+        // skipped under reduced motion) + an expanding shockwave ring.
+        this.addTrauma(0.7);
+        if (!this.reducedMotion) {
+            this.hitstop = Math.max(this.hitstop, 4);
+            this.cameras.main.flash(70, 255, 255, 255);
+        }
+        this.fireRing(cx, cy, true);
         playExplosion();
         // Framed explosion from the pool (6 slots for 6 robots max), then a
         // persistent per-archetype wreck. The fallback allocates only if a
-        // seventh flash is somehow live within 430 ms.
+        // seventh flash is somehow live within 430 ms. Frame 1 holds 60 ms
+        // (white flash), then fire → embers → smoke over ~600 ms staged.
         const pooled = this.booms.find((b) => !b.visible) ?? null;
         if (pooled) {
             pooled.setPosition(cx, cy).setTexture('boom_1').setVisible(true);
-            this.time.delayedCall(90, () => pooled.setTexture('boom_2'));
-            this.time.delayedCall(180, () => pooled.setTexture('boom_3'));
-            this.time.delayedCall(270, () => pooled.setTexture('boom_4'));
+            this.time.delayedCall(60, () => pooled.setTexture('boom_2'));
+            this.time.delayedCall(160, () => pooled.setTexture('boom_3'));
+            this.time.delayedCall(260, () => pooled.setTexture('boom_4'));
             this.time.delayedCall(430, () => pooled.setVisible(false));
         } else {
             const boom = this.add.image(cx, cy, 'boom_1').setScale(3).setDepth(8);
-            this.time.delayedCall(90, () => boom.setTexture('boom_2'));
-            this.time.delayedCall(180, () => boom.setTexture('boom_3'));
-            this.time.delayedCall(270, () => boom.setTexture('boom_4'));
+            this.time.delayedCall(60, () => boom.setTexture('boom_2'));
+            this.time.delayedCall(160, () => boom.setTexture('boom_3'));
+            this.time.delayedCall(260, () => boom.setTexture('boom_4'));
             this.time.delayedCall(430, () => boom.destroy());
         }
         const wreck = this.add.image(cx, cy, wreckKey(robotId)).setScale(2).setDepth(3);
         wreck.setRotation(snap.heading + 0.5);
         wreck.setAlpha(0.95);
-        const skin = this.request.skins[i] as SlotSkin;
-        this.queueBanner(destroyedBanner(skin.callsign));
+        const victim = (this.request.skins[i] as SlotSkin).callsign;
+        if (!this.firstBlood) {
+            this.firstBlood = true;
+            this.queueBanner(BATTLE.bannerFirstBlood, COLORS.goldCss);
+            playSting();
+        }
+        if (dealer >= 0 && dealer !== i) {
+            const killer = this.request.skins[dealer] as SlotSkin;
+            const ksnap = this.match.robotSnapshots[dealer] as RobotSnapshot;
+            this.queueBanner(killCreditBanner(victim, killer.callsign, ksnap.kills), teamCss(ksnap.team));
+        } else {
+            this.queueBanner(destroyedBanner(victim));
+        }
     }
 
-    private queueBanner(text: string): void {
-        this.bannerQueue.push(text);
+    /** Screen shake as trauma: squared response, linear decay, kills only. */
+    private addTrauma(amount: number): void {
+        if (this.reducedMotion) return;
+        this.trauma = Math.min(1, this.trauma + amount);
+        this.traumaClean = false;
+    }
+
+    private updateTrauma(dt: number): void {
+        if (this.reducedMotion || this.trauma <= 0) {
+            if (!this.traumaClean) {
+                this.cameras.main.setScroll(0, 0);
+                this.traumaClean = true;
+            }
+            return;
+        }
+        this.trauma = Math.max(0, this.trauma - dt * 1.6);
+        const mag = this.trauma * this.trauma * 14;
+        if (this.trauma === 0) {
+            this.cameras.main.setScroll(0, 0);
+            this.traumaClean = true;
+            return;
+        }
+        this.cameras.main.setScroll((Math.random() * 2 - 1) * mag, (Math.random() * 2 - 1) * mag);
+    }
+
+    /** Shockwave ring from the pool: scale-out + fade (motion-gated). */
+    private fireRing(x: number, y: number, big: boolean): void {
+        if (this.reducedMotion) return;
+        const ring = this.rings.find((r) => !r.visible) ?? null;
+        if (!ring) return;
+        ring.setPosition(x, y).setScale(0.75).setAlpha(0.95).setVisible(true);
+        this.tweens.add({
+            targets: ring,
+            scale: big ? 6 : 3.5,
+            alpha: 0,
+            duration: big ? 450 : 320,
+            ease: 'Cubic.easeOut',
+            onComplete: () => ring.setVisible(false),
+        });
+    }
+
+    private queueBanner(text: string, color: string = COLORS.ink): void {
+        this.bannerQueue.push({ text, color });
         if (!this.bannerBusy) this.nextBanner();
     }
 
     private nextBanner(): void {
-        const text = this.bannerQueue.shift();
-        if (text === undefined) {
+        const item = this.bannerQueue.shift();
+        if (item === undefined) {
             this.bannerBusy = false;
             return;
         }
         this.bannerBusy = true;
-        this.banner.setText(text).setAlpha(1).setY(AY + 56);
+        // Per-event edge color (stroke) + a 1.3→1.0 scale punch (gated).
+        this.banner.setText(item.text).setAlpha(1).setY(AY + 56).setScale(1);
+        this.banner.setStroke(item.color, 4);
         if (this.reducedMotion) {
             this.time.delayedCall(1300, () => {
                 this.banner.setAlpha(0);
@@ -736,10 +910,12 @@ export class BattleScene extends Scene {
             });
             return;
         }
+        this.banner.setScale(1.3);
         this.tweens.add({
             targets: this.banner,
             y: AY + 34,
             alpha: 0,
+            scale: 1,
             duration: 1300,
             ease: 'Cubic.easeOut',
             onComplete: () => this.nextBanner(),
@@ -798,12 +974,23 @@ export class BattleScene extends Scene {
         }
     }
 
-    private spawnDamageNumber(x: number, y: number, dmg: number): void {
+    /**
+     * Damage-number tiers: 12px white hits, 16px gold + scale-pop for charged
+     * and killing blows, 12px red SD ticks, green regen. Size AND color AND
+     * motion carry the tier (never color-only); the pop is motion-gated.
+     */
+    private spawnDamageNumber(x: number, y: number, dmg: number, tier: 'hit' | 'charged' | 'kill' | 'sd' | 'heal'): void {
         const slot = this.dmgCursor;
         const text = this.dmgTexts[slot] as Phaser.GameObjects.Text;
         this.dmgCursor = (this.dmgCursor + 1) % this.dmgTexts.length;
         this.tweens.killTweensOf(text);
-        text.setText(damageText(dmg)).setPosition(x, y).setAlpha(1).setVisible(true);
+        const big = tier === 'charged' || tier === 'kill';
+        text.setFontSize(big ? 16 : 12);
+        text.setColor(
+            tier === 'heal' ? COLORS.accentCss : tier === 'sd' ? COLORS.dangerCss : big ? COLORS.goldCss : COLORS.whiteCss,
+        );
+        text.setText(tier === 'heal' ? healText(dmg) : damageText(dmg));
+        text.setPosition(x, y).setAlpha(1).setScale(1).setVisible(true);
         if (this.reducedMotion) {
             // Static show; the token keeps a stale timer from hiding a reuse.
             this.dmgToken[slot] = (this.dmgToken[slot] as number) + 1;
@@ -812,6 +999,10 @@ export class BattleScene extends Scene {
                 if (this.dmgToken[slot] === token) text.setVisible(false);
             });
             return;
+        }
+        if (big) {
+            text.setScale(1.4);
+            this.tweens.add({ targets: text, scale: 1, duration: 180, ease: 'Back.easeOut' });
         }
         this.tweens.add({
             targets: text,
@@ -831,9 +1022,13 @@ export class BattleScene extends Scene {
     private decayEffects(dt: number): void {
         for (let i = 0; i < this.muzzleLife.length; i += 1) {
             if ((this.muzzleLife[i] as number) > 0) this.muzzleLife[i] = (this.muzzleLife[i] as number) - dt;
-            if ((this.recoil[i] as number) > 0) {
-                this.recoil[i] = Math.max((this.recoil[i] as number) - dt * 60, 0);
+            // Recoil offset decays exponentially (snappy return, soft tail).
+            const rec = this.recoil[i] as number;
+            if (rec > 0) {
+                const next = rec * Math.exp(-dt * 10);
+                this.recoil[i] = next < 0.05 ? 0 : next;
             }
+            if ((this.punchT[i] as number) > 0) this.punchT[i] = (this.punchT[i] as number) - dt;
         }
         for (let i = this.indicators.length - 1; i >= 0; i -= 1) {
             const ind = this.indicators[i] as EdgeIndicator;
@@ -843,6 +1038,7 @@ export class BattleScene extends Scene {
     }
 
     private syncSprites(snaps: RobotSnapshot[], bullets: BulletSnapshot[]): void {
+        const tick = this.match.result.tick;
         snaps.forEach((s, i) => {
             const cx = AX + s.x;
             const cy = AY + s.y;
@@ -853,19 +1049,72 @@ export class BattleScene extends Scene {
             const stripe = this.stripes[i] as Phaser.GameObjects.Rectangle;
             const skin = this.request.skins[i] as SlotSkin;
             const visible = s.alive;
+            // Step delta (render-side, from position deltas): drives treads,
+            // lean, and bob. Correct under pause/slow-mo by construction.
+            const lx = this.treadLastX[i] as number;
+            const ly = this.treadLastY[i] as number;
+            const stepx = lx > -9998 ? s.x - lx : 0;
+            const stepy = ly > -9998 ? s.y - ly : 0;
+            this.treadLastX[i] = s.x;
+            this.treadLastY[i] = s.y;
+            const stepLen = Math.hypot(stepx, stepy);
+            let ox = 0;
+            let oy = 0;
+            if (!this.reducedMotion) {
+                // Speed lean (≤2 px along heading) + 1 px sinusoidal bob.
+                const lean = Math.min(stepLen * 0.2, 2);
+                ox = Math.cos(s.heading) * lean;
+                oy = Math.sin(s.heading) * lean + Math.sin((tick + i * 9) / 5);
+            }
+            const px = cx + ox;
+            const py = cy + oy;
+            // Treads: distance-keyed frame swap (static under reduced motion).
+            const tread = this.treads[i] as Phaser.GameObjects.Image;
+            tread.setVisible(visible).setPosition(px, py).setRotation(s.heading);
+            if (visible && !this.reducedMotion) {
+                this.treadAcc[i] = (this.treadAcc[i] as number) + stepLen;
+                if ((this.treadAcc[i] as number) >= TREAD_SWAP_PX) {
+                    this.treadAcc[i] = 0;
+                    const flip = !(this.treadFlip[i] as boolean);
+                    this.treadFlip[i] = flip;
+                    tread.setTexture(flip ? 'treads_b' : 'treads_a');
+                }
+            }
+            // Bake-time damage overlay below 35% HP (texture swap, no tint).
+            const wantDmg = visible && s.health < s.maxHealth * 0.35;
+            if (wantDmg !== this.damaged[i]) {
+                this.damaged[i] = wantDmg;
+                body.setTexture(chassisTeamKey(this.robotIds[i] as string, s.team, wantDmg));
+            }
+            // Hurt-flash: 2-frame white blink on the damaged chassis.
+            if ((this.hurtT[i] as number) > 0) {
+                body.setTint(COLORS.white);
+                this.hurtT[i] = (this.hurtT[i] as number) - 1;
+            } else {
+                body.clearTint();
+            }
             const aura = this.auras[i] as Phaser.GameObjects.Image;
             const charging = visible && s.charge > 0.05;
-            aura.setVisible(charging).setPosition(cx, cy);
+            aura.setVisible(charging).setPosition(px, py);
             if (charging) aura.setAlpha(0.25 + 0.55 * s.charge);
-            if (charging && !this.reducedMotion) aura.setRotation(this.match.result.tick / 24);
-            body.setVisible(visible).setPosition(cx, cy).setRotation(s.heading);
-            stripe.setVisible(visible && skin.finish === 'Stripe').setPosition(cx, cy).setRotation(s.heading);
+            if (charging && !this.reducedMotion) aura.setRotation(tick / 24);
+            body.setVisible(visible).setPosition(px, py).setRotation(s.heading);
+            stripe.setVisible(visible && skin.finish === 'Stripe').setPosition(px, py).setRotation(s.heading);
             const rec = this.recoil[i] as number;
-            const tx = cx - Math.cos(s.tower) * rec;
-            const ty = cy - Math.sin(s.tower) * rec;
+            const tx = px - Math.cos(s.tower) * rec;
+            const ty = py - Math.sin(s.tower) * rec;
             tower.setVisible(visible).setPosition(tx, ty).setRotation(s.tower);
+            // Scale punch: touch scale only across the punch window so the
+            // spawn-pop tween owns it otherwise.
+            if ((this.punchT[i] as number) > 0) {
+                tower.setScale(2.3);
+                this.punchOn[i] = true;
+            } else if (this.punchOn[i] === true) {
+                tower.setScale(2);
+                this.punchOn[i] = false;
+            }
             hub.setVisible(visible).setPosition(tx, ty).setRotation(0);
-            if (ring) ring.setVisible(visible).setPosition(cx, cy);
+            if (ring) ring.setVisible(visible).setPosition(px, py);
             // Muzzle flash.
             const muzzle = this.muzzles[i] as Phaser.GameObjects.Image;
             const show = visible && (this.muzzleLife[i] as number) > 0;
@@ -902,13 +1151,24 @@ export class BattleScene extends Scene {
             }
         });
         // Bullets from pool (tint only when the slot's team changes).
+        // Cur/prev positions feed the dyn-Graphics hot-bullet tracers.
+        let hot = false;
         this.bullets.forEach((img, i) => {
+            this.prevBX[i] = this.curBX[i] as number;
+            this.prevBY[i] = this.curBY[i] as number;
             const b = bullets[i];
             if (b === undefined) {
                 img.setVisible(false);
                 this.bulletTeam[i] = null;
+                this.hotSlot[i] = false;
+                this.curBX[i] = -9999;
+                this.curBY[i] = -9999;
                 return;
             }
+            this.curBX[i] = b.x;
+            this.curBY[i] = b.y;
+            this.hotSlot[i] = b.hot;
+            if (b.hot) hot = true;
             img.setVisible(true).setPosition(AX + b.x, AY + b.y);
             const want = b.hot ? 'bullet_hot' : 'bullet';
             if (this.bulletTeam[i] !== b.team || img.texture.key !== want) {
@@ -917,6 +1177,7 @@ export class BattleScene extends Scene {
                 img.setTint(bulletColor(b.team));
             }
         });
+        this.hotLive = hot;
     }
 
     private drawDynamic(snaps: RobotSnapshot[]): void {
@@ -933,13 +1194,16 @@ export class BattleScene extends Scene {
                 });
             });
         }
+        // Anti-clutter rule: FOV cones dim while charged fire is live, paying
+        // for the added tracer brightness (no net glow growth).
+        const coneAlpha = this.hotLive ? 0.035 : 0.07;
         for (const s of snaps) {
             if (!s.alive) continue;
             const cx = AX + s.x;
             const cy = AY + s.y;
             const a0 = s.tower - s.fov / 2;
             const a1 = s.tower + s.fov / 2;
-            g.fillStyle(teamColor(s.team), 0.07);
+            g.fillStyle(teamColor(s.team), coneAlpha);
             g.fillTriangle(
                 cx,
                 cy,
@@ -948,6 +1212,25 @@ export class BattleScene extends Scene {
                 cx + Math.cos(a1) * s.scan,
                 cy + Math.sin(a1) * s.scan,
             );
+        }
+        // Hot-bullet tracers: fixed-length streaks in dyn Graphics (no new
+        // sprites), oriented by per-slot position deltas. Teleport-length
+        // deltas mean pool-slot reuse, not motion — skipped.
+        for (let i = 0; i < BULLET_POOL; i += 1) {
+            if (!(this.hotSlot[i] as boolean)) continue;
+            const team = this.bulletTeam[i];
+            if (team === null || team === undefined) continue;
+            const px = this.prevBX[i] as number;
+            const py = this.prevBY[i] as number;
+            const cx = this.curBX[i] as number;
+            const cy = this.curBY[i] as number;
+            if (px < -9998) continue;
+            const dx = cx - px;
+            const dy = cy - py;
+            const len = Math.hypot(dx, dy);
+            if (len < 0.5 || len > 40) continue;
+            g.lineStyle(3, bulletColor(team), 0.65);
+            g.lineBetween(AX + cx - (dx / len) * 26, AY + cy - (dy / len) * 26, AX + cx, AY + cy);
         }
         for (const ind of this.indicators) this.drawEdgeIndicator(g, ind);
         // Sudden-death safe circle: red ring shrinking onto the arena center.
@@ -1009,7 +1292,7 @@ export class BattleScene extends Scene {
     private syncHud(snaps: RobotSnapshot[]): void {
         if (this.match.result.suddenDeath && !this.sdAnnounced) {
             this.sdAnnounced = true;
-            this.queueBanner(BATTLE.bannerSuddenDeath);
+            this.queueBanner(BATTLE.bannerSuddenDeath, COLORS.dangerCss);
         }
         let alive0 = 0;
         let alive1 = 0;
@@ -1027,7 +1310,11 @@ export class BattleScene extends Scene {
             this.lastHudSecond = second;
             this.hudTimer.setText(formatClock(this.match.result.tick));
         }
-        this.drawMinimap(snaps);
+        // Minimap redraws at most every 3rd tick (perf budget).
+        if (this.match.result.tick - this.lastMapTick >= 3 || this.match.result.over) {
+            this.lastMapTick = this.match.result.tick;
+            this.drawMinimap(snaps);
+        }
     }
 
     private drawMinimap(snaps: RobotSnapshot[]): void {
@@ -1232,7 +1519,7 @@ export class BattleScene extends Scene {
             teamSize: data.teamSize,
             lineupIds: [...data.lineupIds],
             loadouts: data.loadouts.map((l) => ({ ...l })),
-            skins: data.lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
+            skins: data.lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i, (i < data.teamSize ? 0 : 1) as 0 | 1)),
             trails: this.request.trails,
             seed: data.seed,
             arena: data.arena ?? 'open',

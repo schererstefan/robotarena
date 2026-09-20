@@ -300,8 +300,8 @@ export class ShowcaseScene extends Scene {
     }
 
     // ---- Launchers --------------------------------------------------------
-    private skinsFor(count: number): BattleRequest['skins'] {
-        return Array.from({ length: count }, (_, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] as string, i));
+    private skinsFor(count: number, teamSize: number): BattleRequest['skins'] {
+        return Array.from({ length: count }, (_, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] as string, i, (i < teamSize ? 0 : 1) as 0 | 1));
     }
 
     /** Single featured-code watch (showcase battle, EXIT returns here). */
@@ -315,7 +315,7 @@ export class ShowcaseScene extends Scene {
             teamSize: data.teamSize,
             lineupIds: [...data.lineupIds],
             loadouts: data.loadouts.map((l) => ({ ...l })),
-            skins: this.skinsFor(data.lineupIds.length),
+            skins: this.skinsFor(data.lineupIds.length, data.teamSize),
             trails: true,
             seed: data.seed,
             arena: (data.arena ?? 'open') as ArenaId,
@@ -337,7 +337,7 @@ export class ShowcaseScene extends Scene {
             teamSize: data.teamSize,
             lineupIds: [...data.lineupIds],
             loadouts: data.loadouts.map((l) => ({ ...l })),
-            skins: this.skinsFor(data.lineupIds.length),
+            skins: this.skinsFor(data.lineupIds.length, data.teamSize),
             trails: true,
             seed: data.seed,
             arena: (data.arena ?? 'open') as ArenaId,
@@ -356,7 +356,7 @@ export class ShowcaseScene extends Scene {
             teamSize: 1,
             lineupIds: [champ.baseBot, champ.botId],
             loadouts: [{ ...champ.seedLoadout }, { ...champ.champLoadout }],
-            skins: this.skinsFor(2),
+            skins: this.skinsFor(2, 1),
             trails: true,
             seed: (Math.random() * 0x7fffffff) | 0,
             arena: 'open',
