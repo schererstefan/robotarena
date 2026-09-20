@@ -26,6 +26,7 @@ import { parseOnlineBoard } from '../src/game/onlineBoard';
 import { parseShowcaseManifest } from '../src/game/showcase';
 import { resimReplay } from './eval/resim';
 import { castContact, castFocusVote, focusTarget, formationSlot, latestContact, resolveRoles } from '../src/robots/comms';
+import { castClaim, castSlotHold, collectClaims, HOLD_BONUS, latestSlotHold, myRole, preferenceBid, roleSlot, ROLE_POINT } from '../src/robots/roles';
 import { ROBOTS } from '../src/robots/registry';
 import { canonicalStringify, defaultGenome, genomeDefFor, genomeHash, genomeLoadout, sha256Hex, validateGenome, type Genome } from '../src/robots/genome';
 import { BRAIN_DEFAULTS, BRAIN_PRESETS, createBrain, pickTarget as brainPickTarget, safeCircleFor, type BrainParams } from '../src/robots/brain';
@@ -2772,6 +2773,32 @@ console.log('comms');
         ({ kind: 'contact', x, y: 0, foe: 2, role: 0, slot: 0, bid: 0, from, sent: 6 });
     check('latest contact prefers the lowest-id sender', latestContact([contacts(2, 9), contacts(1, 7)])?.x === 7);
     check('no contacts is null', latestContact([]) === null);
+    // Squad role protocol (roles.ts): claim/slot shapes, auction plumbing.
+    check('claim builds the right shape', JSON.stringify(castClaim(1, 3)) === JSON.stringify({ kind: 'claim', x: 0, y: 0, foe: -1, role: 1, slot: 0, bid: 3 }));
+    check('slot hold builds the right shape', JSON.stringify(castSlotHold(1, 2)) === JSON.stringify({ kind: 'slot', x: 0, y: 0, foe: -1, role: 1, slot: 2, bid: 0 }));
+    check('top preference bids highest', preferenceBid(0, 3) === 3 && preferenceBid(2, 3) === 1 && preferenceBid(9, 3) === 1);
+    check('hold bonus is positive but below one rank', HOLD_BONUS > 0 && HOLD_BONUS < 1);
+    const claimMsg = (from: number, role: number, bid: number): { kind: 'claim'; x: number; y: number; foe: number; role: number; slot: number; bid: number; from: number; sent: number } =>
+        ({ kind: 'claim', x: 0, y: 0, foe: -1, role, slot: 0, bid, from, sent: 6 });
+    const ballotClaims = collectClaims(
+        [claimMsg(1, 0, 3), claimMsg(9, 0, 99), ballot(1, 4)],
+        new Set([0, 1]),
+        { from: 0, role: 1, bid: 3 },
+    );
+    check('collectClaims keeps live claims plus own', ballotClaims.length === 2 && ballotClaims.some((c) => c.from === 1 && c.role === 0) && ballotClaims.some((c) => c.from === 0 && c.role === 1));
+    check('myRole reads the settled win', myRole([{ from: 0, role: 0, bid: 1 }, { from: 1, role: 0, bid: 9 }, { from: 0, role: 1, bid: 5 }], 0) === 1);
+    check('myRole is null on a shutout', myRole([{ from: 1, role: 0, bid: 9 }], 0) === null);
+    // Trio auction converges identically from every mate's perspective.
+    const trioRole = (self: number): number | null =>
+        myRole(collectClaims([0, 1, 2].filter((i) => i !== self).map((i) => claimMsg(i, i, 3)), new Set([0, 1, 2]), { from: self, role: self, bid: 3 }), self);
+    check('trio auction converges per mate', trioRole(0) === 0 && trioRole(1) === 1 && trioRole(2) === 2);
+    const holdMsg = (from: number, slot: number, sent: number): { kind: 'slot'; x: number; y: number; foe: number; role: number; slot: number; bid: number; from: number; sent: number } =>
+        ({ kind: 'slot', x: 0, y: 0, foe: -1, role: 1, slot, bid: 0, from, sent });
+    check('fresh slot hold is seen', latestSlotHold([holdMsg(1, 2, 100)], 2, 110)?.from === 1);
+    check('stale slot hold frees the slot', latestSlotHold([holdMsg(1, 2, 50)], 2, 110) === null);
+    check('other slots are ignored', latestSlotHold([holdMsg(1, 2, 100)], 1, 110) === null);
+    const point = roleSlot(ROLE_POINT, 3, 480, 320, 100);
+    check('point role takes the north slot', Math.abs(point.x - 480) < 0.001 && Math.abs(point.y - 220) < 0.001);
     // Wired bots: hunter votes reach a mate, ghost contacts reach a mate.
     const wiredLog: MailboxEntry[] = [];
     const wiredHunter = new Match(
