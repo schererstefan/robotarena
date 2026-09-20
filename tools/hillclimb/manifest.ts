@@ -85,14 +85,19 @@ export function writeManifest(runsDir: string, runId: string, archetype: string,
 }
 
 /**
- * Validation replay code: team-0 slot first, champion on its validation side,
- * champion loadout + opponent default loadout. Decodes once the champion id
- * exists in the registry (i.e. after freeze).
+ * Validation replay code: team-0 slots first, champion team on its validation
+ * side (champion id + loadout on every slot), opponent default id + loadout
+ * on every foe slot. Decodes once the champion id exists in the registry
+ * (i.e. after freeze). teamSize 1 reproduces the legacy 1v1 code exactly.
  */
-export function validationCode(championId: string, champLoadout: SkillLoadout, match: { seed: number; arena: ArenaId; opponent: string; side: 0 | 1 }): string {
+export function validationCode(championId: string, champLoadout: SkillLoadout, match: { seed: number; arena: ArenaId; opponent: string; side: 0 | 1 }, teamSize = 1): string {
     const foe = getRobot(match.opponent);
     if (!foe) throw new Error(`unknown opponent ${match.opponent}`);
-    const lineupIds = match.side === 0 ? [championId, match.opponent] : [match.opponent, championId];
-    const loadouts = match.side === 0 ? [{ ...champLoadout }, { ...foe.loadout }] : [{ ...foe.loadout }, { ...champLoadout }];
-    return encodeReplay({ seed: match.seed, teamSize: 1, lineupIds, loadouts, arena: match.arena });
+    const champIds = Array<string>(teamSize).fill(championId);
+    const foeIds = Array<string>(teamSize).fill(match.opponent);
+    const champLoadouts: SkillLoadout[] = Array.from({ length: teamSize }, () => ({ ...champLoadout }));
+    const foeLoadouts: SkillLoadout[] = Array.from({ length: teamSize }, () => ({ ...foe.loadout }));
+    const lineupIds = match.side === 0 ? [...champIds, ...foeIds] : [...foeIds, ...champIds];
+    const loadouts = match.side === 0 ? [...champLoadouts, ...foeLoadouts] : [...foeLoadouts, ...champLoadouts];
+    return encodeReplay({ seed: match.seed, teamSize, lineupIds, loadouts, arena: match.arena });
 }

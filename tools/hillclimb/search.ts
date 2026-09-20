@@ -6,7 +6,7 @@
 
 import { GENOME_VERSION, validateGenome, type Genome, type GenomeDef } from '../../src/robots/genome';
 import { aggregate, better, binomialUpperTail, signTest, type Aggregate } from './fitness';
-import { buildPool, evaluateGenome, type CreateFromGenome } from './evaluate';
+import { buildPool, buildTeamPool, evaluateGenome, evaluateTeamGenome, type CreateFromGenome, type GenomeEval, type PoolMatch, type TeamPoolMatch } from './evaluate';
 import { mutateGenome, type Rand } from './mutate';
 
 export interface GenRecord {
@@ -42,6 +42,8 @@ export interface HillclimbOptions {
     /** Stop after this many accept-free generations (0 disables). */
     earlyStop: number;
     rng: Rand;
+    /** Bots per side; >1 runs the team arm (shared genome on every slot). Defaults to 1. */
+    teamSize?: number;
 }
 
 function defaultParamsGenome(def: GenomeDef): Genome {
@@ -50,6 +52,15 @@ function defaultParamsGenome(def: GenomeDef): Genome {
 
 /** Single restart from a Stage-A survivor loadout at default behavior params. */
 export function hillclimbRestart(opts: HillclimbOptions, restart: number, seedLoadout: Genome): RestartResult {
+    // Team arm: every slot (candidate and foe) runs one shared genome, so the
+    // single-genome mutation/accept loop is unchanged — only the pool builders
+    // and scorers swap. teamSize 1 keeps the exact 1v1 code path.
+    const teamSize = opts.teamSize ?? 1;
+    const teamMode = teamSize > 1;
+    const buildTrainPool = (seeds: number[], offset: number): PoolMatch[] | TeamPoolMatch[] =>
+        teamMode ? buildTeamPool({ seeds, teamSize, opponents: opts.opponents, offset }) : buildPool({ seeds, oppsPerSeed: 1, opponents: opts.opponents, offset });
+    const evaluate = (genome: Genome, pool: PoolMatch[] | TeamPoolMatch[]): GenomeEval =>
+        teamMode ? evaluateTeamGenome(opts.create, genome, pool as TeamPoolMatch[]) : evaluateGenome(opts.create, genome, pool as PoolMatch[]);
     const defaults = defaultParamsGenome(opts.def);
     let incumbent = validateGenome(opts.def, {
         genome_version: GENOME_VERSION,
@@ -64,14 +75,14 @@ export function hillclimbRestart(opts: HillclimbOptions, restart: number, seedLo
 
     for (let gen = 0; gen < opts.generations; gen += 1) {
         // Rotated pool per generation; incumbent re-evaluated every gen.
-        const pool = buildPool({ seeds: opts.trainSeeds, oppsPerSeed: 1, opponents: opts.opponents, offset: gen });
-        const incumbentEval = evaluateGenome(opts.create, incumbent, pool);
+        const pool = buildTrainPool(opts.trainSeeds, gen);
+        const incumbentEval = evaluate(incumbent, pool);
         matchesRun += pool.length;
 
         const tried = [];
         for (let c = 0; c < opts.challengers; c += 1) {
             const genome = mutateGenome(opts.def, incumbent, opts.rng);
-            const result = evaluateGenome(opts.create, genome, pool);
+            const result = evaluate(genome, pool);
             matchesRun += pool.length;
             tried.push({ genome, result });
         }
@@ -116,8 +127,8 @@ export function hillclimbRestart(opts: HillclimbOptions, restart: number, seedLo
     }
 
     // Held-out validation: promote only if valid ≥ train − 5pp.
-    const validPool = buildPool({ seeds: opts.validSeeds, oppsPerSeed: 1, opponents: opts.opponents });
-    const valid = evaluateGenome(opts.create, incumbent, validPool).agg;
+    const validPool = buildTrainPool(opts.validSeeds, 0);
+    const valid = evaluate(incumbent, validPool).agg;
     matchesRun += validPool.length;
     return { restart, incumbent, train, valid, promoted: valid.mean >= train.mean - 0.05, history, matchesRun, stoppedEarly };
 }
@@ -137,11 +148,13 @@ export interface VetoResult {
  * Regression veto: champion vs the default build (default params + default
  * loadout) on a fresh CRN pool. Freeze is blocked only when the default
  * build is *significantly* better (one-sided binomial p < 0.05).
+ * teamSize > 1 runs both sides as teams on a team pool (same comparison).
  */
-export function regressionVeto(create: CreateFromGenome, champion: Genome, defaults: Genome, poolSeed: Parameters<typeof buildPool>[0]['seeds'], opponents: string[]): VetoResult {
-    const pool = buildPool({ seeds: poolSeed, oppsPerSeed: 1, opponents });
-    const champ = evaluateGenome(create, champion, pool);
-    const base = evaluateGenome(create, defaults, pool);
+export function regressionVeto(create: CreateFromGenome, champion: Genome, defaults: Genome, poolSeed: Parameters<typeof buildPool>[0]['seeds'], opponents: string[], teamSize = 1): VetoResult {
+    const teamMode = teamSize > 1;
+    const pool = teamMode ? buildTeamPool({ seeds: poolSeed, teamSize, opponents }) : buildPool({ seeds: poolSeed, oppsPerSeed: 1, opponents });
+    const champ = teamMode ? evaluateTeamGenome(create, champion, pool as TeamPoolMatch[]) : evaluateGenome(create, champion, pool as PoolMatch[]);
+    const base = teamMode ? evaluateTeamGenome(create, defaults, pool as TeamPoolMatch[]) : evaluateGenome(create, defaults, pool as PoolMatch[]);
     const a = champ.matches.map((m) => m.score);
     const b = base.matches.map((m) => m.score);
     let nonTied = 0;

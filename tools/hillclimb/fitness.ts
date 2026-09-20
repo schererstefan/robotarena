@@ -71,6 +71,46 @@ export function tiebreak(input: TiebreakInput): number {
     return damageDiff + 0.2 * survival - stall - passivity - errors;
 }
 
+export interface TeamTiebreakInput {
+    /** Snapshots of my team's bots (lineup order). */
+    mine: RobotSnapshot[];
+    /** Total damage dealt by the opposing team. */
+    foeDamage: number;
+    endTick: number;
+    draw: boolean;
+    /** One spy per team slot, aligned with `mine`. */
+    spies: SpyStats[];
+}
+
+/**
+ * Team tiebreak F (3v3 arm). Exact formula:
+ *   F = (myDamage − foeDamage) / (200 × teamSize)
+ *     + 0.2 × (aliveCount / teamSize)
+ *     − stall − meanPassivity − maxErrors
+ * where myDamage sums damageDealt over my team's bots; stall is 1 only on a
+ * capped draw (same as 1v1); meanPassivity averages the 1v1 passivity term
+ * (1 − min(1, shotsFired / max(1, spyTicks/25))) over the team's spies; and
+ * maxErrors is the max over the team's bots of min(1, errors). The surviving-
+ * bot fraction replaces the single-bot survival scalar in the same 0.2 slot,
+ * so selection pressure matches the 1v1 tiebreak (damage first, survival small).
+ */
+export function teamTiebreak(input: TeamTiebreakInput): number {
+    const { mine, foeDamage, endTick, draw, spies } = input;
+    const teamSize = mine.length;
+    const myDamage = mine.reduce((sum, m) => sum + m.damageDealt, 0);
+    const damageDiff = teamSize > 0 ? (myDamage - foeDamage) / (200 * teamSize) : 0;
+    const survival = teamSize > 0 ? mine.filter((m) => m.alive).length / teamSize : 0;
+    const stall = draw && endTick >= MAX_TICKS_TOTAL ? 1 : 0;
+    const passivities = mine.map((m, i) => {
+        const spy = spies[i] ?? { ticks: 0, fireIntents: 0, chargeIntents: 0, moveSum: 0 };
+        const expected = Math.max(1, spy.ticks / 25);
+        return 1 - Math.min(1, m.shotsFired / expected);
+    });
+    const passivity = passivities.length > 0 ? passivities.reduce((sum, p) => sum + p, 0) / passivities.length : 0;
+    const errors = mine.reduce((max, m) => Math.max(max, Math.min(1, m.errors)), 0);
+    return damageDiff + 0.2 * survival - stall - passivity - errors;
+}
+
 export interface ScoredMatch {
     score: number;
     f: number;
