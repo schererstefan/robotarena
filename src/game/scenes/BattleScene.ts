@@ -6,7 +6,8 @@ import { Scene } from 'phaser';
 import { ARENA_HEIGHT, ARENA_WIDTH, DT, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import { clamp } from '../../sim/math';
-import { encodeReplay } from '../../sim/replay';
+import { decodeReplay, encodeReplay } from '../../sim/replay';
+import { getRobot } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
 import { bakedTextureCount, chassisKey, ensureArtTextures, towerKey, wreckKey } from '../art';
 import { playClick, playExplosion, playHit, playShoot, playWin, toggleMuted, unlockAudio } from '../audio';
@@ -27,10 +28,14 @@ import {
     exhibitionTag,
     formatClock,
     hudTeamPips,
+    reelCountdown,
+    reelExitCountdown,
     resultRow,
     resultsSub,
     resultsTitle,
     seedLabel,
+    showcaseResultsLine,
+    showcaseTag,
     speedLabel,
     tsFilename,
     type CopyStep,
@@ -38,7 +43,7 @@ import {
 import { COLORS, FONTS } from '../theme';
 import { markTutorialSeen } from '../tutorial';
 import { copyText, downloadText, makeButton, type Button } from '../ui';
-import type { SlotSkin } from '../customize';
+import { CALLSIGNS, defaultSkin, type SlotSkin } from '../customize';
 import type { BattleRequest } from './MenuScene';
 
 const AX = 32;
@@ -332,6 +337,10 @@ export class BattleScene extends Scene {
         if (this.request.pilot === true) tags.push(BATTLE.tagPilot);
         else if (this.request.daily !== undefined) tags.push(BATTLE.tagDaily);
         else if (this.request.replay === true) tags.push(BATTLE.tagReplay);
+        else if (this.request.showcase !== undefined) {
+            const reel = this.request.showcase.reel;
+            tags.push(showcaseTag(reel ? reel.index : null, reel ? reel.codes.length : 0));
+        }
         if (this.exhibition) {
             const parts = [...(this.customMatch ? [BATTLE.tagCustom] : []), ...modifierCodes(this.request.modifiers)];
             tags.push(exhibitionTag(parts));
@@ -1052,8 +1061,9 @@ export class BattleScene extends Scene {
         // Replays re-watch history; only live battles append to it. Daily
         // matches go to the daily board instead of the main log so the fixed
         // daily matchup can't skew per-robot win rates. Pilot matches are
-        // human-driven and tutorial matches are a fixed scripted matchup, so
-        // both stay out of the log for the same reason. Exhibition matches
+        // human-driven, tutorial matches are a fixed scripted matchup, and
+        // showcase matches replay curated champion content, so all three
+        // stay out of the log for the same reason. Exhibition matches
         // (any modifier on) are barred from every board.
         if (this.exhibition) {
             // Barred from stats: no record anywhere.
@@ -1064,7 +1074,7 @@ export class BattleScene extends Scene {
                 winner: result.winner,
                 ticks: result.tick,
             });
-        } else if (this.request.replay !== true && this.request.pilot !== true && this.request.tutorial !== true) {
+        } else if (this.request.replay !== true && this.request.pilot !== true && this.request.tutorial !== true && this.request.showcase === undefined) {
             recordMatch({
                 teamSize: this.request.teamSize,
                 lineupIds: [...this.request.lineupIds],
@@ -1087,6 +1097,14 @@ export class BattleScene extends Scene {
             const parts = [...(this.customMatch ? [BATTLE.customRobotPart] : []), ...modifierCodes(this.request.modifiers)];
             this.add
                 .text(512, 250, exhibitionResultsLine(parts), {
+                    ...FONTS.monoSmall,
+                    color: '#ffd23f',
+                })
+                .setOrigin(0.5)
+                .setDepth(20);
+        } else if (this.request.showcase !== undefined) {
+            this.add
+                .text(512, 250, showcaseResultsLine(), {
                     ...FONTS.monoSmall,
                     color: '#ffd23f',
                 })
@@ -1128,25 +1146,99 @@ export class BattleScene extends Scene {
             this.showReplayCode(code, hintY);
         }
 
-        makeButton(
-            this,
-            412,
-            566,
-            170,
-            44,
-            BATTLE.rematch,
-            () => {
-                this.scene.restart({
-                    ...this.request,
-                    seed: (Math.random() * 0x7fffffff) | 0,
-                    replay: false,
-                    daily: undefined,
-                    tutorial: undefined,
-                });
+        const showcase = this.request.showcase;
+        if (showcase?.reel) {
+            this.showReelButtons(showcase.reel);
+        } else if (showcase !== undefined) {
+            makeButton(
+                this,
+                412,
+                566,
+                170,
+                44,
+                BATTLE.rematch,
+                () => {
+                    this.scene.restart({
+                        ...this.request,
+                        seed: (Math.random() * 0x7fffffff) | 0,
+                        replay: false,
+                        daily: undefined,
+                        tutorial: undefined,
+                    });
+                },
+                21,
+            );
+            makeButton(this, 612, 566, 170, 44, BATTLE.exitShowcase, () => this.scene.start('Showcase'), 21);
+        } else {
+            makeButton(
+                this,
+                412,
+                566,
+                170,
+                44,
+                BATTLE.rematch,
+                () => {
+                    this.scene.restart({
+                        ...this.request,
+                        seed: (Math.random() * 0x7fffffff) | 0,
+                        replay: false,
+                        daily: undefined,
+                        tutorial: undefined,
+                    });
+                },
+                21,
+            );
+            makeButton(this, 612, 566, 170, 44, COMMON.menu, () => this.scene.start('Menu'), 21);
+        }
+    }
+
+    /** Reel results: NEXT steps the reel, EXIT returns to the showcase. */
+    private showReelButtons(reel: { codes: string[]; index: number }): void {
+        const hasNext = reel.index + 1 < reel.codes.length;
+        if (hasNext) {
+            makeButton(this, 412, 566, 170, 44, COMMON.next, () => this.advanceReel(), 21);
+        }
+        makeButton(this, hasNext ? 612 : 512, 566, 170, 44, BATTLE.exitShowcase, () => this.scene.start('Showcase'), 21);
+        // 4 s skippable auto-advance: NEXT jumps ahead immediately, EXIT
+        // leaves, otherwise the reel plays through (out at the end).
+        const label = this.add.text(512, 528, '', FONTS.monoSmall).setOrigin(0.5).setDepth(20);
+        let left = 4;
+        label.setText(hasNext ? reelCountdown(left) : reelExitCountdown(left));
+        this.time.addEvent({
+            delay: 1000,
+            repeat: 3,
+            callback: () => {
+                left -= 1;
+                if (left <= 0) this.advanceReel();
+                else label.setText(hasNext ? reelCountdown(left) : reelExitCountdown(left));
             },
-            21,
-        );
-        makeButton(this, 612, 566, 170, 44, COMMON.menu, () => this.scene.start('Menu'), 21);
+        });
+    }
+
+    /** Step to the next reel code (or EXIT to the showcase at the end). */
+    private advanceReel(): void {
+        const showcase = this.request.showcase;
+        const reel = showcase?.reel;
+        if (!showcase || !reel || reel.index + 1 >= reel.codes.length) {
+            this.scene.start('Showcase');
+            return;
+        }
+        const data = decodeReplay(reel.codes[reel.index + 1] as string);
+        if (!data || !data.lineupIds.every((id) => getRobot(id))) {
+            this.scene.start('Showcase');
+            return;
+        }
+        this.scene.restart({
+            teamSize: data.teamSize,
+            lineupIds: [...data.lineupIds],
+            loadouts: data.loadouts.map((l) => ({ ...l })),
+            skins: data.lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
+            trails: this.request.trails,
+            seed: data.seed,
+            arena: data.arena ?? 'open',
+            modifiers: data.modifiers ?? {},
+            showcase: { botId: showcase.botId, reel: { codes: [...reel.codes], index: reel.index + 1 } },
+        } satisfies BattleRequest);
     }
 
     private showReplayCode(code: string, hintY: number): void {

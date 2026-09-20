@@ -1,0 +1,491 @@
+{
+ "season": "0.1.0",
+ "version": "0.1.0",
+ "champions": [
+  {
+   "botId": "brawler-hc1",
+   "baseBot": "brawler",
+   "author": "RobotArena (hillclimb)",
+   "seedLoadout": {
+    "overdrive": 2,
+    "trigger": 2,
+    "plating": 2
+   },
+   "champLoadout": {
+    "trigger": 3,
+    "plating": 1,
+    "slipstream": 1,
+    "scout": 1
+   },
+   "stats": {
+    "before": {
+     "wins": 42,
+     "losses": 22,
+     "draws": 0,
+     "winRate": 0.65625,
+     "games": 64
+    },
+    "after": {
+     "wins": 53,
+     "losses": 7,
+     "draws": 4,
+     "winRate": 0.859375,
+     "games": 64
+    }
+   },
+   "featuredReplays": [
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbImJyYXdsZXItaGMxIiwicnVzaGVyIl0sIm8iOlsiNTozLDg6MSwxMDoxLDEyOjEiLCIwOjMsNToxLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsImJyYXdsZXItaGMxIl0sIm8iOlsiMDozLDU6MSw4OjIiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbImJyYXdsZXItaGMxIiwicnVzaGVyIl0sIm8iOlsiNTozLDg6MSwxMDoxLDEyOjEiLCIwOjMsNToxLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsImJyYXdsZXItaGMxIl0sIm8iOlsiMDozLDU6MSw4OjIiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+     "outcome": "win"
+    }
+   ],
+   "board": {
+    "elo": 946.3,
+    "wins": 911,
+    "losses": 324,
+    "draws": 45
+   }
+  },
+  {
+   "botId": "ghost-hc1",
+   "baseBot": "ghost",
+   "author": "RobotArena (hillclimb)",
+   "seedLoadout": {
+    "overdrive": 2,
+    "gyro": 2,
+    "wideband": 1,
+    "scout": 1
+   },
+   "champLoadout": {
+    "overdrive": 1,
+    "trigger": 2,
+    "marksman": 2,
+    "scout": 1
+   },
+   "stats": {
+    "before": {
+     "wins": 43,
+     "losses": 21,
+     "draws": 0,
+     "winRate": 0.671875,
+     "games": 64
+    },
+    "after": {
+     "wins": 55,
+     "losses": 9,
+     "draws": 0,
+     "winRate": 0.859375,
+     "games": 64
+    }
+   },
+   "featuredReplays": [
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbImdob3N0LWhjMSIsInJ1c2hlciJdLCJvIjpbIjA6MSw1OjIsNjoyLDEyOjEiLCIwOjMsNToxLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsImdob3N0LWhjMSJdLCJvIjpbIjA6Myw1OjEsODoyIiwiMDoxLDU6Miw2OjIsMTI6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbImdob3N0LWhjMSIsInJ1c2hlciJdLCJvIjpbIjA6MSw1OjIsNjoyLDEyOjEiLCIwOjMsNToxLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsImdob3N0LWhjMSJdLCJvIjpbIjA6Myw1OjEsODoyIiwiMDoxLDU6Miw2OjIsMTI6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+     "outcome": "win"
+    }
+   ],
+   "board": {
+    "elo": 1153.2,
+    "wins": 1066,
+    "losses": 213,
+    "draws": 1
+   }
+  },
+  {
+   "botId": "hunter-hc2",
+   "baseBot": "hunter",
+   "author": "RobotArena (hillclimb)",
+   "seedLoadout": {
+    "trigger": 2,
+    "marksman": 1,
+    "charger": 2,
+    "plating": 1
+   },
+   "champLoadout": {
+    "trigger": 2,
+    "charger": 1,
+    "plating": 2,
+    "nanorepair": 1
+   },
+   "stats": {
+    "before": {
+     "wins": 41,
+     "losses": 23,
+     "draws": 0,
+     "winRate": 0.640625,
+     "games": 64
+    },
+    "after": {
+     "wins": 56,
+     "losses": 8,
+     "draws": 0,
+     "winRate": 0.875,
+     "games": 64
+    }
+   },
+   "featuredReplays": [
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbImh1bnRlci1oYzIiLCJydXNoZXIiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCIwOjMsNToxLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsImh1bnRlci1oYzIiXSwibyI6WyIwOjMsNToxLDg6MiIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbImh1bnRlci1oYzIiLCJydXNoZXIiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCIwOjMsNToxLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsImh1bnRlci1oYzIiXSwibyI6WyIwOjMsNToxLDg6MiIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+     "outcome": "win"
+    }
+   ],
+   "board": {
+    "elo": 1681.9,
+    "wins": 1147,
+    "losses": 132,
+    "draws": 1
+   }
+  },
+  {
+   "botId": "orbiter-hc1",
+   "baseBot": "orbiter",
+   "author": "RobotArena (hillclimb)",
+   "seedLoadout": {
+    "overdrive": 2,
+    "gyro": 2,
+    "trigger": 1,
+    "plating": 1
+   },
+   "champLoadout": {
+    "trigger": 2,
+    "charger": 1,
+    "plating": 2,
+    "nanorepair": 1
+   },
+   "stats": {
+    "before": {
+     "wins": 12,
+     "losses": 52,
+     "draws": 0,
+     "winRate": 0.1875,
+     "games": 64
+    },
+    "after": {
+     "wins": 51,
+     "losses": 13,
+     "draws": 0,
+     "winRate": 0.796875,
+     "games": 64
+    }
+   },
+   "featuredReplays": [
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwicnVzaGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMDozLDU6MSw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMDozLDU6MSw4OjIiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwicnVzaGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMDozLDU6MSw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMDozLDU6MSw4OjIiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+     "outcome": "win"
+    }
+   ],
+   "board": {
+    "elo": 957.4,
+    "wins": 890,
+    "losses": 390,
+    "draws": 0
+   }
+  },
+  {
+   "botId": "rusher-hc1",
+   "baseBot": "rusher",
+   "author": "RobotArena (hillclimb)",
+   "seedLoadout": {
+    "overdrive": 3,
+    "trigger": 1,
+    "plating": 2
+   },
+   "champLoadout": {
+    "longscan": 2,
+    "trigger": 1,
+    "plating": 2,
+    "nanorepair": 1
+   },
+   "stats": {
+    "before": {
+     "wins": 17,
+     "losses": 47,
+     "draws": 0,
+     "winRate": 0.265625,
+     "games": 64
+    },
+    "after": {
+     "wins": 53,
+     "losses": 11,
+     "draws": 0,
+     "winRate": 0.828125,
+     "games": 64
+    }
+   },
+   "featuredReplays": [
+    {
+     "label": "vs turret (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlci1oYzEiLCJ0dXJyZXQiXSwibyI6WyIzOjIsNToxLDg6Miw5OjEiLCIyOjEsMzoyLDU6Miw2OjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+     "outcome": "win"
+    },
+    {
+     "label": "vs turret (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInR1cnJldCIsInJ1c2hlci1oYzEiXSwibyI6WyIyOjEsMzoyLDU6Miw2OjEiLCIzOjIsNToxLDg6Miw5OjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+     "outcome": "win"
+    },
+    {
+     "label": "vs turret (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlci1oYzEiLCJ0dXJyZXQiXSwibyI6WyIzOjIsNToxLDg6Miw5OjEiLCIyOjEsMzoyLDU6Miw2OjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs turret (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInR1cnJldCIsInJ1c2hlci1oYzEiXSwibyI6WyIyOjEsMzoyLDU6Miw2OjEiLCIzOjIsNToxLDg6Miw5OjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+     "outcome": "win"
+    }
+   ],
+   "board": {
+    "elo": 847,
+    "wins": 746,
+    "losses": 531,
+    "draws": 3
+   }
+  },
+  {
+   "botId": "sniper-hc1",
+   "baseBot": "sniper",
+   "author": "RobotArena (hillclimb)",
+   "seedLoadout": {
+    "longscan": 2,
+    "marksman": 2,
+    "charger": 1,
+    "deadeye": 1
+   },
+   "champLoadout": {
+    "longscan": 2,
+    "charger": 2,
+    "plating": 1,
+    "nanorepair": 1
+   },
+   "stats": {
+    "before": {
+     "wins": 26,
+     "losses": 38,
+     "draws": 0,
+     "winRate": 0.40625,
+     "games": 64
+    },
+    "after": {
+     "wins": 32,
+     "losses": 32,
+     "draws": 0,
+     "winRate": 0.5,
+     "games": 64
+    }
+   },
+   "featuredReplays": [
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInNuaXBlci1oYzEiLCJydXNoZXIiXSwibyI6WyIzOjIsNzoyLDg6MSw5OjEiLCIwOjMsNToxLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsInNuaXBlci1oYzEiXSwibyI6WyIwOjMsNToxLDg6MiIsIjM6Miw3OjIsODoxLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInNuaXBlci1oYzEiLCJydXNoZXIiXSwibyI6WyIzOjIsNzoyLDg6MSw5OjEiLCIwOjMsNToxLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsInNuaXBlci1oYzEiXSwibyI6WyIwOjMsNToxLDg6MiIsIjM6Miw3OjIsODoxLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+     "outcome": "win"
+    }
+   ],
+   "board": {
+    "elo": 1202.6,
+    "wins": 495,
+    "losses": 785,
+    "draws": 0
+   }
+  },
+  {
+   "botId": "turret-hc1",
+   "baseBot": "turret",
+   "author": "RobotArena (hillclimb)",
+   "seedLoadout": {
+    "servos": 1,
+    "longscan": 2,
+    "trigger": 2,
+    "marksman": 1
+   },
+   "champLoadout": {
+    "trigger": 2,
+    "charger": 1,
+    "plating": 2,
+    "nanorepair": 1
+   },
+   "stats": {
+    "before": {
+     "wins": 25,
+     "losses": 39,
+     "draws": 0,
+     "winRate": 0.390625,
+     "games": 64
+    },
+    "after": {
+     "wins": 43,
+     "losses": 21,
+     "draws": 0,
+     "winRate": 0.671875,
+     "games": 64
+    }
+   },
+   "featuredReplays": [
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInR1cnJldC1oYzEiLCJydXNoZXIiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCIwOjMsNToxLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsInR1cnJldC1oYzEiXSwibyI6WyIwOjMsNToxLDg6MiIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInR1cnJldC1oYzEiLCJydXNoZXIiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCIwOjMsNToxLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsInR1cnJldC1oYzEiXSwibyI6WyIwOjMsNToxLDg6MiIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+     "outcome": "win"
+    }
+   ],
+   "board": {
+    "elo": 1391.3,
+    "wins": 759,
+    "losses": 519,
+    "draws": 2
+   }
+  },
+  {
+   "botId": "wanderer-hc1",
+   "baseBot": "wanderer",
+   "author": "RobotArena (hillclimb)",
+   "seedLoadout": {
+    "overdrive": 2,
+    "longscan": 2,
+    "wideband": 2
+   },
+   "champLoadout": {
+    "trigger": 3,
+    "plating": 1,
+    "slipstream": 1,
+    "scout": 1
+   },
+   "stats": {
+    "before": {
+     "wins": 12,
+     "losses": 52,
+     "draws": 0,
+     "winRate": 0.1875,
+     "games": 64
+    },
+    "after": {
+     "wins": 33,
+     "losses": 30,
+     "draws": 1,
+     "winRate": 0.5234375,
+     "games": 64
+    }
+   },
+   "featuredReplays": [
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInJ1c2hlciJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiMDozLDU6MSw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjA6Myw1OjEsODoyIiwiNTozLDg6MSwxMDoxLDEyOjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInJ1c2hlciJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiMDozLDU6MSw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+     "outcome": "win"
+    },
+    {
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjA6Myw1OjEsODoyIiwiNTozLDg6MSwxMDoxLDEyOjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+     "outcome": "win"
+    }
+   ],
+   "board": {
+    "elo": 1180.7,
+    "wins": 645,
+    "losses": 581,
+    "draws": 54
+   }
+  }
+ ]
+}

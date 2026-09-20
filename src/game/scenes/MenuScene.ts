@@ -22,6 +22,8 @@ import { COLORS, FONTS } from '../theme';
 import { isColorblind, isReducedMotion, setColorblind, setReducedMotion, teamColor } from '../accessibility';
 import { displayRobotId, getImported, importRobotFromFile, importRobotFromUrl } from '../importRobot';
 import { FocusNav, type NavTarget } from '../nav';
+import { fetchOnlineBoard, type OnlineBoard } from '../onlineBoard';
+import { loadShowcase } from '../showcase';
 import {
     APP,
     arenaLabel,
@@ -46,14 +48,19 @@ import {
     MODS,
     modsButtonLabel,
     motionLabel,
+    ONLINE,
+    onlineRow,
+    onlineSummary,
     rankText,
     REPLAY_DIALOG,
     replayUnknownRobot,
     robotByline,
+    showcaseTickerLine,
     skillLine,
     skillsButtonLabel,
     soundLabel,
     STATS,
+    statsAndMore,
     statsPct,
     statsRow,
     statsSummary,
@@ -82,9 +89,17 @@ export interface BattleRequest {
     pilot?: boolean;
     /** True for the scripted spectated tutorial battle. Excluded from history. */
     tutorial?: boolean;
+    /**
+     * Showcase battle (featured champion content). Excluded from history
+     * like replay/pilot. `reel` steps a curated code list with NEXT/EXIT;
+     * without it the battle is a single showcase watch or VS compare.
+     */
+    showcase?: { botId: string; reel?: { codes: string[]; index: number } };
 }
 
 const CX = 512;
+/** Max stats rows per overlay page (the panel fits 8 + daily + buttons). */
+const STATS_ROWS = 8;
 
 export class MenuScene extends Scene {
     private teamSize = 1;
@@ -117,6 +132,13 @@ export class MenuScene extends Scene {
     private nav!: FocusNav;
     private navBase: NavTarget[] = [];
     private navSlots: NavTarget[] = [];
+    private showcaseButton: Button | null = null;
+    private tickerTimer: ReturnType<typeof setInterval> | null = null;
+    private statsTab: 'local' | 'online' = 'local';
+    private onlineBoard: OnlineBoard | null = null;
+    private onlineCached = false;
+    private onlineTried = false;
+    private onlineToken = 0;
     private replayOverlay: HTMLDivElement | null = null;
     private importOverlay: HTMLDivElement | null = null;
     private tourRequested = false;
@@ -152,6 +174,12 @@ export class MenuScene extends Scene {
         this.tourNext = null;
         this.navBase = [];
         this.navSlots = [];
+        this.showcaseButton = null;
+        this.statsTab = 'local';
+        this.onlineBoard = null;
+        this.onlineCached = false;
+        this.onlineTried = false;
+        this.onlineToken += 1;
         this.nav = new FocusNav(this);
         this.nav.onEscape = () => this.escapeOverlay();
         this.add.text(CX, 44, APP.title, FONTS.title).setOrigin(0.5);
@@ -186,11 +214,27 @@ export class MenuScene extends Scene {
         this.navButton(CX - 290, 684, 270, 50, MENU.randomizeSkins, () => this.randomizeSkins());
         this.navButton(CX, 684, 270, 50, MENU.startBattle, () => this.startBattle());
         this.navButton(CX + 290, 684, 270, 50, MENU.pilot, () => this.startPilot());
-        this.trailsButton = this.navButton(CX - 320, 728, 150, 26, '', () => this.toggleTrails());
-        this.muteButton = this.navButton(CX - 160, 728, 150, 26, '', () => this.toggleMute());
-        this.navButton(CX, 728, 150, 26, MENU.watchReplay, () => this.openReplayDialog());
-        this.colorButton = this.navButton(CX + 160, 728, 150, 26, '', () => this.toggleColorblind());
-        this.motionButton = this.navButton(CX + 320, 728, 150, 26, '', () => this.toggleMotion());
+        this.trailsButton = this.navButton(CX - 350, 728, 140, 26, '', () => this.toggleTrails());
+        this.muteButton = this.navButton(CX - 210, 728, 140, 26, '', () => this.toggleMute());
+        this.navButton(CX - 70, 728, 140, 26, MENU.watchReplay, () => this.openReplayDialog());
+        this.colorButton = this.navButton(CX + 70, 728, 140, 26, '', () => this.toggleColorblind());
+        this.motionButton = this.navButton(CX + 210, 728, 140, 26, '', () => this.toggleMotion());
+        // SHOWCASE lands in the last slot once the manifest resolves — and
+        // stays hidden (with the ticker silent) when no manifest shipped.
+        void loadShowcase().then((manifest) => {
+            if (!manifest || manifest.champions.length === 0) return;
+            if (!this.scene.isActive('Menu')) return;
+            this.maybeAddShowcase();
+            this.startTicker(
+                manifest.champions.map((champ) =>
+                    showcaseTickerLine(
+                        getRobot(champ.botId)?.meta.name ?? champ.botId,
+                        champ.stats.before.winRate,
+                        champ.stats.after.winRate,
+                    ),
+                ),
+            );
+        });
         this.dailyButton = this.navButton(CX - 362, 754, 130, 24, '', () => this.startDaily());
         this.navButton(CX - 218, 754, 130, 24, MENU.tourney, () => this.scene.start('Tournament'));
         this.navButton(CX - 74, 754, 130, 24, MENU.stats, () => this.openStats());
@@ -223,6 +267,7 @@ export class MenuScene extends Scene {
             this.input.keyboard?.off('keydown', this.onNavKey);
             this.closeReplayDialog();
             this.closeImportDialog();
+            this.stopTicker();
         });
     }
 
@@ -263,6 +308,37 @@ export class MenuScene extends Scene {
 
     private restoreNav(): void {
         if (!this.overlayOpen()) this.nav.replaceTargets([...this.navBase, ...this.navSlots]);
+    }
+
+    // ---- Champion showcase entry + marquee ticker --------------------------
+    private maybeAddShowcase(): void {
+        if (this.showcaseButton) return;
+        this.showcaseButton = this.navButton(CX + 350, 728, 140, 26, MENU.showcase, () => this.scene.start('Showcase'));
+        this.restoreNav();
+    }
+
+    /** Cycle champion headlines through the page marquee under the canvas. */
+    private startTicker(lines: string[]): void {
+        this.stopTicker();
+        if (lines.length === 0) return;
+        const el = document.getElementById('marquee');
+        if (!el) return;
+        let i = 0;
+        const tick = (): void => {
+            el.textContent = `${APP.marquee} - ${lines[i % lines.length] as string}`;
+            i += 1;
+        };
+        tick();
+        this.tickerTimer = setInterval(tick, 4000);
+    }
+
+    private stopTicker(): void {
+        if (this.tickerTimer !== null) {
+            clearInterval(this.tickerTimer);
+            this.tickerTimer = null;
+        }
+        const el = document.getElementById('marquee');
+        if (el) el.textContent = APP.marquee;
     }
 
     private escapeOverlay(): void {
@@ -951,6 +1027,7 @@ export class MenuScene extends Scene {
 
     private openStats(): void {
         this.closeStats();
+        this.statsTab = 'local';
         // Backdrop swallows clicks so menu controls beneath can't fire.
         this.trackStats(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50).setInteractive());
         this.trackStats(this.add.rectangle(CX, 384, 560, 600, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
@@ -959,27 +1036,54 @@ export class MenuScene extends Scene {
         this.nav.reset();
     }
 
+    private setStatsTab(tab: 'local' | 'online'): void {
+        if (this.statsTab === tab) return;
+        this.statsTab = tab;
+        this.refreshStatsRows();
+    }
+
     private refreshStatsRows(): void {
         // Drop old rows but keep the overlay frame (first 3 objects).
         const frame = this.statsObjects.slice(0, 3);
         for (const obj of this.statsObjects.slice(3)) obj.destroy();
         this.statsObjects = frame;
+        const targets: NavTarget[] = [];
+        const tabs: Array<{ tab: 'local' | 'online'; label: string; x: number }> = [
+            { tab: 'local', label: STATS.localTab, x: CX - 90 },
+            { tab: 'online', label: STATS.onlineTab, x: CX + 90 },
+        ];
+        for (const t of tabs) {
+            const active = this.statsTab === t.tab;
+            const bg = this.trackStats(
+                this.add.rectangle(t.x, 150, 160, 30, COLORS.panel).setStrokeStyle(2, active ? COLORS.team[0] : COLORS.panelEdge).setDepth(50),
+            );
+            this.trackStats(this.add.text(t.x, 150, bracketedLabel(t.label, active), FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+            bg.setInteractive({ useHandCursor: true });
+            bg.on('pointerdown', () => this.setStatsTab(t.tab));
+            targets.push({ x: t.x, y: 150, w: 160, h: 30, activate: () => this.setStatsTab(t.tab) });
+        }
+        if (this.statsTab === 'local') this.renderLocalStats(targets);
+        else this.renderOnlineStats(targets);
+        this.nav.replaceTargets(targets);
+    }
 
+    private renderLocalStats(targets: NavTarget[]): void {
         const history = loadHistory();
         const draws = history.filter((r) => r.winner === -1).length;
         this.trackStats(
-            this.add.text(CX, 148, statsSummary(history.length, draws), FONTS.mono).setOrigin(0.5).setDepth(50),
+            this.add.text(CX, 180, statsSummary(history.length, draws), FONTS.mono).setOrigin(0.5).setDepth(50),
         );
         const rows = winRates(ROBOTS.map((r) => r.meta.id)).sort(
             (a, b) => b.rate - a.rate || b.games - a.games,
         );
         if (history.length === 0) {
             this.trackStats(
-                this.add.text(CX, 196, STATS.empty, FONTS.small).setOrigin(0.5).setDepth(50),
+                this.add.text(CX, 220, STATS.empty, FONTS.small).setOrigin(0.5).setDepth(50),
             );
         } else {
-            rows.forEach((row, i) => {
-                const y = 182 + i * 26;
+            const shown = rows.slice(0, STATS_ROWS);
+            shown.forEach((row, i) => {
+                const y = 206 + i * 26;
                 const entry = ROBOTS.find((r) => r.meta.id === row.id) ?? ROBOTS[0]!;
                 const name = this.trackStats(
                     this.add.text(CX - 220, y, entry.meta.name.toUpperCase(), FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(50),
@@ -989,9 +1093,15 @@ export class MenuScene extends Scene {
                     this.add.text(CX + 220, y, statsRow(row.games, row.wins, row.draws, statsPct(row.games, row.rate)), FONTS.mono).setOrigin(1, 0.5).setDepth(50),
                 );
             });
+            if (rows.length > shown.length) {
+                this.trackStats(
+                    this.add.text(CX, 206 + shown.length * 26, statsAndMore(rows.length - shown.length), FONTS.monoSmall).setOrigin(0.5).setDepth(50),
+                );
+            }
         }
 
-        const dailyY = 182 + Math.max(rows.length, 1) * 26 + 22;
+        const rowCount = history.length === 0 ? 1 : Math.min(rows.length, STATS_ROWS) + (rows.length > STATS_ROWS ? 1 : 0);
+        const dailyY = 206 + rowCount * 26 + 22;
         this.trackStats(
             this.add.text(CX, dailyY, STATS.dailyTitle, FONTS.buttonSmall).setOrigin(0.5).setDepth(50),
         );
@@ -1029,7 +1139,7 @@ export class MenuScene extends Scene {
         this.trackStats(this.add.text(CX + 120, 630, COMMON.close, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         close.setInteractive({ useHandCursor: true });
         close.on('pointerdown', () => this.closeStats());
-        this.nav.replaceTargets([
+        targets.push(
             {
                 x: CX - 120,
                 y: 630,
@@ -1042,7 +1152,92 @@ export class MenuScene extends Scene {
                 },
             },
             { x: CX + 120, y: 630, w: 170, h: 40, activate: () => this.closeStats() },
-        ]);
+        );
+    }
+
+    private renderOnlineStats(targets: NavTarget[]): void {
+        if (!this.onlineTried) {
+            this.onlineTried = true;
+            const token = ++this.onlineToken;
+            this.trackStats(this.add.text(CX, 220, ONLINE.loading, FONTS.small).setOrigin(0.5).setDepth(50));
+            void fetchOnlineBoard().then((result) => {
+                if (!this.scene.isActive('Menu')) return;
+                if (token !== this.onlineToken || this.statsTab !== 'online' || this.statsObjects.length === 0) return;
+                this.onlineBoard = result.board;
+                this.onlineCached = result.cached;
+                this.refreshStatsRows();
+            });
+        } else if (!this.onlineBoard) {
+            this.trackStats(this.add.text(CX, 220, ONLINE.unavailable, FONTS.small).setOrigin(0.5).setDepth(50));
+        } else {
+            const rows = [...this.onlineBoard.entries].sort((a, b) => b.elo - a.elo || (a.botId < b.botId ? -1 : 1));
+            this.trackStats(
+                this.add.text(CX, 180, onlineSummary(this.onlineBoard.season, rows.length), FONTS.mono).setOrigin(0.5).setDepth(50),
+            );
+            let y0 = 206;
+            if (this.onlineCached) {
+                this.trackStats(this.add.text(CX, 200, ONLINE.cachedNote, FONTS.monoSmall).setOrigin(0.5).setDepth(50));
+                y0 = 224;
+            }
+            if (rows.length === 0) {
+                this.trackStats(this.add.text(CX, y0 + 14, ONLINE.empty, FONTS.small).setOrigin(0.5).setDepth(50));
+            } else {
+                const shown = rows.slice(0, STATS_ROWS);
+                shown.forEach((row, i) => {
+                    const y = y0 + i * 26;
+                    const name = (ROBOTS.find((r) => r.meta.id === row.botId)?.meta.name ?? row.botId).toUpperCase();
+                    const nameText = this.trackStats(
+                        this.add.text(CX - 240, y, name, FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(50),
+                    );
+                    nameText.setColor(COLORS.ink);
+                    this.trackStats(
+                        this.add.text(CX + 120, y, onlineRow(row.elo, row.wins, row.losses, row.draws), FONTS.mono).setOrigin(1, 0.5).setDepth(50),
+                    );
+                    if (row.showcaseCode !== '') {
+                        const bg = this.trackStats(
+                            this.add.rectangle(CX + 185, y, 100, 22, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(50),
+                        );
+                        this.trackStats(this.add.text(CX + 185, y, ONLINE.watch, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+                        bg.setInteractive({ useHandCursor: true });
+                        bg.on('pointerdown', () => this.watchOnlineCode(row.showcaseCode));
+                        targets.push({ x: CX + 185, y, w: 100, h: 22, activate: () => this.watchOnlineCode(row.showcaseCode) });
+                    }
+                });
+                if (rows.length > shown.length) {
+                    this.trackStats(
+                        this.add.text(CX, y0 + shown.length * 26, statsAndMore(rows.length - shown.length), FONTS.monoSmall).setOrigin(0.5).setDepth(50),
+                    );
+                }
+            }
+        }
+        // CLOSE only: CLEAR would clear LOCAL data while viewing ONLINE.
+        const close = this.trackStats(
+            this.add.rectangle(CX, 630, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50),
+        );
+        this.trackStats(this.add.text(CX, 630, COMMON.close, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        close.setInteractive({ useHandCursor: true });
+        close.on('pointerdown', () => this.closeStats());
+        targets.push({ x: CX, y: 630, w: 170, h: 40, activate: () => this.closeStats() });
+    }
+
+    /** Watch-per-code: rated board rows play back through the replay flow. */
+    private watchOnlineCode(code: string): void {
+        const data = decodeReplay(code);
+        if (!data) return;
+        for (const id of data.lineupIds) {
+            if (!getRobot(id)) return;
+        }
+        this.scene.start('Battle', {
+            teamSize: data.teamSize,
+            lineupIds: [...data.lineupIds],
+            loadouts: data.loadouts.map((l) => ({ ...l })),
+            skins: data.lineupIds.map((id, i) => defaultSkin(CALLSIGNS[i % CALLSIGNS.length] ?? id, i)),
+            trails: this.trails,
+            seed: data.seed,
+            arena: data.arena ?? 'open',
+            modifiers: data.modifiers ?? {},
+            replay: true,
+        } satisfies BattleRequest);
     }
 
     private closeStats(): void {

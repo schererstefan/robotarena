@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { ROBOTS } from '../src/robots/registry';
 import { ROBOT_API_VERSION } from '../src/sim/types';
+import { buildBoard, writeBoard } from './eval/board';
 import { runJobs } from './eval/pool';
 import type { EvalRow } from './eval/runner';
 import {
@@ -44,6 +45,7 @@ interface Options {
     baseSeed?: number;
     updateGolden: boolean;
     compare: string | null;
+    emitBoard: string | null;
 }
 
 function parseArgs(argv: string[]): Options {
@@ -58,6 +60,7 @@ function parseArgs(argv: string[]): Options {
         sample: null,
         updateGolden: false,
         compare: null,
+        emitBoard: null,
     };
     for (let i = 0; i < argv.length; i += 1) {
         const arg = argv[i] as string;
@@ -84,6 +87,7 @@ function parseArgs(argv: string[]): Options {
         else if (arg === '--base-seed') opts.baseSeed = Number(next());
         else if (arg === '--update-golden') opts.updateGolden = true;
         else if (arg === '--compare') opts.compare = next();
+        else if (arg === '--emit-board') opts.emitBoard = next();
         else if (arg === '--help' || arg === '-h') {
             console.log(helpText());
             process.exit(0);
@@ -111,6 +115,7 @@ function helpText(): string {
         '  --base-seed N                 seed base (default 0xc0ffee)',
         '  --update-golden               merge this run into tools/eval/golden.json',
         '  --compare SUMMARY.json        print Elo/W/L/D deltas vs a previous summary',
+        '  --emit-board PATH             write static leaderboard JSON (Phase A board)',
         '',
         'Exit codes: 0 pass, 1 errors>0 (or bad usage), 2 balance smell (draw spike / sweep).',
         'Golden mismatches are advisory warnings, never failures.',
@@ -275,6 +280,15 @@ async function main(argv: string[]): Promise<number> {
     if (smells.drawSpike) console.log('SMELL: draw spike (>5% draws)');
     if (smells.sweeps.length > 0) console.log(`SMELL: sweep (${smells.sweeps.join(', ')})`);
     console.log(`wrote ${resultsPath} + ${summaryPath}`);
+    if (opts.emitBoard) {
+        const board = buildBoard(rollups, {
+            gameVersion: gameVersion(),
+            updatedAt: new Date().toISOString(),
+            championsDir: join(process.cwd(), 'tools', 'hillclimb', 'champions'),
+        });
+        writeBoard(opts.emitBoard, board);
+        console.log(`wrote ${opts.emitBoard} (${board.entries.length} entries, season ${board.season})`);
+    }
 
     if (opts.compare) {
         try {

@@ -20,7 +20,11 @@ import {
     recordMatch,
     winRates,
 } from '../src/game/history';
+import { readFileSync } from 'fs';
 import { dodgeVector, leadAngle, leadShot, toGrid } from '../src/robots/common';
+import { parseOnlineBoard } from '../src/game/onlineBoard';
+import { parseShowcaseManifest } from '../src/game/showcase';
+import { resimReplay } from './eval/resim';
 import { castContact, castFocusVote, focusTarget, formationSlot, latestContact, resolveRoles } from '../src/robots/comms';
 import { ROBOTS } from '../src/robots/registry';
 import { canonicalStringify, defaultGenome, genomeDefFor, genomeHash, genomeLoadout, sha256Hex, validateGenome, type Genome } from '../src/robots/genome';
@@ -2903,6 +2907,80 @@ console.log('brain');
             if (brainWins < legacyWins) regressed.push(`${foe.meta.id} (${brainWins}<${legacyWins})`);
         }
         check('no 1v1 regression vs pre-brain hunter', regressed.length === 0, regressed.join(', '));
+    }
+}
+
+// --- Leaderboard + showcase manifests (Phase A static board) ---------------
+console.log('manifests');
+{
+    const board = parseOnlineBoard(JSON.parse(readFileSync('public/leaderboard.json', 'utf8')) as unknown);
+    check('leaderboard.json parses', board !== null);
+    if (board) {
+        check('board season matches game version', board.season === board.gameVersion && board.season.length > 0);
+        check('board covers the registry', board.entries.length === ROBOTS.length, `${board.entries.length}/${ROBOTS.length}`);
+        let boardCodes = 0;
+        let boardOk = true;
+        for (const entry of board.entries) {
+            if (!ROBOTS.some((r) => r.meta.id === entry.botId)) boardOk = false;
+            if (entry.showcaseCode !== '') {
+                boardCodes += 1;
+                if (resimReplay(entry.showcaseCode, entry.botId) === null) boardOk = false;
+            }
+        }
+        check('board showcase codes re-sim to completion', boardOk && boardCodes > 0, `${boardCodes} codes`);
+    }
+    const manifest = parseShowcaseManifest(JSON.parse(readFileSync('public/data/showcase.json', 'utf8')) as unknown);
+    check('showcase.json parses', manifest !== null);
+    if (manifest) {
+        check('showcase has champions', manifest.champions.length > 0);
+        let featured = 0;
+        let showcaseOk = true;
+        for (const champ of manifest.champions) {
+            if (!ROBOTS.some((r) => r.meta.id === champ.botId)) showcaseOk = false;
+            if (!ROBOTS.some((r) => r.meta.id === champ.baseBot)) showcaseOk = false;
+            if (champ.featuredReplays.length === 0) showcaseOk = false;
+            for (const rep of champ.featuredReplays) {
+                featured += 1;
+                const resim = resimReplay(rep.code, champ.botId);
+                if (!resim || resim.outcome !== rep.outcome) showcaseOk = false;
+            }
+        }
+        check('featured codes re-sim to claimed outcomes', showcaseOk && featured > 0, `${featured} codes`);
+    }
+}
+
+// --- Pinned replay codes: semantic-drift tripwire per format ---------------
+console.log('pinned-codes');
+{
+    // rusher vs turret, seed 4242, open, default builds — one code per
+    // format, both describing the same match (winner 1 @ tick 278).
+    const pins: Array<{ format: string; code: string; fp: string }> = [
+        {
+            format: 'RA2',
+            code: 'RA2-4000-2290-3860-2200-4328-0091-0',
+            fp: 'open|{}|1@278|OVR3 TRG1 PLT2,130,0,0,700.4557315973328,470.07610164335085,0.5555900725572009,0.5593158544906753,0,72,6,20,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,28,723.7647032190188,485.5903480620281,-2.6541348199916794,-2.572682348031272,1,132,12,18,0,0,0,0|',
+        },
+        {
+            format: 'RA1',
+            code: 'RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MjQyLCJ0IjoxLCJsIjpbInJ1c2hlciIsInR1cnJldCJdLCJvIjpbIjA6Myw1OjEsODoyIiwiMjoxLDM6Miw1OjIsNjoxIl0sImEiOiJvcGVuIiwibSI6IiJ9',
+            fp: 'open|{}|1@278|OVR3 TRG1 PLT2,130,0,0,700.4557315973328,470.07610164335085,0.5555900725572009,0.5593158544906753,0,72,6,20,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,28,723.7647032190188,485.5903480620281,-2.6541348199916794,-2.572682348031272,1,132,12,18,0,0,0,0|',
+        },
+    ];
+    for (const pin of pins) {
+        const data = decodeReplay(pin.code);
+        let fp: string | null = null;
+        if (data) {
+            const lineups: LineupEntry[] = data.lineupIds.map((id, i) => {
+                const entry = ROBOTS.find((r) => r.meta.id === id);
+                if (!entry) throw new Error(`unknown robot ${id}`);
+                return { team: (i < data.teamSize ? 0 : 1) as 0 | 1, controller: entry.create(), loadout: { ...data.loadouts[i]! } };
+            });
+            const match = new Match(lineups, data.seed, { arena: data.arena ?? 'open', modifiers: data.modifiers ?? {} });
+            match.runToEnd();
+            fp = fingerprint(match);
+        }
+        check(`${pin.format} pinned code decodes`, data !== null);
+        check(`${pin.format} pinned code re-sims exactly`, fp === pin.fp);
     }
 }
 

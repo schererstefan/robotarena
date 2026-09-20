@@ -1,6 +1,7 @@
 import { AUTO, Game, Scale } from 'phaser';
 import { BattleScene } from './scenes/BattleScene';
 import { MenuScene } from './scenes/MenuScene';
+import { ShowcaseScene } from './scenes/ShowcaseScene';
 import { TournamentScene } from './scenes/TournamentScene';
 import { WorkshopScene } from './scenes/WorkshopScene';
 
@@ -27,7 +28,7 @@ const config: Phaser.Types.Core.GameConfig = {
     fps: {
         target: 60,
     },
-    scene: [MenuScene, BattleScene, TournamentScene, WorkshopScene],
+    scene: [MenuScene, BattleScene, ShowcaseScene, TournamentScene, WorkshopScene],
 };
 
 const StartGame = (parent: string) => {

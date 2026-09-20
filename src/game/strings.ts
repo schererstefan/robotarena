@@ -114,6 +114,7 @@ export const MENU = {
     tutorial: 'TUTORIAL',
     daily: 'DAILY',
     dailyDone: 'DAILY (DONE)',
+    showcase: 'SHOWCASE',
 } as const;
 
 /** Mode/size button: active choice gets "> ... <" brackets. */
@@ -341,7 +342,14 @@ export const STATS = {
     noRate: '--',
     /** Defensive fallback when a recorded robot id left the registry. */
     unknownTeam: 'team',
+    localTab: 'LOCAL',
+    onlineTab: 'ONLINE',
 } as const;
+
+/** Overflow marker when a stats list is capped ("+3 MORE"). */
+export function statsAndMore(extra: number): string {
+    return `+${extra} MORE`;
+}
 
 export function statsSummary(matches: number, draws: number): string {
     return `MATCHES ${matches}   DRAWS ${draws}`;
@@ -389,6 +397,7 @@ export const BATTLE = {
     tagPilot: 'PILOT',
     tagDaily: 'DAILY',
     tagReplay: 'REPLAY',
+    tagShowcase: 'SHOWCASE',
     /** Short HUD tag appended to the seed readout on exhibition matches. */
     tagCustom: 'CUSTOM',
     pilotHelp: 'WASD DRIVE - MOUSE AIM - SPACE TAP FIRE, HOLD CHARGE - P PAUSE',
@@ -413,7 +422,29 @@ export const BATTLE = {
     replayCopied: 'REPLAY CODE - COPIED!',
     replayCopyFailed: 'REPLAY CODE - COPY FAILED',
     rematch: 'REMATCH',
+    /** Reel navigation: NEXT steps the reel, EXIT returns to the showcase. */
+    exitShowcase: 'EXIT',
 } as const;
+
+/** HUD tag for a showcase battle, with reel position when in a reel. */
+export function showcaseTag(index: number | null, total: number): string {
+    return index === null ? BATTLE.tagShowcase : `${BATTLE.tagShowcase} ${index + 1}/${total}`;
+}
+
+/** Results caption for showcase battles (never recorded, like replays). */
+export function showcaseResultsLine(): string {
+    return `${BATTLE.tagShowcase} - NOT RECORDED`;
+}
+
+/** Reel auto-advance countdown ("NEXT IN 3..."). */
+export function reelCountdown(secondsLeft: number): string {
+    return `NEXT IN ${secondsLeft}...`;
+}
+
+/** Reel auto-exit countdown on the last code ("EXIT IN 3..."). */
+export function reelExitCountdown(secondsLeft: number): string {
+    return `EXIT IN ${secondsLeft}...`;
+}
 
 /** Seed readout with match tags ("SEED 42 - DAILY - EXHIBITION 2X"). */
 export function seedLabel(seed: number, tags: string[]): string {
@@ -604,4 +635,69 @@ export function unknownSkillDetail(skills: string[]): string {
 
 export function blockedImportDetail(specs: string[]): string {
     return commaList(specs.map((spec) => `blocked ${spec}`));
+}
+
+// ---- Online leaderboard (Phase A: static JSON + local cache) -------------
+
+export const ONLINE = {
+    title: 'ONLINE LEADERBOARD',
+    loading: 'fetching board...',
+    /** Served from cache because the fetch failed or timed out. */
+    cachedNote: 'OFFLINE - CACHED BOARD',
+    unavailable: 'board unavailable - check back later',
+    empty: 'no board entries yet',
+    watch: 'WATCH',
+    seasonLabel: 'SEASON',
+} as const;
+
+/** Online board header ("SEASON 0.1.0 - 17 BOTS"). */
+export function onlineSummary(season: string, bots: number): string {
+    return `${ONLINE.seasonLabel} ${season} - ${bots} BOTS`;
+}
+
+/** One board row's right column ("ELO 1234  10W 2L 1D"). */
+export function onlineRow(elo: number, wins: number, losses: number, draws: number): string {
+    return `ELO ${Math.round(elo)}  ${wins}W ${losses}L ${draws}D`;
+}
+
+// ---- Champion showcase ----------------------------------------------------
+
+export const SHOWCASE = {
+    title: 'CHAMPION SHOWCASE',
+    subtitle: 'hillclimb-bred champions - watch the reels, run the rematches',
+    galleryTab: 'GALLERY',
+    boardTab: 'BOARD',
+    watchReel: 'WATCH REEL',
+    versus: 'BASE VS CHAMP',
+    compare: 'COMPARE',
+    close: 'CLOSE',
+    watch: 'WATCH',
+    beforeTitle: 'BEFORE (DEFAULT BUILD)',
+    afterTitle: 'AFTER (CHAMPION)',
+    buildLabel: 'BUILD',
+    recordLabel: 'RECORD',
+    replaysTitle: 'FEATURED REPLAYS',
+    noData: 'no showcase data shipped with this build',
+    /** Gallery card line when the champion has no rated record yet. */
+    unrated: 'UNRATED',
+} as const;
+
+/** Gallery card win-rate line ("64.1% -> 90.6%"). */
+export function showcaseRateLine(before: number, after: number): string {
+    return `${(before * 100).toFixed(1)}% -> ${(after * 100).toFixed(1)}%`;
+}
+
+/** Compare overlay record line ("52W 10L 2D OVER 64"). */
+export function showcaseRecord(wins: number, losses: number, draws: number, games: number): string {
+    return `${wins}W ${losses}L ${draws}D OVER ${games}`;
+}
+
+/** Featured-replay row ("WATCH: VS GHOST (OPEN) - WIN"). */
+export function showcaseReplayLine(label: string, outcome: string): string {
+    return `WATCH: ${label} - ${outcome.toUpperCase()}`;
+}
+
+/** Menu marquee ticker headline for one champion. */
+export function showcaseTickerLine(name: string, before: number, after: number): string {
+    return `${name.toUpperCase()} ${(before * 100).toFixed(1)}% -> ${(after * 100).toFixed(1)}%`;
 }
