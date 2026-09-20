@@ -1251,7 +1251,10 @@ export class BattleScene extends Scene {
         try {
             const internal = this.cameras.main.filters.internal;
             if (!this.fxVignette) {
-                this.fxVignette = internal.addVignette(0.5, 0.5, 0.55, 0, 0xff2a2a);
+                // Radius must exceed the screen-corner distance (0.707 in UV
+                // space): outside the radius the shader mixes 100% opaque
+                // color, so a smaller radius floods the screen solid red.
+                this.fxVignette = internal.addVignette(0.5, 0.5, 0.9, 0, 0xff2a2a);
             }
             if (!this.fxGrade) {
                 this.fxGrade = internal.addColorMatrix();
@@ -1330,7 +1333,10 @@ export class BattleScene extends Scene {
                 frac = Math.min(frac, Math.max(s.health, 0) / s.maxHealth);
             }
         }
-        const target = frac < 0.5 ? (0.5 - frac) * 1.4 : 0;
+        // Peak strength 0.15 (was 0.7): a subtle edge glow at near-zero HP
+        // instead of a full-screen red wash. The ramp always starts at the
+        // center, so strength is the center-slope gain, not just edge depth.
+        const target = frac < 0.5 ? (0.5 - frac) * 0.3 : 0;
         if (this.reducedMotion) {
             this.fxVignette.strength = target;
         } else {
