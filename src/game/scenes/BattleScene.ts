@@ -1631,8 +1631,8 @@ export class BattleScene extends Scene {
     }
 
     /**
-     * Damage-number tiers: 12px white hits, 16px gold + scale-pop for charged
-     * and killing blows, 12px red SD ticks, green regen. Size AND color AND
+     * Damage-number tiers: 16px white hits, 20px gold + scale-pop for charged
+     * and killing blows, 16px red SD ticks, green regen. Size AND color AND
      * motion carry the tier (never color-only); the pop is motion-gated.
      */
     private spawnDamageNumber(x: number, y: number, dmg: number, tier: 'hit' | 'charged' | 'kill' | 'sd' | 'heal'): void {
@@ -1641,7 +1641,7 @@ export class BattleScene extends Scene {
         this.dmgCursor = (this.dmgCursor + 1) % this.dmgTexts.length;
         this.tweens.killTweensOf(text);
         const big = tier === 'charged' || tier === 'kill';
-        text.setFontSize(big ? 16 : 12);
+        text.setFontSize(big ? 20 : 16);
         text.setColor(
             tier === 'heal' ? COLORS.accentCss : tier === 'sd' ? COLORS.dangerCss : big ? COLORS.goldCss : COLORS.whiteCss,
         );
@@ -2254,7 +2254,7 @@ export class BattleScene extends Scene {
             this.plateHead.push(head);
             const rows: Phaser.GameObjects.Text[] = [];
             for (let r = 0; r < 3; r += 1) {
-                rows.push(this.add.text(cxp - 61, 726 + r * 14, '', FONTS.buttonSmall).setOrigin(0, 0.5).setDepth(10));
+                rows.push(this.add.text(cxp - 61, 726 + r * 14, '', FONTS.plate).setOrigin(0, 0.5).setDepth(10));
             }
             this.plateRows.push(rows);
         }
