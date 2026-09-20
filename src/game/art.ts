@@ -34,22 +34,22 @@ import { WRECKS } from './art/wrecks';
 type PixelMap = string[];
 
 const PALETTE: Record<string, string> = {
-    k: '#0b0e12',
-    d: '#232e3b',
+    k: '#0a0e14',
+    d: '#1f2e40',
     m: '#5d6a78',
-    l: '#9aa7b4',
-    w: '#e8edf2',
+    l: '#aaa79e',
+    w: '#ece9e2',
     r: '#ff5d5d',
     g: '#7de08a',
     y: '#ffb340',
     o: '#e06a2d',
-    s: '#3a4656',
+    s: '#36435a',
     b: '#3a7ca5',
     c: '#ffd28a',
-    p: '#12171d',
-    q: '#1b232d',
+    p: '#111820',
+    q: '#1b2530',
     a: '#8a6d1f',
-    h: '#3d444c',
+    h: '#4d555f',
     t: '#ffb340',
 };
 
@@ -403,7 +403,7 @@ function bakeArenaFloor(scene: Scene): void {
 function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [number, number, number]>): void {
     // Spawn pads: shape-coded (triangle = team 0, square = team 1), no tint.
     context.lineWidth = 2;
-    context.strokeStyle = 'rgba(232,237,242,0.35)';
+    context.strokeStyle = 'rgba(236,233,226,0.35)';
     for (const x of [130, 830]) {
         for (const y of [170, 245, 320, 395, 470]) {
             context.strokeRect(x - 22, y - 22, 44, 44);
@@ -420,12 +420,12 @@ function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [numbe
         }
     }
     // Center-ring emblem = the SD collapse target.
-    context.strokeStyle = 'rgba(232,237,242,0.28)';
+    context.strokeStyle = 'rgba(236,233,226,0.28)';
     context.lineWidth = 3;
     context.beginPath();
     context.arc(480, 320, 60, 0, Math.PI * 2);
     context.stroke();
-    context.strokeStyle = 'rgba(232,237,242,0.2)';
+    context.strokeStyle = 'rgba(236,233,226,0.2)';
     context.lineWidth = 2;
     context.beginPath();
     context.arc(480, 320, 44, 0, Math.PI * 2);
@@ -436,12 +436,12 @@ function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [numbe
     context.moveTo(480, 320 - 72);
     context.lineTo(480, 320 + 72);
     context.stroke();
-    context.fillStyle = 'rgba(232,237,242,0.35)';
+    context.fillStyle = 'rgba(236,233,226,0.35)';
     context.beginPath();
     context.arc(480, 320, 4, 0, Math.PI * 2);
     context.fill();
     // Dot-vs-dash per-half cue along the center line (shape, not color).
-    context.fillStyle = 'rgba(232,237,242,0.25)';
+    context.fillStyle = 'rgba(236,233,226,0.25)';
     for (let y = 20; y < 640; y += 40) {
         context.beginPath();
         context.arc(470, y, 2.5, 0, Math.PI * 2);
@@ -479,7 +479,7 @@ function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [numbe
     stampMap(context, lut, DECOR_VENT, 36, 588);
     stampMap(context, lut, DECOR_LAMP, 908, 588);
     // 2 px inner border.
-    context.strokeStyle = '#3a4656';
+    context.strokeStyle = '#36435a';
     context.lineWidth = 2;
     context.strokeRect(1, 1, 958, 638);
 }
@@ -603,10 +603,10 @@ export function ensureBlockTexture(scene: Scene, w: number, h: number): void {
             }
         }
     });
-    context.strokeStyle = '#0b0e12';
+    context.strokeStyle = '#0a0e14';
     context.lineWidth = 3;
     context.strokeRect(1, 1, w - 2, h - 2);
-    context.strokeStyle = 'rgba(232,237,242,0.5)';
+    context.strokeStyle = 'rgba(236,233,226,0.5)';
     context.lineWidth = 1;
     context.beginPath();
     context.moveTo(3, 3);

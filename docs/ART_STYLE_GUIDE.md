@@ -9,43 +9,38 @@ Companion spec: `docs/PIXELART_BUILD_GUIDE.md`. QA harness: `tools/art-qa.mjs`
 Every opaque pixel in every `string[]` map MUST be one of these chars.
 No new char without a style-guide entry + `art.ts` palette entry.
 
-| char | hex (current) | role |
+| char | hex | role |
 |---|---|---|
-| `k` | `#0b0e12` | near-black outline / crack / bore |
-| `d` | `#232e3b` | dark gray shadow |
-| `m` | `#5d6a78` | mid gray body |
-| `l` | `#9aa7b4` | light gray top-left light catch |
-| `w` | `#e8edf2` | near-white hull (NEVER team-tinted; see §4) |
+| `k` | `#0a0e14` | near-black outline / crack / bore (faint blue) |
+| `d` | `#1f2e40` | cool slate-blue shadow |
+| `m` | `#5d6a78` | mid gray body (ramp pivot, neutral) |
+| `l` | `#aaa79e` | warm light gray top-left light catch |
+| `w` | `#ece9e2` | neutral-warm steel/ivory hull (NEVER team-tinted; see §4) |
 | `r` | `#ff5d5d` | red lens / ember / danger |
 | `g` | `#7de08a` | green lens / accent |
 | `y` | `#ffb340` | amber lens / fire / trim default |
 | `o` | `#e06a2d` | orange fire mid-tone |
-| `s` | `#3a4656` | cool slate / smoke |
+| `s` | `#36435a` | cool slate / smoke |
 | `b` | `#3a7ca5` | blue lens |
 | `c` | `#ffd28a` | cream scope glass / warm specular |
-| `p` | `#12171d` | floor base plate |
-| `q` | `#1b232d` | floor inset line |
+| `p` | `#111820` | floor base plate (cool) |
+| `q` | `#1b2530` | floor inset line (cool) |
 | `a` | `#8a6d1f` | dark amber (rare) |
-| `h` | `#3d444c` | dark gray 2 / smoke alt (rare) |
+| `h` | `#4d555f` | neutral dark gray / smoke alt (vent slats) |
 | `t` | `#ffb340` | **team accent** (trim/lens ONLY, see §4). Base bake = amber (team-0 look for menu previews); team variants recolor per team (amber/cyan + CB pair). |
 
 `.` = transparent (not a color, never budgeted).
 
-Planned hue-shift targets (Phase 3.1, engine track — table above updates when they land):
+Hue-shift rationale (Phase 3.1): shadows drift cool slate-blue, lights drift
+warm ivory; `m` anchors the ramp neutral. Ramp lightness stays monotonic
+(`k < p < q < d < s < h < m < l < w`); sprite-ramp steps (`d→s→h→m→l→w`)
+hold ≥ 0.05 so shading survives in grayscale, while the floor darks
+(`k/p/q`) cluster below 0.15 to stay quiet behind bright robots. `w`
+reconciles the owner call ("neutral steel gray") with the guide
+("warm ivory"): near-neutral with a faint warm kiss.
 
-| char | target | direction |
-|---|---|---|
-| `k` | `#0a0e14` | faint blue tint, same value |
-| `d` | `#1f2e40` | cool slate-blue shadow |
-| `l` | `#aaa79e` | warm light gray |
-| `w` | `#ece9e2` | neutral-warm steel/ivory hull |
-| `s` | `#36435a` | cooler slate |
-| `h` | `#434b54` | neutral dark gray |
-| `p` | `#111820` | cooler floor base |
-| `q` | `#1b2530` | cooler floor inset |
-
-`m r g y o b c a` unchanged. Team colors (amber `#ffb340` / cyan `#35d0ff`,
-colorblind `#e69f00` / `#56b4e9`) live in `theme.ts` / `accessibility.ts`, not the palette.
+Team colors (amber `#ffb340` / cyan `#35d0ff`, colorblind `#e69f00` /
+`#56b4e9`) live in `theme.ts` / `accessibility.ts`, not the palette.
 
 ## 2. Light: top-left, always
 
