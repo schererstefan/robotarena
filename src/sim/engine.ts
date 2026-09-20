@@ -1,7 +1,7 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
+import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SPAWN_HEADING_JITTER, SPAWN_SALT, SPAWN_X, SPAWN_X_JITTER, SPAWN_Y_JITTER, SPAWN_Y_SHIFT, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
 import { angleDiff, assistSteer, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
@@ -210,8 +210,9 @@ export class Match {
         this.seed = seed;
         this.arena = options.arena === 'blocks' ? 'blocks' : 'open';
         this.mods = sanitizeModifiers(options.modifiers);
+        const spawns = Match.computeSpawns(lineups, seed);
         lineups.forEach((entry, index) => {
-            const spawn = Match.spawnFor(entry.team, Match.teamIndex(lineups, index), Match.teamSize(lineups, entry.team));
+            const spawn = spawns[index] as { x: number; y: number; heading: number };
             // Guarded: hostile getters on the entry/controller must not kill setup.
             let loadout: SkillLoadout = {};
             let setupErrors = 0;
@@ -1089,23 +1090,64 @@ export class Match {
         return lineups.filter((entry) => entry.team === team).length;
     }
 
-    private static teamIndex(lineups: LineupEntry[], index: number): number {
-        const team = lineups[index]?.team;
-        let count = 0;
-        for (let i = 0; i < index; i += 1) {
-            if (lineups[i]?.team === team) count += 1;
-        }
-        return count;
-    }
-
-    private static spawnFor(team: 0 | 1, index: number, size: number): { x: number; y: number; heading: number } {
-        const x = team === 0 ? 130 : ARENA_WIDTH - 130;
+    /**
+     * Seeded spawn layout: team 0 draws offsets from a dedicated stream
+     * (seed ^ SPAWN_SALT), team 1 mirrors through the arena center. Draw
+     * order is fixed (column shift, then dx/jy/dh per team-0 slot), and the
+     * brain RNG streams are untouched. Guarantees for team sizes 1-3: x in
+     * [90,170] (116px clear of blocks), y in [50,590] (clamp never fires),
+     * teammate gap >= 70px (spread 150 minus 2x40 jitter), headings within
+     * 0.3 rad of horizontal (never into a wall). Asymmetric lineups (never
+     * in eval/soak) fall back to independent seeded draws for team 1.
+     */
+    private static computeSpawns(lineups: LineupEntry[], seed: number): Array<{ x: number; y: number; heading: number }> {
+        const n0 = Match.teamSize(lineups, 0);
+        const n1 = Match.teamSize(lineups, 1);
+        const rng = createRng((seed ^ SPAWN_SALT) >>> 0);
+        const shift = (rng() * 2 - 1) * SPAWN_Y_SHIFT;
         const spread = 150;
-        const y = clamp(
-            ARENA_HEIGHT / 2 + (index - (size - 1) / 2) * spread,
-            ROBOT_RADIUS * 2,
-            ARENA_HEIGHT - ROBOT_RADIUS * 2,
-        );
-        return { x, y, heading: team === 0 ? 0 : Math.PI };
+        const team0: Array<{ x: number; y: number; heading: number }> = [];
+        for (let i = 0; i < n0; i += 1) {
+            const dx = (rng() * 2 - 1) * SPAWN_X_JITTER;
+            const jy = (rng() * 2 - 1) * SPAWN_Y_JITTER;
+            const dh = (rng() * 2 - 1) * SPAWN_HEADING_JITTER;
+            const baseY = ARENA_HEIGHT / 2 + (i - (n0 - 1) / 2) * spread;
+            team0.push({
+                x: clamp(SPAWN_X + dx, ROBOT_RADIUS, ARENA_WIDTH - ROBOT_RADIUS),
+                y: clamp(baseY + shift + jy, ROBOT_RADIUS * 2, ARENA_HEIGHT - ROBOT_RADIUS * 2),
+                heading: wrapAngle(dh),
+            });
+        }
+        const team1: Array<{ x: number; y: number; heading: number }> = [];
+        if (n0 === n1) {
+            for (let i = 0; i < n1; i += 1) {
+                const s = team0[i] as { x: number; y: number; heading: number };
+                team1.push({
+                    x: ARENA_WIDTH - s.x,
+                    y: ARENA_HEIGHT - s.y,
+                    heading: wrapAngle(s.heading + Math.PI),
+                });
+            }
+        } else {
+            for (let i = 0; i < n1; i += 1) {
+                const dx = (rng() * 2 - 1) * SPAWN_X_JITTER;
+                const jy = (rng() * 2 - 1) * SPAWN_Y_JITTER;
+                const dh = (rng() * 2 - 1) * SPAWN_HEADING_JITTER;
+                const baseY = ARENA_HEIGHT / 2 + (i - (n1 - 1) / 2) * spread;
+                team1.push({
+                    x: clamp(ARENA_WIDTH - SPAWN_X + dx, ROBOT_RADIUS, ARENA_WIDTH - ROBOT_RADIUS),
+                    y: clamp(baseY + shift + jy, ROBOT_RADIUS * 2, ARENA_HEIGHT - ROBOT_RADIUS * 2),
+                    heading: wrapAngle(Math.PI + dh),
+                });
+            }
+        }
+        const spawns: Array<{ x: number; y: number; heading: number }> = [];
+        let c0 = 0;
+        let c1 = 0;
+        for (const entry of lineups) {
+            if (entry.team === 0) spawns.push(team0[c0++] as { x: number; y: number; heading: number });
+            else spawns.push(team1[c1++] as { x: number; y: number; heading: number });
+        }
+        return spawns;
     }
 }

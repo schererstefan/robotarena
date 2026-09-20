@@ -11,6 +11,10 @@ import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/type
 import { createBrain, pickTarget, type BrainParams } from './brain';
 import { aimed, aimTurret, leadAngle, manageCharge, rayClearance, steerTo, throttleFor } from './common';
 import { castFocusVote, focusTarget } from './comms';
+import { createRoleTracker, roleGoal, type RoleState } from './roles';
+
+/** Idle role state: tracker bypassed (1v1 shape, so behavior is byte-identical without roles). */
+const IDLE_ROLE: RoleState = { role: null, slot: 0, slots: 1, radio: null };
 import type { Genome } from './genome';
 import { createOpponentModel, MODEL_DEFAULTS, type ModelParams } from './model';
 
@@ -36,6 +40,8 @@ export interface HunterParams {
     closeThrottle: number;
     scanTurn: number;
     targetPolicy: TargetPolicy;
+    /** Squad roles on/off; absent = on. False restores the pre-B3 brain+model hunter (role ablation gate). */
+    roles?: boolean;
     /** Brain mode utilities (brain.* genome group); absent = preset defaults. */
     brain?: Partial<BrainParams>;
     /** Opponent-model counter-lead (model.* genome group); absent = model defaults. */
@@ -157,6 +163,8 @@ export function createWithParams(overrides?: Partial<HunterParams>): RobotContro
         ...(p.brain ?? {}),
     });
     const model = createOpponentModel(p.model ?? {});
+    const roles = createRoleTracker();
+    const rolesOn = p.roles !== false;
 
     function update(sense: SenseState): Intent {
         model.update(sense);
@@ -239,7 +247,27 @@ export function createWithParams(overrides?: Partial<HunterParams>): RobotContro
                 }
             }
         }
-        return { ...intent, radio: out.targetId !== null ? castFocusVote(out.targetId) : null };
+        // Squad roles (reference implementation): with a settled role, hold
+        // the formation slot around a visible foe in the flank band instead
+        // of the brain's tangent orbit. Blind approach keeps the brain's
+        // lane (centroid forming would delay contact and focus chaining),
+        // combat modes (engage/focus/kite/retreat) are untouched, and in
+        // 1v1 the tracker idles so solo behavior is byte-identical. Tower,
+        // fire, and charge always stay with the brain + opponent model
+        // above — this is drive-only.
+        const roleState = rolesOn ? roles.update(sense) : IDLE_ROLE;
+        if (roleState.role !== null && brain.mode === 'flank' && sense.foes.length > 0) {
+            const self = sense.self;
+            const slot = roleGoal(sense, roleState.role, roleState.slots);
+            if (Math.hypot(slot.x - self.x, slot.y - self.y) > 90) {
+                const angle = Math.atan2(slot.y - self.y, slot.x - self.x);
+                intent.throttle = throttleFor(self.heading, angle);
+                intent.turn = steerTo(self.heading, angle, p.steerGain);
+            }
+        }
+        // Role mail (claims while unsettled, sparse slot heartbeats) takes
+        // the radio when due; otherwise focus votes chain as before.
+        return { ...intent, radio: roleState.radio ?? (out.targetId !== null ? castFocusVote(out.targetId) : null) };
     }
 
     return { meta, loadout, update };

@@ -26,6 +26,7 @@ import { parseOnlineBoard } from '../src/game/onlineBoard';
 import { parseShowcaseManifest } from '../src/game/showcase';
 import { resimReplay } from './eval/resim';
 import { castContact, castFocusVote, focusTarget, formationSlot, latestContact, resolveRoles } from '../src/robots/comms';
+import { castClaim, castSlotHold, collectClaims, createRoleTracker, HOLD_BONUS, latestSlotHold, liveTeamIds, myRole, preferenceBid, rankByMidfield, roleGoal, roleSlot, ROLE_POINT, type RoleSense } from '../src/robots/roles';
 import { ROBOTS } from '../src/robots/registry';
 import { canonicalStringify, defaultGenome, genomeDefFor, genomeHash, genomeLoadout, sha256Hex, validateGenome, type Genome } from '../src/robots/genome';
 import { BRAIN_DEFAULTS, BRAIN_PRESETS, createBrain, pickTarget as brainPickTarget, safeCircleFor, type BrainParams } from '../src/robots/brain';
@@ -275,7 +276,23 @@ console.log('skills');
     };
     const gunner: RobotController = {
         meta: { id: 'gunner', name: 'Gunner', author: 'test', version: '0', description: '' },
-        update: (): Intent => ({ throttle: 1, turn: 0, towerTurn: 0, fire: true, charge: false }),
+        update: (sense: SenseState): Intent => {
+            const foe = sense.foes[0] ?? sense.scout[0] ?? sense.tracks[0];
+            if (!foe) return { throttle: 1, turn: 0, towerTurn: 0.5, fire: true, charge: false };
+            const goal = Math.atan2(foe.y - sense.self.y, foe.x - sense.self.x);
+            const wrap = (a: number): number => {
+                while (a > Math.PI) a -= Math.PI * 2;
+                while (a < -Math.PI) a += Math.PI * 2;
+                return a;
+            };
+            return {
+                throttle: 1,
+                turn: Math.max(-1, Math.min(1, wrap(goal - sense.self.heading) * 2.5)),
+                towerTurn: Math.max(-1, Math.min(1, wrap(goal - sense.self.tower) * 3)),
+                fire: true,
+                charge: false,
+            };
+        },
     };
     // Regen: identical damage in both matches, so the gap is pure regen ticks.
     const regenDuel = (loadout: SkillLoadout): Match =>
@@ -394,9 +411,16 @@ console.log('skills');
         first !== undefined && first.foes === 0 && first.scout === 1,
         `foes=${first?.foes} scout=${first?.scout}`,
     );
+    const foeSpawn = new Match(
+        [
+            { team: 0, controller: { meta: { id: 'a', name: 'a', author: 't', version: '0', description: '' }, update: () => ({}) } },
+            { team: 1, controller: { meta: { id: 'b', name: 'b', author: 't', version: '0', description: '' }, update: () => ({}) } },
+        ],
+        3,
+    ).robotSnapshots[1] as { x: number; y: number };
     check(
         'blip is live position, zero health/heading/speed',
-        first !== undefined && first.x === 830 && first.y === 320 && first.health === 0 && first.heading === 0 && first.speed === 0,
+        first !== undefined && first.x === foeSpawn.x && first.y === foeSpawn.y && first.health === 0 && first.heading === 0 && first.speed === 0,
         `x=${first?.x} y=${first?.y} hp=${first?.health}`,
     );
     check(
@@ -475,8 +499,9 @@ console.log('actives');
         ],
         3,
     );
+    const parkedStart = { x: still.robotSnapshots[0]?.x, y: still.robotSnapshots[0]?.y };
     for (let i = 0; i < 30; i += 1) still.step();
-    check('parked dash moves nowhere', still.robotSnapshots[0]?.x === 130 && still.robotSnapshots[0]?.y === 320);
+    check('parked dash moves nowhere', still.robotSnapshots[0]?.x === parkedStart.x && still.robotSnapshots[0]?.y === parkedStart.y);
 
     // EMP: closing driver pulses on entering radius; the sitter logs slowed.
     const runEmp = (): { userCd: number[]; foeSlow: boolean[]; trigger: number } => {
@@ -862,6 +887,87 @@ console.log('arena');
         }
     }
     check('robots never clip blocks mid-match', !clipped && sampled > 0);
+}
+
+// --- 5b2. Spawn variation: seeded, mirrored, constrained -------------------
+console.log('spawn-variation');
+{
+    const dummy = (id: string): RobotController => ({
+        meta: { id, name: id, author: 'test', version: '0', description: '' },
+        update: (): Intent => ({}),
+    });
+    const mkLineups = (teamSize: number): LineupEntry[] => {
+        const lineups: LineupEntry[] = [];
+        for (let i = 0; i < teamSize; i += 1) lineups.push({ team: 0, controller: dummy(`a${i}`) });
+        for (let i = 0; i < teamSize; i += 1) lineups.push({ team: 1, controller: dummy(`b${i}`) });
+        return lineups;
+    };
+    const snapPos = (seed: number, teamSize: number): Array<{ x: number; y: number; heading: number }> =>
+        new Match(mkLineups(teamSize), seed).robotSnapshots.map((s) => ({ x: s.x, y: s.y, heading: s.heading }));
+    // Determinism: same seed, same spawns.
+    let detOk = true;
+    for (const teamSize of [1, 2, 3]) {
+        const a = snapPos(4242, teamSize);
+        const b = snapPos(4242, teamSize);
+        if (JSON.stringify(a) !== JSON.stringify(b)) detOk = false;
+    }
+    check('spawns are deterministic per seed', detOk);
+    // Variation: different seeds, different spawns.
+    const v0 = snapPos(11, 1)[0] as { x: number; y: number };
+    const v1 = snapPos(12, 1)[0] as { x: number; y: number };
+    check('spawns vary by seed', v0.x !== v1.x || v0.y !== v1.y, `(${v0.x.toFixed(1)},${v0.y.toFixed(1)}) vs (${v1.x.toFixed(1)},${v1.y.toFixed(1)})`);
+    // Mirror + constraints across 60 seeds x 1v1/2v2/3v3.
+    let mirrorOk = true;
+    let boundsOk = true;
+    let gapOk = true;
+    let headingOk = true;
+    let blocksOk = true;
+    const rects = ARENA_OBSTACLES.blocks;
+    for (let seed = 1; seed <= 60; seed += 1) {
+        for (const teamSize of [1, 2, 3]) {
+            const snaps = snapPos(seed * 7919 + 13, teamSize);
+            for (let i = 0; i < teamSize; i += 1) {
+                const a = snaps[i] as { x: number; y: number; heading: number };
+                const b = snaps[teamSize + i] as { x: number; y: number; heading: number };
+                if (Math.abs(b.x - (ARENA_WIDTH - a.x)) > 1e-9 || Math.abs(b.y - (ARENA_HEIGHT - a.y)) > 1e-9) mirrorOk = false;
+                let dh = Math.abs(b.heading - a.heading - Math.PI) % (Math.PI * 2);
+                if (dh > Math.PI) dh = Math.PI * 2 - dh;
+                if (dh > 1e-9) mirrorOk = false;
+            }
+            for (const s of snaps) {
+                if (s.x < ROBOT_RADIUS || s.x > ARENA_WIDTH - ROBOT_RADIUS || s.y < ROBOT_RADIUS * 2 || s.y > ARENA_HEIGHT - ROBOT_RADIUS * 2) boundsOk = false;
+                for (const o of rects) {
+                    const cx = Math.max(o.x, Math.min(s.x, o.x + o.w));
+                    const cy = Math.max(o.y, Math.min(s.y, o.y + o.h));
+                    if (Math.hypot(s.x - cx, s.y - cy) < ROBOT_RADIUS - 1e-6) blocksOk = false;
+                }
+            }
+            const team0 = snaps.slice(0, teamSize);
+            const team1 = snaps.slice(teamSize);
+            for (const team of [team0, team1]) {
+                for (let i = 0; i < team.length; i += 1) {
+                    for (let j = i + 1; j < team.length; j += 1) {
+                        const p = team[i] as { x: number; y: number };
+                        const q = team[j] as { x: number; y: number };
+                        if (Math.hypot(p.x - q.x, p.y - q.y) < ROBOT_RADIUS * 2 + 8 - 1e-6) gapOk = false;
+                    }
+                }
+            }
+            for (let i = 0; i < teamSize; i += 1) {
+                const a = snaps[i] as { heading: number };
+                const b = snaps[teamSize + i] as { heading: number };
+                if (Math.abs(a.heading) > 0.3 + 1e-9) headingOk = false;
+                let hb = Math.abs(b.heading);
+                if (hb > Math.PI) hb = Math.PI * 2 - hb;
+                if (Math.abs(hb - Math.PI) > 0.3 + 1e-9) headingOk = false;
+            }
+        }
+    }
+    check('team 1 mirrors team 0 through the center', mirrorOk);
+    check('spawns stay clamped to the arena', boundsOk);
+    check('teammates keep minimum separation', gapOk);
+    check('spawn headings face midfield, never a wall', headingOk);
+    check('varied spawns clear obstacle blocks', blocksOk);
 }
 
 // --- 5c. Sudden death: circle shrinks, outsiders pulse, draws vanish ------
@@ -1320,7 +1426,23 @@ console.log('modifiers');
     // (one hit only: equal-speed shots land 24 ticks apart, no deaths yet).
     const shooter: RobotController = {
         meta: { id: 'shooter', name: 'Shooter', author: 'test', version: '0', description: '' },
-        update: (): Intent => ({ throttle: 1, turn: 0, towerTurn: 0, fire: true, charge: false }),
+        update: (sense: SenseState): Intent => {
+            const foe = sense.foes[0] ?? sense.scout[0] ?? sense.tracks[0];
+            if (!foe) return { throttle: 1, turn: 0, towerTurn: 0.5, fire: true, charge: false };
+            const goal = Math.atan2(foe.y - sense.self.y, foe.x - sense.self.x);
+            const wrap = (a: number): number => {
+                while (a > Math.PI) a -= Math.PI * 2;
+                while (a < -Math.PI) a += Math.PI * 2;
+                return a;
+            };
+            return {
+                throttle: 1,
+                turn: Math.max(-1, Math.min(1, wrap(goal - sense.self.heading) * 2.5)),
+                towerTurn: Math.max(-1, Math.min(1, wrap(goal - sense.self.tower) * 3)),
+                fire: true,
+                charge: false,
+            };
+        },
     };
     const target: RobotController = {
         meta: { id: 'target', name: 'Target', author: 'test', version: '0', description: '' },
@@ -1685,14 +1807,15 @@ console.log('senses');
             meta: { id: 'sitter', name: 'Sitter', author: 'test', version: '0', description: '' },
             update: (): Intent => ({}),
         };
-        new Match(
+        const whiskerMatch = new Match(
             [
                 { team: 0, controller: probe },
                 { team: 1, controller: sitter },
             ],
             3,
             { arena },
-        ).step();
+        );
+        whiskerMatch.step();
         const s = first as unknown as SenseState;
         check(`spawn sense carries every channel (${arena})`, Array.isArray(s.events) && Array.isArray(s.bullets) && Array.isArray(s.tracks) && s.arena !== undefined && s.zone !== undefined && s.grid !== undefined && s.match !== undefined);
         check(`spawn events/bullets/tracks start empty (${arena})`, s.events?.length === 0 && s.bullets?.length === 0 && s.tracks?.length === 0);
@@ -1701,7 +1824,18 @@ console.log('senses');
         check(`grid is 12x8 zeroed (${arena})`, s.grid?.w === SENSE_GRID_W && s.grid?.h === SENSE_GRID_H && s.grid?.cell === SENSE_GRID_CELL && s.grid?.foes.length === 96 && s.grid?.danger.length === 96 && (s.grid?.foes.every((v) => v === 0) ?? false));
         check(`match reports arena + caps (${arena})`, s.match?.arena === arena && s.match?.tickCap === MAX_TICKS_TOTAL && s.match?.killsYou === 0 && s.match?.killsTeam === 0 && s.match?.aliveFoes === 1);
         check(`lastDamage opens null (${arena})`, s.self.lastDamage === null);
-        check(`spawn whisker reads the far wall (${arena})`, s.self.blocked.ahead === ARENA_WIDTH - 130 - ROBOT_RADIUS, `ahead=${s.self.blocked.ahead}`);
+        const w0 = whiskerMatch.robotSnapshots[0] as { x: number; y: number; heading: number };
+        const ahead = s.self.blocked.ahead as number;
+        const px = w0.x + Math.cos(w0.heading) * (ahead + ROBOT_RADIUS);
+        const py = w0.y + Math.sin(w0.heading) * (ahead + ROBOT_RADIUS);
+        const eps = 1e-6;
+        const onWall = Math.abs(px) < eps || Math.abs(px - ARENA_WIDTH) < eps || Math.abs(py) < eps || Math.abs(py - ARENA_HEIGHT) < eps;
+        const onBlock = ARENA_OBSTACLES[arena].some((o) => {
+            const onV = (Math.abs(px - o.x) < eps || Math.abs(px - (o.x + o.w)) < eps) && py >= o.y - eps && py <= o.y + o.h + eps;
+            const onH = (Math.abs(py - o.y) < eps || Math.abs(py - (o.y + o.h)) < eps) && px >= o.x - eps && px <= o.x + o.w + eps;
+            return onV || onH;
+        });
+        check(`spawn whisker ends on a wall or block (${arena})`, ahead > 0 && (onWall || onBlock), `ahead=${ahead} end=(${px.toFixed(1)},${py.toFixed(1)})`);
     }
     // Determinism: identical spied digests across two full matches.
     const runSpied = (): SenseDigest[][] => {
@@ -1874,7 +2008,15 @@ console.log('senses');
         check('driving into a wall logs wall-bump', bumps > 0, `bumps=${bumps}`);
         const rammer = (id: string): RobotController => ({
             meta: { id, name: id, author: 'test', version: '0', description: '' },
-            update: (): Intent => ({ throttle: 1 }),
+            update: (sense: SenseState): Intent => {
+                const foe = sense.foes[0] ?? sense.scout[0] ?? sense.tracks[0];
+                if (!foe) return { throttle: 1 };
+                const goal = Math.atan2(foe.y - sense.self.y, foe.x - sense.self.x);
+                let diff = goal - sense.self.heading;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                return { throttle: 1, turn: Math.max(-1, Math.min(1, diff * 2.5)) };
+            },
         });
         const rams: boolean[] = [false, false];
         const ramSpy = (inner: RobotController, slot: number): RobotController => ({
@@ -2098,7 +2240,7 @@ console.log('intent');
             meta: { id: `strafer${strafe}`, name: 'Strafer', author: 'test', version: '0', description: '' },
             update: (): Intent => ({ strafe }),
         });
-        const runStrafe = (strafe: number, ticks: number): { x: number; y: number } => {
+        const runStrafe = (strafe: number, ticks: number): { x0: number; y0: number; h0: number; x1: number; y1: number } => {
             const m = new Match(
                 [
                     { team: 0, controller: strafer(strafe) },
@@ -2106,14 +2248,17 @@ console.log('intent');
                 ],
                 3,
             );
+            const start = m.robotSnapshots[0] as { x: number; y: number; heading: number };
             for (let i = 0; i < ticks; i += 1) m.step();
             const s = m.robotSnapshots[0] as { x: number; y: number };
-            return { x: s.x, y: s.y };
+            return { x0: start.x, y0: start.y, h0: start.heading, x1: s.x, y1: s.y };
         };
         const south = runStrafe(1, 60);
-        check('strafe +1 slides starboard at half speed', south.x === 130 && Math.abs(south.y - 395) < 0.01, `(${south.x},${south.y.toFixed(2)})`);
+        const southWant = { x: south.x0 - Math.sin(south.h0) * MAX_SPEED * STRAFE_FACTOR, y: south.y0 + Math.cos(south.h0) * MAX_SPEED * STRAFE_FACTOR };
+        check('strafe +1 slides starboard at half speed', Math.abs(south.x1 - southWant.x) < 0.01 && Math.abs(south.y1 - southWant.y) < 0.01, `(${south.x1.toFixed(2)},${south.y1.toFixed(2)})`);
         const north = runStrafe(-1, 60);
-        check('strafe -1 slides port symmetrically', north.x === 130 && Math.abs(north.y - 245) < 0.01, `(${north.x},${north.y.toFixed(2)})`);
+        const northWant = { x: north.x0 + Math.sin(north.h0) * MAX_SPEED * STRAFE_FACTOR, y: north.y0 - Math.cos(north.h0) * MAX_SPEED * STRAFE_FACTOR };
+        check('strafe -1 slides port symmetrically', Math.abs(north.x1 - northWant.x) < 0.01 && Math.abs(north.y1 - northWant.y) < 0.01, `(${north.x1.toFixed(2)},${north.y1.toFixed(2)})`);
         // Diagonal: throttle 1 + strafe 1 never exceeds top speed per tick.
         const diag = new Match(
             [
@@ -2138,10 +2283,15 @@ console.log('intent');
             ],
             3,
         );
+        const straightStart = straight.robotSnapshots[0] as { x: number; y: number; heading: number };
         for (let i = 0; i < 180; i += 1) straight.step();
+        const diagEnd = diag.robotSnapshots[0] as { x: number; y: number };
+        const straightEnd = straight.robotSnapshots[0] as { x: number; y: number };
+        const diagAlong = (diagEnd.x - straightStart.x) * Math.cos(straightStart.heading) + (diagEnd.y - straightStart.y) * Math.sin(straightStart.heading);
+        const straightAlong = (straightEnd.x - straightStart.x) * Math.cos(straightStart.heading) + (straightEnd.y - straightStart.y) * Math.sin(straightStart.heading);
         check(
             'strafe trades forward pace (never adds it)',
-            (diag.robotSnapshots[0]?.x ?? 0) < (straight.robotSnapshots[0]?.x ?? 0),
+            diagAlong < straightAlong,
         );
     }
     // Move assist: overrides manual drive, arrives, holds, deterministic.
@@ -2623,6 +2773,99 @@ console.log('comms');
         ({ kind: 'contact', x, y: 0, foe: 2, role: 0, slot: 0, bid: 0, from, sent: 6 });
     check('latest contact prefers the lowest-id sender', latestContact([contacts(2, 9), contacts(1, 7)])?.x === 7);
     check('no contacts is null', latestContact([]) === null);
+    // Squad role protocol (roles.ts): claim/slot shapes, auction plumbing.
+    check('claim builds the right shape', JSON.stringify(castClaim(1, 3)) === JSON.stringify({ kind: 'claim', x: 0, y: 0, foe: -1, role: 1, slot: 0, bid: 3 }));
+    check('slot hold builds the right shape', JSON.stringify(castSlotHold(1, 2)) === JSON.stringify({ kind: 'slot', x: 0, y: 0, foe: -1, role: 1, slot: 2, bid: 0 }));
+    check('top preference bids highest', preferenceBid(0, 3) === 3 && preferenceBid(2, 3) === 1 && preferenceBid(9, 3) === 1);
+    check('hold bonus is positive but below one rank', HOLD_BONUS > 0 && HOLD_BONUS < 1);
+    const claimMsg = (from: number, role: number, bid: number): { kind: 'claim'; x: number; y: number; foe: number; role: number; slot: number; bid: number; from: number; sent: number } =>
+        ({ kind: 'claim', x: 0, y: 0, foe: -1, role, slot: 0, bid, from, sent: 6 });
+    const ballotClaims = collectClaims(
+        [claimMsg(1, 0, 3), claimMsg(9, 0, 99), ballot(1, 4)],
+        new Set([0, 1]),
+        { from: 0, role: 1, bid: 3 },
+    );
+    check('collectClaims keeps live claims plus own', ballotClaims.length === 2 && ballotClaims.some((c) => c.from === 1 && c.role === 0) && ballotClaims.some((c) => c.from === 0 && c.role === 1));
+    check('myRole reads the settled win', myRole([{ from: 0, role: 0, bid: 1 }, { from: 1, role: 0, bid: 9 }, { from: 0, role: 1, bid: 5 }], 0) === 1);
+    check('myRole is null on a shutout', myRole([{ from: 1, role: 0, bid: 9 }], 0) === null);
+    // Trio auction converges identically from every mate's perspective.
+    const trioRole = (self: number): number | null =>
+        myRole(collectClaims([0, 1, 2].filter((i) => i !== self).map((i) => claimMsg(i, i, 3)), new Set([0, 1, 2]), { from: self, role: self, bid: 3 }), self);
+    check('trio auction converges per mate', trioRole(0) === 0 && trioRole(1) === 1 && trioRole(2) === 2);
+    const holdMsg = (from: number, slot: number, sent: number): { kind: 'slot'; x: number; y: number; foe: number; role: number; slot: number; bid: number; from: number; sent: number } =>
+        ({ kind: 'slot', x: 0, y: 0, foe: -1, role: 1, slot, bid: 0, from, sent });
+    check('fresh slot hold is seen', latestSlotHold([holdMsg(1, 2, 100)], 2, 110)?.from === 1);
+    check('stale slot hold frees the slot', latestSlotHold([holdMsg(1, 2, 50)], 2, 110) === null);
+    check('other slots are ignored', latestSlotHold([holdMsg(1, 2, 100)], 1, 110) === null);
+    const point = roleSlot(ROLE_POINT, 3, 480, 320, 100);
+    check('point role takes the north slot', Math.abs(point.x - 480) < 0.001 && Math.abs(point.y - 220) < 0.001);
+    // Role behavior: ranking, tracker convergence, death re-resolve, goals.
+    check('live team ids sort ascending', JSON.stringify(liveTeamIds(1, [{ id: 2 }, { id: 0 }])) === '[0,1,2]');
+    const rankMates = [{ id: 1, x: 300, y: 300 }, { id: 2, x: 100, y: 300 }];
+    check('midfield ranking leads with the closest mate', JSON.stringify(rankByMidfield(0, 200, 300, rankMates)) === '[1,0,2]');
+    // Three trackers with 6-tick delayed delivery, engine-style (cap 4).
+    const trioMates = [
+        { id: 0, x: 200, y: 300 },
+        { id: 1, x: 300, y: 300 },
+        { id: 2, x: 100, y: 300 },
+    ];
+    const trioTrackers = trioMates.map(() => createRoleTracker());
+    const trioInFlight: Array<{ to: number; msg: RoleSense['inbox'][number]; arrive: number }> = [];
+    let trioDead = -1;
+    const trioStep = (tick: number): Array<number | null> =>
+        trioMates.map((mate, i) => {
+            if (mate.id === trioDead) return null;
+            const inbox = trioInFlight.filter((f) => f.to === mate.id && f.arrive <= tick).map((f) => f.msg).slice(-4);
+            const allies = trioMates.filter((m) => m.id !== mate.id && m.id !== trioDead);
+            const state = (trioTrackers[i] as ReturnType<typeof createRoleTracker>).update({ tick, self: mate, allies, inbox });
+            if (state.radio !== null) {
+                for (const other of trioMates) {
+                    if (other.id === mate.id || other.id === trioDead) continue;
+                    trioInFlight.push({ to: other.id, msg: { ...state.radio, from: mate.id, sent: tick }, arrive: tick + 6 });
+                }
+            }
+            return state.role;
+        });
+    let trioRoles: Array<number | null> = [null, null, null];
+    for (let t = 0; t < 30; t += 1) trioRoles = trioStep(t);
+    check('trio trackers converge on distinct roles', JSON.stringify(trioRoles) === '[1,0,2]', `roles=${JSON.stringify(trioRoles)}`);
+    // Heartbeats are sparse: settled trackers mostly yield radio to focus votes.
+    let holdCount = 0;
+    for (let t = 30; t < 66; t += 1) {
+        const mate = trioMates[0] as { id: number; x: number; y: number };
+        const inbox = trioInFlight.filter((f) => f.to === 0 && f.arrive <= t).map((f) => f.msg).slice(-4);
+        const state = (trioTrackers[0] as ReturnType<typeof createRoleTracker>).update({ tick: t, self: mate, allies: trioMates.slice(1), inbox });
+        if (state.radio !== null && state.radio.kind === 'slot') holdCount += 1;
+        for (const other of trioMates.slice(1)) {
+            if (state.radio !== null) trioInFlight.push({ to: other.id, msg: { ...state.radio, from: 0, sent: t }, arrive: t + 6 });
+        }
+    }
+    check('slot heartbeats stay sparse', holdCount >= 2 && holdCount <= 4, `holds=${holdCount}`);
+    // Death re-resolve: mate 2 drops; survivors re-settle distinct roles.
+    trioDead = 2;
+    for (let t = 66; t < 90; t += 1) trioRoles = trioStep(t);
+    check('survivors re-resolve distinct roles', trioRoles[0] !== null && trioRoles[1] !== null && trioRoles[0] !== trioRoles[1], `roles=${JSON.stringify(trioRoles)}`);
+    const solo = createRoleTracker().update({ tick: 0, self: { id: 0, x: 200, y: 300 }, allies: [], inbox: [] });
+    check('tracker idles in 1v1', solo.role === null && solo.radio === null);
+    const goalFoe = roleGoal({ self: { id: 0, x: 480, y: 320 }, allies: [], foes: [{ id: 3, x: 600, y: 320, distance: 120 }], inbox: [] }, ROLE_POINT, 3, 170);
+    check('slot goal rings the foe', Math.abs(goalFoe.x - 600) < 0.001 && Math.abs(goalFoe.y - 150) < 0.001);
+    const goalBlind = roleGoal({ self: { id: 0, x: 400, y: 320 }, allies: [{ id: 1, x: 560, y: 320 }], foes: [], inbox: [] }, 1, 3, 170);
+    check('blind slot goal rings the team centroid', Math.abs(goalBlind.x - 627.224) < 0.01 && Math.abs(goalBlind.y - 405) < 0.01);
+    const goalVoted = roleGoal(
+        {
+            self: { id: 0, x: 480, y: 320 },
+            allies: [{ id: 1, x: 500, y: 320 }],
+            foes: [
+                { id: 5, x: 600, y: 320, distance: 120 },
+                { id: 7, x: 480, y: 480, distance: 160 },
+            ],
+            inbox: [ballot(1, 7)],
+        },
+        ROLE_POINT,
+        3,
+        170,
+    );
+    check('slot goal anchors the voted foe', Math.abs(goalVoted.x - 480) < 0.001 && Math.abs(goalVoted.y - 310) < 0.001);
     // Wired bots: hunter votes reach a mate, ghost contacts reach a mate.
     const wiredLog: MailboxEntry[] = [];
     const wiredHunter = new Match(
@@ -2637,6 +2880,58 @@ console.log('comms');
     for (let i = 0; i < 400 && !wiredHunter.result.over; i += 1) wiredHunter.step();
     const hunterVotes = wiredLog.flatMap((e) => e.inbox).filter((m) => m.kind === 'focus');
     check('hunter focus votes reach its mate', hunterVotes.length > 0 && hunterVotes.every((m) => m.foe === 2 || m.foe === 3), `votes=${hunterVotes.length}`);
+    // Hunter trio: two hunters + a listener settle distinct slots live while
+    // focus votes keep chaining on the shared radio.
+    interface FullMailEntry {
+        tick: number;
+        inbox: Array<{ kind: string; role: number; slot: number; bid: number; foe: number; from: number; sent: number }>;
+    }
+    const fullmail = (log: FullMailEntry[]): RobotController => ({
+        meta: { id: 'fullmail', name: 'Fullmail', author: 'test', version: '0', description: '' },
+        update: (sense: SenseState): Intent => {
+            log.push({ tick: sense.tick, inbox: sense.inbox.map((m) => ({ kind: m.kind, role: m.role, slot: m.slot, bid: m.bid, foe: m.foe, from: m.from, sent: m.sent })) });
+            return {};
+        },
+    });
+    const trioMailLog: FullMailEntry[] = [];
+    const wiredTrio = new Match(
+        [
+            { team: 0, controller: cleanEntry.create(), loadout: { ...cleanEntry.loadout } },
+            { team: 0, controller: cleanEntry.create(), loadout: { ...cleanEntry.loadout } },
+            { team: 0, controller: fullmail(trioMailLog) },
+            { team: 1, controller: sitter('a') },
+            { team: 1, controller: sitter('b') },
+            { team: 1, controller: sitter('c') },
+        ],
+        5,
+    );
+    for (let i = 0; i < 400 && !wiredTrio.result.over; i += 1) wiredTrio.step();
+    const trioMail = trioMailLog.flatMap((e) => e.inbox);
+    const trioHolds = trioMail.filter((m) => m.kind === 'slot');
+    const trioVotes = trioMail.filter((m) => m.kind === 'focus');
+    const heldRoles = new Set(trioHolds.map((m) => m.role));
+    check('hunter trio heartbeats distinct slots', trioHolds.length > 0 && heldRoles.size === 2, `holds=${trioHolds.length} roles=${[...heldRoles]}`);
+    check('trio focus votes still chain', trioVotes.length > 0, `votes=${trioVotes.length}`);
+    // Ablation flag: roles:false sends no claim/slot mail (pre-B3 radio).
+    const ablationLog: FullMailEntry[] = [];
+    const wiredAblation = new Match(
+        [
+            { team: 0, controller: createHunterParams({ roles: false }), loadout: { ...cleanEntry.loadout } },
+            { team: 0, controller: createHunterParams({ roles: false }), loadout: { ...cleanEntry.loadout } },
+            { team: 0, controller: fullmail(ablationLog) },
+            { team: 1, controller: sitter('a') },
+            { team: 1, controller: sitter('b') },
+            { team: 1, controller: sitter('c') },
+        ],
+        5,
+    );
+    for (let i = 0; i < 400 && !wiredAblation.result.over; i += 1) wiredAblation.step();
+    const ablationMail = ablationLog.flatMap((e) => e.inbox);
+    check(
+        'roles:false sends no claim/slot mail',
+        ablationMail.length > 0 && ablationMail.every((m) => m.kind !== 'claim' && m.kind !== 'slot'),
+        `mail=${ablationMail.length}`,
+    );
     const ghostEntry = ROBOTS.find((r) => r.meta.id === 'ghost');
     if (!ghostEntry) throw new Error('no ghost');
     const ghostLog: MailboxEntry[] = [];
@@ -2957,19 +3252,19 @@ console.log('manifests');
 console.log('pinned-codes');
 {
     // rusher vs turret, seed 4242, open, default builds — one code per
-    // format, both describing the same match (winner 1 @ tick 278).
-    // Re-pinned for the Final-review rusher aimTol rebalance (deterministic
-    // re-sim x2; outcome unchanged, only transient fields moved).
+    // format, both describing the same match (winner 1 @ tick 290).
+    // Re-pinned for complexity/spawn seeded variation (deterministic
+    // re-sim x2; outcome unchanged, spawn geometry moved the end state).
     const pins: Array<{ format: string; code: string; fp: string }> = [
         {
             format: 'RA2',
             code: 'RA2-4000-2290-3860-2200-4328-0091-0',
-            fp: 'open|{}|1@278|OVR3 TRG1 PLT2,130,0,0,700.4557315973328,470.07610164335085,0.5555900725572009,0.5593158544906753,0,72,6,18,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,28,723.7647032190188,485.5903480620281,-2.6541348199916794,-2.572682348031272,1,132,12,18,0,0,0,0|',
+            fp: 'open|{}|1@290|OVR3 TRG1 PLT2,130,0,0,578.9258332055584,504.4712165470966,2.4838022661497137,-0.6757560931448545,0,60,6,16,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,40,653.9098876986923,440.21522725762117,-2.536764874794541,2.418550658083492,1,132,12,10,0,0,0,0|640.4499522260696,459.11108519103584,0,0',
         },
         {
             format: 'RA1',
             code: 'RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MjQyLCJ0IjoxLCJsIjpbInJ1c2hlciIsInR1cnJldCJdLCJvIjpbIjA6Myw1OjEsODoyIiwiMjoxLDM6Miw1OjIsNjoxIl0sImEiOiJvcGVuIiwibSI6IiJ9',
-            fp: 'open|{}|1@278|OVR3 TRG1 PLT2,130,0,0,700.4557315973328,470.07610164335085,0.5555900725572009,0.5593158544906753,0,72,6,18,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,28,723.7647032190188,485.5903480620281,-2.6541348199916794,-2.572682348031272,1,132,12,18,0,0,0,0|',
+            fp: 'open|{}|1@290|OVR3 TRG1 PLT2,130,0,0,578.9258332055584,504.4712165470966,2.4838022661497137,-0.6757560931448545,0,60,6,16,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,40,653.9098876986923,440.21522725762117,-2.536764874794541,2.418550658083492,1,132,12,10,0,0,0,0|640.4499522260696,459.11108519103584,0,0',
         },
     ];
     for (const pin of pins) {
