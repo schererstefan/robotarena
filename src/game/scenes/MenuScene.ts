@@ -69,7 +69,7 @@ import {
     type CopyStep,
 } from '../strings';
 import { markTutorialSeen, shouldShowTutorial, TUTORIAL_LINEUP, TUTORIAL_SEED } from '../tutorial';
-import { addTouchHit, makeButton, makePanel, type Button } from '../ui';
+import { addTouchHit, makeButton, makePanel, transition, type Button } from '../ui';
 import { CALLSIGNS, defaultSkin, FINISHES, PAINTS, randomSkin, type SlotSkin } from '../customize';
 
 export interface BattleRequest {
@@ -515,7 +515,10 @@ export class MenuScene extends Scene {
     }
 
     private rebuildSlots(): void {
-        for (const obj of this.slotObjects) obj.destroy();
+        for (const obj of this.slotObjects) {
+            this.tweens.killTweensOf(obj);
+            obj.destroy();
+        }
         this.slotObjects = [];
         this.navSlots = [];
 
@@ -539,6 +542,18 @@ export class MenuScene extends Scene {
             previewTower.setTint(skin.paint).setRotation(-0.5);
             const previewHub = this.track(this.add.image(152, y, 'hub').setScale(2));
             previewHub.setTint(skin.paint);
+            // Idle life: gentle preview sway via tween (no new MenuScene
+            // update loop; frozen under reduced motion).
+            if (!isReducedMotion()) {
+                this.tweens.add({
+                    targets: [preview, previewTower, previewHub],
+                    y: y + 3,
+                    duration: 900 + i * 70,
+                    yoyo: true,
+                    repeat: -1,
+                    ease: 'Sine.easeInOut',
+                });
+            }
 
             this.cycler(285, 150, y, cyclerLabel(skin.callsign), () => this.cycleCallsign(i), skin.paintCss);
             this.cycler(490, 200, y, cyclerLabel(entry.meta.name), () => this.cycleRobot(i));
@@ -608,10 +623,13 @@ export class MenuScene extends Scene {
 
         // Backdrop swallows clicks so menu controls beneath can't fire.
         this.trackEditor(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50).setInteractive());
-        this.trackEditor(this.add.rectangle(CX, 384, 740, 560, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
-        this.trackEditor(this.add.text(CX, 140, editorSlotTitle(slot), FONTS.heading).setOrigin(0.5).setDepth(50));
-        this.trackEditor(this.add.text(CX, 166, editorSubtitle(entry.meta.name, entry.meta.description), FONTS.small).setOrigin(0.5).setDepth(50));
+        const frame = [
+            this.trackEditor(this.add.rectangle(CX, 384, 740, 560, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50)),
+            this.trackEditor(this.add.text(CX, 140, editorSlotTitle(slot), FONTS.heading).setOrigin(0.5).setDepth(50)),
+            this.trackEditor(this.add.text(CX, 166, editorSubtitle(entry.meta.name, entry.meta.description), FONTS.small).setOrigin(0.5).setDepth(50)),
+        ];
         this.editorPoints = this.trackEditor(this.add.text(CX, 196, '', FONTS.mono).setOrigin(0.5).setDepth(50));
+        transition(this, [...frame, this.editorPoints]);
         this.refreshEditorRows();
         this.nav.reset();
     }
@@ -764,14 +782,12 @@ export class MenuScene extends Scene {
         this.clearTour();
         this.tourMode = 'prompt';
         this.trackTour(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(60).setInteractive());
-        this.trackTour(this.add.rectangle(CX, 384, 460, 220, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(60));
-        this.trackTour(this.add.text(CX, 320, TUTORIAL_PROMPT.title, FONTS.heading).setOrigin(0.5).setDepth(60));
-        this.trackTour(
-            this.add.text(CX, 352, TUTORIAL_PROMPT.line1, FONTS.small).setOrigin(0.5).setDepth(60),
-        );
-        this.trackTour(
-            this.add.text(CX, 370, TUTORIAL_PROMPT.line2, FONTS.small).setOrigin(0.5).setDepth(60),
-        );
+        transition(this, [
+            this.trackTour(this.add.rectangle(CX, 384, 460, 220, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(60)),
+            this.trackTour(this.add.text(CX, 320, TUTORIAL_PROMPT.title, FONTS.heading).setOrigin(0.5).setDepth(60)),
+            this.trackTour(this.add.text(CX, 352, TUTORIAL_PROMPT.line1, FONTS.small).setOrigin(0.5).setDepth(60)),
+            this.trackTour(this.add.text(CX, 370, TUTORIAL_PROMPT.line2, FONTS.small).setOrigin(0.5).setDepth(60)),
+        ]);
         this.tourButtons.push(
             makeButton(this, CX - 110, 440, 200, 40, TUTORIAL_PROMPT.play, () => {
                 this.clearTour();

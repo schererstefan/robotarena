@@ -19,6 +19,7 @@ import {
 } from '../strings';
 import { COLORS, FONTS } from '../theme';
 import { initialRound, nextRound, roundName, tiebreakWinner, type BracketMatch } from '../tournament';
+import { transition } from '../ui';
 
 const CX = 512;
 /** Headless sim budget per frame: a full 8-bot bracket settles in seconds. */
@@ -355,6 +356,7 @@ export class TournamentScene extends Scene {
                 this.add.text(CX, 678, championLabel(champ ? this.nameOf(champ) : null), FONTS.heading).setOrigin(0.5),
             );
             label.setColor(COLORS.goldCss);
+            transition(this, [label]);
             this.bracketButton(CX - 240, 726, 200, 36, TOURNAMENT.runAgain, () => this.startTournament());
             this.bracketButton(CX, 726, 200, 36, TOURNAMENT.lineup, () => {
                 for (const obj of this.bracketObjects) obj.destroy();

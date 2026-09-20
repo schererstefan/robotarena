@@ -5,6 +5,27 @@ import { isReducedMotion } from './accessibility';
 import { playHover } from './audio';
 import { COLORS, FONTS } from './theme';
 
+/**
+ * Overlay entrance: fade + rise over 150 ms. Objects are created at their
+ * final position; this offsets them down and tweens back. Under reduced
+ * motion it is a no-op (content simply appears at its final state).
+ */
+export function transition(scene: Scene, targets: Phaser.GameObjects.GameObject[], rise = 8): void {
+    if (targets.length === 0 || isReducedMotion()) return;
+    for (const target of targets) {
+        const obj = target as unknown as { y: number; alpha: number };
+        obj.y += rise;
+        obj.alpha = 0;
+    }
+    scene.tweens.add({
+        targets: targets as unknown as Array<{ y: number; alpha: number }>,
+        y: `-=${rise}`,
+        alpha: 1,
+        duration: 150,
+        ease: 'Quad.easeOut',
+    });
+}
+
 export interface Button {
     setLabel: (label: string) => void;
     setEnabled: (enabled: boolean) => void;

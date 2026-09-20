@@ -5,7 +5,7 @@
 import { Scene } from 'phaser';
 import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DT, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
-import { clamp } from '../../sim/math';
+import { clamp, wrapAngle } from '../../sim/math';
 import { decodeReplay, encodeReplay } from '../../sim/replay';
 import { getRobot } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
@@ -129,6 +129,26 @@ export class BattleScene extends Scene {
     private hitstop = 0;
     private trauma = 0;
     private traumaClean = true;
+    /** Turret spring state (critically-damped lag/overshoot, render-only). */
+    private turA: number[] = [];
+    private turV: number[] = [];
+    /** Twin double-tap: second kick delay. Heavy hub dip (px). */
+    private kick2T: number[] = [];
+    private hubDip: number[] = [];
+    /** Staged intro: acc-hold window + per-robot analytic phases. */
+    private introActive = false;
+    private introElapsed = 0;
+    private introDur = 0;
+    private introLanded: boolean[] = [];
+    private introSkipHint: Phaser.GameObjects.Text | null = null;
+    /** Death-throes: countdown to the delayed detonation (≤450 ms). */
+    private throesT: number[] = [];
+    private throesDealer: number[] = [];
+    private throesStage: number[] = [];
+    /** Deciding-kill slow-mo window (acc-rate + results hold). */
+    private slowmoT = 0;
+    private zoomBusy = false;
+    private lampImg: Phaser.GameObjects.Image | null = null;
     private rings: Phaser.GameObjects.Image[] = [];
     private treads: Phaser.GameObjects.Image[] = [];
     private treadAcc: number[] = [];
@@ -239,6 +259,21 @@ export class BattleScene extends Scene {
         this.hitstop = 0;
         this.trauma = 0;
         this.traumaClean = true;
+        this.turA = [];
+        this.turV = [];
+        this.kick2T = [];
+        this.hubDip = [];
+        this.introActive = false;
+        this.introElapsed = 0;
+        this.introDur = 0;
+        this.introLanded = [];
+        this.introSkipHint = null;
+        this.throesT = [];
+        this.throesDealer = [];
+        this.throesStage = [];
+        this.slowmoT = 0;
+        this.zoomBusy = false;
+        this.lampImg = null;
         this.firstBlood = false;
         this.trails = [];
         this.lastTrailTick = -1;
@@ -311,13 +346,13 @@ export class BattleScene extends Scene {
         corner(AX + ARENA_WIDTH + 8, AY + ARENA_HEIGHT + 8, true, true);
         this.add.image(AX + ARENA_WIDTH / 2, AY - 8, 'wall_gate').setDepth(1);
         this.add.image(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT + 8, 'wall_gate').setDepth(1).setFlipY(true);
-        const decal = (key: string, x: number, y: number) => {
-            this.add.image(AX + x, AY + y, key).setDepth(0).setAlpha(0.55);
+        const decal = (key: string, x: number, y: number): Phaser.GameObjects.Image => {
+            return this.add.image(AX + x, AY + y, key).setDepth(0).setAlpha(0.55);
         };
         decal('decor_crate', 44, 44);
         decal('decor_barrel', ARENA_WIDTH - 44, 44);
         decal('decor_vent', 44, ARENA_HEIGHT - 44);
-        decal('decor_lamp', ARENA_WIDTH - 44, ARENA_HEIGHT - 44);
+        this.lampImg = decal('decor_lamp', ARENA_WIDTH - 44, ARENA_HEIGHT - 44);
         // Arena obstacles: wall-textured blocks with an edge frame.
         for (const o of this.obstacles) {
             const cx = AX + o.x + o.w / 2;
@@ -383,24 +418,30 @@ export class BattleScene extends Scene {
             this.barBand.push(-1);
             if (snap.team === 0) this.total0 += 1;
             else this.total1 += 1;
-            // Spawn-in pop (chassis + tower + hub scale together).
-            // Reduced motion: robots simply appear, no pop or spawn rings.
-            if (!this.reducedMotion) {
-                body.setScale(0.5).setAlpha(0);
-                tower.setScale(0.5).setAlpha(0);
-                hub.setScale(0.5).setAlpha(0);
-                stripe.setAlpha(0);
-                (this.treads[i] as Phaser.GameObjects.Image).setAlpha(0);
-                this.tweens.add({ targets: [body, tower, hub], scale: 2, alpha: 1, duration: 350, delay: i * 90, ease: 'Back.easeOut' });
-                this.tweens.add({ targets: [stripe, this.treads[i] as Phaser.GameObjects.Image], alpha: 1, duration: 350, delay: i * 90 });
-                // Spawn ring pop at the spawn point.
-                const ring = this.add.image(AX + snap.x, AY + snap.y, 'spawn_a').setScale(2).setDepth(3).setAlpha(0.9);
-                this.time.delayedCall(i * 90, () => ring.setVisible(true));
-                ring.setVisible(false);
-                this.time.delayedCall(i * 90 + 130, () => ring.setTexture('spawn_b'));
-                this.time.delayedCall(i * 90 + 260, () => ring.destroy());
-            }
+            this.turA.push(snap.tower);
+            this.turV.push(0);
+            this.kick2T.push(0);
+            this.hubDip.push(0);
+            this.throesT.push(0);
+            this.throesDealer.push(-1);
+            this.throesStage.push(0);
+            this.introLanded.push(false);
         });
+        // Staged intro (replaces the old spawn-pop): telegraph ring → drop
+        // (Cubic ease-in + dust) → power-on (Back ease-out + aura flash),
+        // 120 ms stagger, acc held ≤1.2 s, skippable on any input.
+        // Reduced motion: robots simply appear, no hold.
+        if (!this.reducedMotion) {
+            const n = this.match.robotSnapshots.length;
+            this.introDur = Math.min(1.2, 0.55 + n * 0.12);
+            this.introElapsed = 0;
+            this.introActive = true;
+            this.introSkipHint = this.add
+                .text(AX + ARENA_WIDTH / 2, 712, BATTLE.introSkip, FONTS.monoSmall)
+                .setOrigin(0.5)
+                .setDepth(10)
+                .setAlpha(0.8);
+        }
 
         // Bullet + particle + explosion-flash pools (no mid-fight allocation).
         for (let i = 0; i < BULLET_POOL; i += 1) {
@@ -494,10 +535,12 @@ export class BattleScene extends Scene {
         this.input.keyboard?.on('keydown-M', this.onMuteKey);
         this.input.keyboard?.on('keydown-N', this.onStepKey);
         this.input.keyboard?.on('keydown-F', this.onDebugKey);
+        this.input.keyboard?.on('keydown', this.onIntroKey);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-SPACE', this.onSpaceKey);
             this.input.keyboard?.off('keydown', this.onPilotKeyDown);
             this.input.keyboard?.off('keyup', this.onPilotKeyUp);
+            this.input.keyboard?.off('keydown', this.onIntroKey);
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown-N', this.onStepKey);
             this.input.keyboard?.off('keydown-F', this.onDebugKey);
@@ -505,9 +548,22 @@ export class BattleScene extends Scene {
 
         if (this.request.tutorial === true) this.buildTutorial();
 
-        this.syncSprites(this.match.robotSnapshots, this.match.bulletSnapshots);
+        this.syncSprites(this.match.robotSnapshots, this.match.bulletSnapshots, 0);
         this.drawDynamic(this.match.robotSnapshots);
         playBattleStart();
+    }
+
+    /** Any key skips the staged intro (no-op once it has finished). */
+    private onIntroKey = (): void => {
+        this.finishIntro();
+    };
+
+    /** End the acc-hold; the next sync snaps every robot to its final state. */
+    private finishIntro(): void {
+        if (!this.introActive) return;
+        this.introActive = false;
+        this.introSkipHint?.destroy();
+        this.introSkipHint = null;
     }
 
     // ---- Onboarding tutorial: scripted spectated battle + coach marks ------
@@ -545,7 +601,6 @@ export class BattleScene extends Scene {
     }
 
     update(_time: number, delta: number): void {
-        void _time;
         const dt = Math.min(delta / 1000, 0.1);
         // FPS estimate drives auto-quality (evaluated once a second).
         this.fpsEma += (Math.min(1000 / Math.max(delta, 1), 120) - this.fpsEma) * 0.05;
@@ -562,15 +617,24 @@ export class BattleScene extends Scene {
             this.pilot.aimX = pointer.x - AX;
             this.pilot.aimY = pointer.y - AY;
         }
+        // Staged intro: hold acc (no ticks) until the drop finishes or the
+        // player skips. Replay-safe: tick content unchanged, only pacing.
+        if (this.introActive && !this.reducedMotion) {
+            this.introElapsed += dt;
+            if (this.introElapsed >= this.introDur) this.finishIntro();
+        }
+        if (this.slowmoT > 0 && !this.paused) this.slowmoT -= dt;
         let stepped = false;
-        if (!this.paused && !this.match.result.over) {
+        if (!this.paused && !this.match.result.over && !this.introActive) {
             // Hitstop: freeze acc (replay-safe: tick content unchanged, only
             // pacing) for a beat on kills/charged hits. Skipped in reduced
             // motion — the banner + wreck carry the event instead.
             if (this.hitstop > 0) {
                 this.hitstop -= 1;
             } else {
-                this.acc += dt * this.speed;
+                // Deciding-kill slow-mo: quarter acc-rate (C6: acc-gating, never
+                // timeScale — the sim cannot see pacing).
+                this.acc += dt * this.speed * (this.slowmoT > 0 ? 0.25 : 1);
                 let steps = 0;
                 while (this.acc >= DT && steps < 12 && !this.match.result.over) {
                     this.match.step();
@@ -601,10 +665,18 @@ export class BattleScene extends Scene {
         this.updateParticles(dt);
         this.decayEffects(dt);
         this.updateTrauma(dt);
-        this.syncSprites(snaps, bullets);
+        if (!this.paused) this.tickThroes(dt);
+        // Lamp idle flicker (idle life; static under reduced motion).
+        if (this.lampImg && !this.reducedMotion) {
+            this.lampImg.setAlpha(0.5 + 0.08 * Math.sin(_time / 130) + Math.random() * 0.04);
+        }
+        this.syncSprites(snaps, bullets, dt);
         this.drawDynamic(snaps);
         this.syncHud(snaps);
         if (this.match.result.over && !this.resultsShown) {
+            // Deciding-kill slow-mo holds the results panel ~0.8 s so the
+            // pre-fired banner + zoom read before the panel lands.
+            if (this.slowmoT > 0 && !this.reducedMotion) return;
             this.resultsShown = true;
             this.showResults();
         }
@@ -701,6 +773,7 @@ export class BattleScene extends Scene {
     private onAnyPointer = (): void => {
         unlockAudio();
         playClick();
+        this.finishIntro();
     };
 
     private onMuteKey = (): void => {
@@ -761,7 +834,18 @@ export class BattleScene extends Scene {
             if (s.shotsFired > p.shotsFired && s.alive) {
                 this.muzzleLife[i] = 0.09;
                 if (!this.reducedMotion) {
-                    this.recoil[i] = 5;
+                    // Per-weapon kick: heavy slams (7px + hub dip), twin
+                    // double-taps, light nudges (4px).
+                    const key = towerKey(this.robotIds[i] as string);
+                    if (key === 'tower_heavy') {
+                        this.recoil[i] = 7;
+                        this.hubDip[i] = 2.5;
+                    } else if (key === 'tower_twin') {
+                        this.recoil[i] = 5;
+                        this.kick2T[i] = 0.07;
+                    } else {
+                        this.recoil[i] = 4;
+                    }
                     this.punchT[i] = 0.06;
                 }
                 (this.muzzles[i] as Phaser.GameObjects.Image)
@@ -814,13 +898,53 @@ export class BattleScene extends Scene {
                 playEmp(s.x);
             }
             if (p.alive && !s.alive) {
-                this.explode(i, cx, cy, topDealer);
+                // Death-throes staging (reduced motion: detonate at once).
+                if (this.reducedMotion) this.explode(i, cx, cy, topDealer);
+                else this.startThroes(i, topDealer);
             }
             if (s.alive && s.health <= 30 && s.health > 0 && this.match.result.tick % 12 === 0) {
                 this.burst(cx, cy - 10, COLORS.faintNum, 1, 30, -60);
             }
         });
         this.prev = snaps;
+    }
+
+    /** Throes open: the chassis stays visible, jittering, until detonation. */
+    private startThroes(i: number, dealer: number): void {
+        this.throesT[i] = 0.45;
+        this.throesDealer[i] = dealer;
+        this.throesStage[i] = 0;
+    }
+
+    /**
+     * Capped death-throes (C13): ≤2 pre-flashes + 2 spark bursts + scale
+     * jitter over ≤450 ms, then the delayed detonation. The kill banner
+     * fires from explode(), so it lands post-detonation.
+     */
+    private tickThroes(dt: number): void {
+        for (let i = 0; i < this.throesT.length; i += 1) {
+            const t = this.throesT[i] as number;
+            if (t <= 0) continue;
+            const next = t - dt;
+            this.throesT[i] = next;
+            const snap = this.match.robotSnapshots[i] as RobotSnapshot;
+            const cx = AX + snap.x;
+            const cy = AY + snap.y;
+            const stage = this.throesStage[i] as number;
+            if (stage === 0 && next <= 0.3) {
+                this.throesStage[i] = 1;
+                this.hurtT[i] = 2;
+                this.burst(cx, cy, COLORS.white, 6, 150, 200);
+            } else if (stage === 1 && next <= 0.15) {
+                this.throesStage[i] = 2;
+                this.hurtT[i] = 2;
+                this.burst(cx, cy, COLORS.gold, 6, 150, 200);
+            }
+            if (next <= 0) {
+                this.throesT[i] = -1;
+                this.explode(i, cx, cy, this.throesDealer[i] as number);
+            }
+        }
     }
 
     private explode(i: number, cx: number, cy: number, dealer: number): void {
@@ -837,6 +961,7 @@ export class BattleScene extends Scene {
             this.cameras.main.flash(70, 255, 255, 255);
         }
         this.fireRing(cx, cy, true);
+        this.killZoom();
         playExplosion(snap.x);
         // Framed explosion from the pool (6 slots for 6 robots max), then a
         // persistent per-archetype wreck. The fallback allocates only if a
@@ -859,6 +984,12 @@ export class BattleScene extends Scene {
         const wreck = this.add.image(cx, cy, wreckKey(robotId)).setScale(2).setDepth(3);
         wreck.setRotation(snap.heading + 0.5);
         wreck.setAlpha(0.95);
+        // Wreck settle: Bounce ease-out + a dust kick (static when reduced).
+        if (!this.reducedMotion) {
+            wreck.setScale(2.6);
+            this.tweens.add({ targets: wreck, scale: 2, duration: 380, ease: 'Bounce.easeOut' });
+            this.burst(cx, cy + 10, COLORS.faintNum, 5, 70, 260);
+        }
         const victim = (this.request.skins[i] as SlotSkin).callsign;
         if (!this.firstBlood) {
             this.firstBlood = true;
@@ -912,6 +1043,54 @@ export class BattleScene extends Scene {
             duration: big ? 450 : 320,
             ease: 'Cubic.easeOut',
             onComplete: () => ring.setVisible(false),
+        });
+    }
+
+    /**
+     * Kill-zoom: a 1.06 punch chained back to 1.0 on every kill. The deciding
+     * kill instead opens the slow-mo window (0.25× acc-rate + results hold)
+     * with a pre-fired verdict banner. All skipped under reduced motion;
+     * results timing is unchanged there.
+     */
+    private killZoom(): void {
+        if (this.reducedMotion || this.resultsShown) return;
+        const snaps = this.match.robotSnapshots;
+        let alive0 = 0;
+        let alive1 = 0;
+        for (const s of snaps) {
+            if (!s.alive) continue;
+            if (s.team === 0) alive0 += 1;
+            else alive1 += 1;
+        }
+        const deciding = alive0 === 0 || alive1 === 0;
+        const cam = this.cameras.main;
+        if (deciding) {
+            const winner: -1 | 0 | 1 = alive0 === 0 && alive1 === 0 ? -1 : alive0 === 0 ? 1 : 0;
+            this.slowmoT = 0.8;
+            this.queueBanner(
+                resultsTitle(this.request.pilot === true, winner),
+                winner === -1 ? COLORS.ink : teamCss(winner),
+            );
+            if (!this.zoomBusy) {
+                this.zoomBusy = true;
+                cam.zoomTo(1.12, 280, 'Quad.easeOut');
+                this.time.delayedCall(800, () => {
+                    cam.zoomTo(1.0, 300, 'Quad.easeInOut');
+                    this.time.delayedCall(320, () => {
+                        this.zoomBusy = false;
+                    });
+                });
+            }
+            return;
+        }
+        if (this.zoomBusy) return;
+        this.zoomBusy = true;
+        cam.zoomTo(1.06, 140, 'Quad.easeOut');
+        this.time.delayedCall(150, () => {
+            cam.zoomTo(1.0, 260, 'Quad.easeInOut');
+            this.time.delayedCall(280, () => {
+                this.zoomBusy = false;
+            });
         });
     }
 
@@ -1055,6 +1234,16 @@ export class BattleScene extends Scene {
                 const next = rec * Math.exp(-dt * 10);
                 this.recoil[i] = next < 0.05 ? 0 : next;
             }
+            // Twin double-tap: the second barrel lands 70 ms after the first.
+            if ((this.kick2T[i] as number) > 0) {
+                this.kick2T[i] = (this.kick2T[i] as number) - dt;
+                if ((this.kick2T[i] as number) <= 0) this.recoil[i] = Math.max(this.recoil[i] as number, 3);
+            }
+            const dip = this.hubDip[i] as number;
+            if (dip > 0) {
+                const next = dip * Math.exp(-dt * 12);
+                this.hubDip[i] = next < 0.05 ? 0 : next;
+            }
             if ((this.punchT[i] as number) > 0) this.punchT[i] = (this.punchT[i] as number) - dt;
         }
         for (let i = this.indicators.length - 1; i >= 0; i -= 1) {
@@ -1064,7 +1253,7 @@ export class BattleScene extends Scene {
         }
     }
 
-    private syncSprites(snaps: RobotSnapshot[], bullets: BulletSnapshot[]): void {
+    private syncSprites(snaps: RobotSnapshot[], bullets: BulletSnapshot[], dt: number): void {
         const tick = this.match.result.tick;
         snaps.forEach((s, i) => {
             const cx = AX + s.x;
@@ -1075,7 +1264,35 @@ export class BattleScene extends Scene {
             const ring = (body as Phaser.GameObjects.Image & { ring?: Phaser.GameObjects.Graphics }).ring;
             const stripe = this.stripes[i] as Phaser.GameObjects.Rectangle;
             const skin = this.request.skins[i] as SlotSkin;
-            const visible = s.alive;
+            const throes = (this.throesT[i] as number) > 0;
+            const visible = s.alive || throes;
+            // Staged-intro analytic phases (local time, 120 ms stagger):
+            // hidden → drop (Cubic ease-in, −46 px) → power-on (Back
+            // ease-out 1.2→2 + aura flash). Pure function of elapsed time,
+            // so skip/pauses snap cleanly.
+            let dropY = 0;
+            let introAlpha = 1;
+            let introScale = 2;
+            let auraFlash = 0;
+            if (this.introActive && !this.reducedMotion) {
+                const lt = this.introElapsed - i * 0.12;
+                if (lt < 0) {
+                    introAlpha = 0;
+                } else if (lt < 0.25) {
+                    const t = lt / 0.25;
+                    dropY = -46 * (1 - t * t * t);
+                    introAlpha = t;
+                } else {
+                    if (!(this.introLanded[i] as boolean)) {
+                        this.introLanded[i] = true;
+                        this.burst(cx, cy + 10, COLORS.faintNum, 5, 70, 260);
+                    }
+                    const t = Math.min((lt - 0.25) / 0.25, 1);
+                    const e = 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
+                    introScale = 1.2 + 0.8 * e;
+                    auraFlash = 1 - t;
+                }
+            }
             // Step delta (render-side, from position deltas): drives treads,
             // lean, and bob. Correct under pause/slow-mo by construction.
             const lx = this.treadLastX[i] as number;
@@ -1093,11 +1310,30 @@ export class BattleScene extends Scene {
                 ox = Math.cos(s.heading) * lean;
                 oy = Math.sin(s.heading) * lean + Math.sin((tick + i * 9) / 5);
             }
-            const px = cx + ox;
-            const py = cy + oy;
+            let px = cx + ox;
+            let py = cy + oy + dropY;
+            // Death-throes jitter: ±2.5 px shake (throes only run unreduced).
+            if (throes) {
+                px += (Math.random() * 2 - 1) * 2.5;
+                py += (Math.random() * 2 - 1) * 2.5;
+            }
+            // Turret spring: critically-damped lag/overshoot (k~180, d~22).
+            // Reduced motion keeps the direct set (no lag, no overshoot).
+            let aim = s.tower;
+            if (!this.reducedMotion && visible) {
+                const err = wrapAngle(s.tower - (this.turA[i] as number));
+                const v = (this.turV[i] as number) + (err * 180 - (this.turV[i] as number) * 22) * dt;
+                this.turV[i] = v;
+                this.turA[i] = (this.turA[i] as number) + v * dt;
+                aim = this.turA[i] as number;
+            } else {
+                this.turA[i] = s.tower;
+                this.turV[i] = 0;
+            }
             // Treads: distance-keyed frame swap (static under reduced motion).
             const tread = this.treads[i] as Phaser.GameObjects.Image;
-            tread.setVisible(visible).setPosition(px, py).setRotation(s.heading);
+            tread.setVisible(visible && introAlpha > 0.05).setPosition(px, py).setRotation(s.heading);
+            tread.setAlpha(introAlpha);
             if (visible && !this.reducedMotion) {
                 this.treadAcc[i] = (this.treadAcc[i] as number) + stepLen;
                 if ((this.treadAcc[i] as number) >= TREAD_SWAP_PX) {
@@ -1122,17 +1358,36 @@ export class BattleScene extends Scene {
             }
             const aura = this.auras[i] as Phaser.GameObjects.Image;
             const charging = visible && s.charge > 0.05;
-            aura.setVisible(charging).setPosition(px, py);
-            if (charging) aura.setAlpha(0.25 + 0.55 * s.charge);
-            if (charging && !this.reducedMotion) aura.setRotation(tick / 24);
-            body.setVisible(visible).setPosition(px, py).setRotation(s.heading);
-            stripe.setVisible(visible && skin.finish === 'Stripe').setPosition(px, py).setRotation(s.heading);
+            const auraOn = charging || auraFlash > 0;
+            aura.setVisible(auraOn && introAlpha > 0.05).setPosition(px, py);
+            // Charge pulse: the aura throbs harder as the bank fills; full
+            // charge pins it near-opaque (plus a muzzle pre-glow dot in dyn).
+            if (auraOn) {
+                const pulse = this.reducedMotion ? 0 : 0.12 * Math.sin(tick / 3) * s.charge;
+                aura.setAlpha(Math.min(0.25 + 0.55 * Math.max(s.charge, auraFlash) + pulse, 1) * introAlpha);
+            }
+            if (auraOn && !this.reducedMotion) aura.setRotation(tick / 24);
+            // Idle breathing: 2±0.03 (intro/throes own the scale otherwise).
+            let chassisScale = introScale;
+            if (!this.reducedMotion && !this.introActive) {
+                chassisScale = throes ? 2 + Math.random() * 0.15 : 2 + 0.03 * Math.sin((tick + i * 13) / 14);
+            }
+            body
+                .setVisible(visible && introAlpha > 0.05)
+                .setPosition(px, py)
+                .setRotation(s.heading)
+                .setScale(chassisScale)
+                .setAlpha(introAlpha);
+            stripe
+                .setVisible(visible && skin.finish === 'Stripe' && introAlpha > 0.05)
+                .setPosition(px, py)
+                .setRotation(s.heading)
+                .setAlpha(introAlpha);
             const rec = this.recoil[i] as number;
-            const tx = px - Math.cos(s.tower) * rec;
-            const ty = py - Math.sin(s.tower) * rec;
-            tower.setVisible(visible).setPosition(tx, ty).setRotation(s.tower);
-            // Scale punch: touch scale only across the punch window so the
-            // spawn-pop tween owns it otherwise.
+            const tx = px - Math.cos(aim) * rec;
+            const ty = py - Math.sin(aim) * rec;
+            tower.setVisible(visible && introAlpha > 0.05).setPosition(tx, ty).setRotation(aim).setAlpha(introAlpha);
+            // Scale punch: touch scale only across the punch window.
             if ((this.punchT[i] as number) > 0) {
                 tower.setScale(2.3);
                 this.punchOn[i] = true;
@@ -1140,22 +1395,29 @@ export class BattleScene extends Scene {
                 tower.setScale(2);
                 this.punchOn[i] = false;
             }
-            hub.setVisible(visible).setPosition(tx, ty).setRotation(0);
-            if (ring) ring.setVisible(visible).setPosition(px, py);
+            // Heavy hub dip: the hub presses back along the aim axis.
+            const dip = this.hubDip[i] as number;
+            hub
+                .setVisible(visible && introAlpha > 0.05)
+                .setPosition(tx - Math.cos(aim) * dip, ty - Math.sin(aim) * dip)
+                .setRotation(0)
+                .setAlpha(introAlpha);
+            if (ring) ring.setVisible(visible).setPosition(px, py).setAlpha(introAlpha);
             // Muzzle flash.
             const muzzle = this.muzzles[i] as Phaser.GameObjects.Image;
             const show = visible && (this.muzzleLife[i] as number) > 0;
             muzzle.setVisible(show);
             if (show) {
-                muzzle.setPosition(cx + Math.cos(s.tower) * 30, cy + Math.sin(s.tower) * 30);
-                muzzle.setRotation(s.tower);
+                muzzle.setPosition(cx + Math.cos(aim) * 30, cy + Math.sin(aim) * 30);
+                muzzle.setRotation(aim);
             }
             // Health bar + name.
             const frac = Math.max(s.health, 0) / s.maxHealth;
             const bg = this.barBg[i] as Phaser.GameObjects.Rectangle;
             const fg = this.barFg[i] as Phaser.GameObjects.Rectangle;
-            bg.setVisible(visible).setPosition(cx, cy - 28);
-            fg.setVisible(visible).setPosition(cx - 22 + (44 * frac) / 2, cy - 28);
+            const plateOn = visible && introAlpha > 0.5;
+            bg.setVisible(plateOn).setPosition(cx, cy - 28);
+            fg.setVisible(plateOn).setPosition(cx - 22 + (44 * frac) / 2, cy - 28);
             fg.setSize(44 * frac, 4);
             const band = frac > 0.5 ? 2 : frac > 0.25 ? 1 : 0;
             if (band !== this.barBand[i]) {
@@ -1163,11 +1425,11 @@ export class BattleScene extends Scene {
                 fg.setFillStyle(band === 2 ? COLORS.accent : band === 1 ? COLORS.team[0] : COLORS.danger);
             }
             const label = this.nameTexts[i] as Phaser.GameObjects.Text;
-            label.setVisible(true).setPosition(cx, cy - 40);
+            label.setVisible(introAlpha > 0.5).setPosition(cx, cy - 40);
             if (!s.alive) label.setColor(COLORS.faint);
             // Cooldown pips under the chassis; text only re-renders on change.
             const pips = this.pipTexts[i] as Phaser.GameObjects.Text;
-            pips.setVisible(visible).setPosition(cx, cy + 30);
+            pips.setVisible(plateOn).setPosition(cx, cy + 30);
             if (visible) {
                 const text = cooldownPips(s.dashCd <= 0, s.empCd <= 0);
                 if (text !== this.pipCache[i]) {
@@ -1224,10 +1486,26 @@ export class BattleScene extends Scene {
         // Anti-clutter rule: FOV cones dim while charged fire is live, paying
         // for the added tracer brightness (no net glow growth).
         const coneAlpha = this.hotLive ? 0.035 : 0.07;
+        // Staged-intro telegraph rings: shrinking team circles on each pad
+        // until its robot drops (drawn in dyn: zero new objects).
+        if (this.introActive && !this.reducedMotion) {
+            snaps.forEach((s, i) => {
+                const lt = this.introElapsed - i * 0.12;
+                if (lt >= 0.25) return;
+                const t = Math.max(lt, 0) / 0.25;
+                g.lineStyle(2, teamColor(s.team), 0.85);
+                g.strokeCircle(AX + s.x, AY + s.y, 34 - 14 * t);
+            });
+        }
         for (const s of snaps) {
             if (!s.alive) continue;
             const cx = AX + s.x;
             const cy = AY + s.y;
+            // Full-charge muzzle pre-glow dot (shape + position, not color-only).
+            if (s.charge >= 1) {
+                g.fillStyle(COLORS.gold, 0.9);
+                g.fillCircle(cx + Math.cos(s.tower) * 32, cy + Math.sin(s.tower) * 32, 3);
+            }
             const a0 = s.tower - s.fov / 2;
             const a1 = s.tower + s.fov / 2;
             g.fillStyle(teamColor(s.team), coneAlpha);

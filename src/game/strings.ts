@@ -422,6 +422,7 @@ export const BATTLE = {
     replayLabel: 'REPLAY CODE - CLICK CODE TO COPY',
     replayCopied: 'REPLAY CODE - COPIED!',
     replayCopyFailed: 'REPLAY CODE - COPY FAILED',
+    introSkip: 'INPUT TO SKIP',
     rematch: 'REMATCH',
     /** Reel navigation: NEXT steps the reel, EXIT returns to the showcase. */
     exitShowcase: 'EXIT',
