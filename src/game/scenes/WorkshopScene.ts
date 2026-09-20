@@ -12,7 +12,7 @@ import {
     workshopDownloaded,
     workshopSummary,
 } from '../strings';
-import { FONTS } from '../theme';
+import { COLORS, FONTS } from '../theme';
 import { copyText, downloadText } from '../ui';
 import { checkRobotSource, suggestFilename, WORKSHOP_TEMPLATE, workshopPassed } from '../workshop';
 
@@ -127,7 +127,7 @@ export class WorkshopScene extends Scene {
         const button = document.createElement('button');
         button.textContent = label;
         button.style.cssText =
-            `flex:1;background:${accent ? '#1d2530' : '#141a21'};` +
+            `flex:1;background:${accent ? COLORS.panelHoverCss : COLORS.panelCss};` +
             `border:2px solid ${accent ? '#ffb340' : '#2b3542'};color:#e8edf2;padding:12px;` +
             'font-family:inherit;font-size:12px;cursor:pointer;';
         button.addEventListener('click', () => {
@@ -149,7 +149,7 @@ export class WorkshopScene extends Scene {
         const passed = checks.filter((check) => check.pass).length;
         const ok = workshopPassed(checks);
         this.summary.textContent = workshopSummary(suggestFilename(source), passed, checks.length);
-        this.summary.style.color = ok ? '#7de08a' : '#ffd23f';
+        this.summary.style.color = ok ? '#7de08a' : COLORS.goldCss;
         this.checksBox.replaceChildren();
         for (const check of checks) {
             const row = document.createElement('div');

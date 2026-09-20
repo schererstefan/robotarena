@@ -171,7 +171,7 @@ export class ShowcaseScene extends Scene {
         const rate = this.trackTab(
             this.add.text(x - 225, y - 22, showcaseRateLine(champ.stats.before.winRate, champ.stats.after.winRate), FONTS.mono).setOrigin(0, 0.5),
         );
-        rate.setColor('#ffd23f');
+        rate.setColor(COLORS.goldCss);
         const boardLine = champ.board ? onlineRow(champ.board.elo, champ.board.wins, champ.board.losses, champ.board.draws) : SHOWCASE.unrated;
         this.trackTab(this.add.text(x - 225, y + 2, boardLine, FONTS.monoSmall).setOrigin(0, 0.5));
         const by = y + 40;
@@ -216,7 +216,7 @@ export class ShowcaseScene extends Scene {
                     .setDepth(50),
             );
             const rate = track(this.add.text(col.x, 230, statsPct(col.games, col.winRate), FONTS.mono).setOrigin(0.5).setDepth(50));
-            rate.setColor('#ffd23f');
+            rate.setColor(COLORS.goldCss);
         }
         // Featured replays.
         track(this.add.text(CX, 272, SHOWCASE.replaysTitle, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));

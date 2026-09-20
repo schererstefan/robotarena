@@ -5,12 +5,7 @@
 
 type PixelMap = string[];
 
-export const PALETTE_ADDITIONS: Record<string, string> = {
-    p: '#12171d', // plate base
-    q: '#1b232d', // faint edge highlight
-    h: '#3d444c', // vent slat
-    a: '#8a6d1f', // dim amber hazard
-};
+// p/q/h/a live in the base PALETTE (plate, edge, slat, amber).
 
 // A: plain plate with inset 1px seam + faint top highlight.
 export const FLOOR_A: PixelMap = [

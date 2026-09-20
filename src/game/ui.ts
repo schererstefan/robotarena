@@ -1,6 +1,7 @@
 // Minimal UI helpers: buttons and panels drawn with rectangles + text.
 
 import { Scene } from 'phaser';
+import { isReducedMotion } from './accessibility';
 import { COLORS, FONTS } from './theme';
 
 export interface Button {
@@ -27,22 +28,47 @@ export function makeButton(
     // overlapping hit rects would misroute taps to the topmost control.
     let hit: Phaser.GameObjects.Rectangle | null = null;
     if (minTouch > 0 && (w < minTouch || h < minTouch)) {
-        hit = scene.add.rectangle(x, y, Math.max(w, minTouch), Math.max(h, minTouch), 0xffffff, 0).setDepth(depth);
+        hit = scene.add.rectangle(x, y, Math.max(w, minTouch), Math.max(h, minTouch), COLORS.white, 0).setDepth(depth);
     }
     const showHover = (): void => {
-        bg.setFillStyle(0x1d2530);
+        bg.setFillStyle(COLORS.panelHover);
         bg.setStrokeStyle(2, COLORS.team[0]);
     };
     const hideHover = (): void => {
         bg.setFillStyle(COLORS.panel);
         bg.setStrokeStyle(2, COLORS.panelEdge);
     };
+    // Press state: instant down-tint dip (kept under reduced motion — it is
+    // state, not animation) + an 80 ms 0.96→1 scale punch (motion-gated).
+    const reduced = isReducedMotion();
+    const press = (): void => {
+        bg.setFillStyle(COLORS.press);
+        bg.setStrokeStyle(2, COLORS.team[0]);
+        if (!reduced) {
+            scene.tweens.killTweensOf([bg, text]);
+            bg.setScale(0.96);
+            text.setScale(0.96);
+        }
+    };
+    const release = (): void => {
+        showHover();
+        if (reduced) return;
+        scene.tweens.add({ targets: [bg, text], scale: 1, duration: 80, ease: 'Quad.easeOut' });
+    };
     const interactives: Phaser.GameObjects.Rectangle[] = hit ? [bg, hit] : [bg];
     for (const target of interactives) {
         target.setInteractive({ useHandCursor: true });
         target.on('pointerover', showHover);
-        target.on('pointerout', hideHover);
-        target.on('pointerdown', onClick);
+        target.on('pointerout', () => {
+            hideHover();
+            bg.setScale(1);
+            text.setScale(1);
+        });
+        target.on('pointerdown', () => {
+            press();
+            onClick();
+        });
+        target.on('pointerup', release);
     }
     return {
         setLabel: (next: string) => text.setText(next),
@@ -52,6 +78,11 @@ export function makeButton(
                 else target.disableInteractive();
             }
             text.setAlpha(enabled ? 1 : 0.4);
+            if (!enabled) {
+                hideHover();
+                bg.setScale(1);
+                text.setScale(1);
+            }
         },
         destroy: () => {
             bg.destroy();
@@ -71,7 +102,7 @@ export function addTouchHit(
     onClick: () => void,
     depth = 0,
 ): Phaser.GameObjects.Rectangle {
-    const hit = scene.add.rectangle(x, y, w, h, 0xffffff, 0).setDepth(depth);
+    const hit = scene.add.rectangle(x, y, w, h, COLORS.white, 0).setDepth(depth);
     hit.setInteractive({ useHandCursor: true });
     hit.on('pointerdown', onClick);
     return hit;

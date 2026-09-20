@@ -6,7 +6,7 @@ import { getRobot, ROBOTS } from '../../robots/registry';
 import { modifierCodes, type ArenaId, type MatchModifiers } from '../../sim/constants';
 import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
-import { chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
+import { artRegistry, chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
 import { isMuted, playClick, toggleMuted, unlockAudio } from '../audio';
 import {
     clearDailyBoard,
@@ -149,6 +149,7 @@ export class MenuScene extends Scene {
     private tourTitle!: Phaser.GameObjects.Text;
     private tourBody!: Phaser.GameObjects.Text;
     private tourNext: Button | null = null;
+    private artPreview: Phaser.GameObjects.Container | null = null;
 
     constructor() {
         super('Menu');
@@ -172,6 +173,7 @@ export class MenuScene extends Scene {
         this.tourButtons = [];
         this.tourStep = 0;
         this.tourNext = null;
+        this.artPreview = null;
         this.navBase = [];
         this.navSlots = [];
         this.showcaseButton = null;
@@ -262,9 +264,11 @@ export class MenuScene extends Scene {
         this.input.on('pointerdown', this.onAnyPointer);
         this.input.keyboard?.on('keydown-M', this.onMuteKey);
         this.input.keyboard?.on('keydown', this.onNavKey);
+        this.input.keyboard?.on('keydown-G', this.onDebugArtKey);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown', this.onNavKey);
+            this.input.keyboard?.off('keydown-G', this.onDebugArtKey);
             this.closeReplayDialog();
             this.closeImportDialog();
             this.stopTicker();
@@ -284,6 +288,32 @@ export class MenuScene extends Scene {
             return;
         }
         this.nav.handleKey(event);
+    };
+
+    /** Hidden G key: toggle the 4x art-atlas preview grid (dev only). */
+    private onDebugArtKey = (): void => {
+        const active = document.activeElement;
+        if (active instanceof HTMLInputElement || active instanceof HTMLSelectElement || active instanceof HTMLTextAreaElement) {
+            return;
+        }
+        if (this.artPreview) {
+            this.artPreview.destroy(true);
+            this.artPreview = null;
+            return;
+        }
+        const keys = artRegistry().map((entry) => entry.key);
+        const panel = this.add.container(0, 0).setDepth(200);
+        panel.add(this.add.rectangle(CX, 384, 1000, 720, 0x0b0e12, 0.96));
+        const perRow = 9;
+        keys.forEach((key, i) => {
+            const col = i % perRow;
+            const row = Math.floor(i / perRow);
+            const x = 92 + col * 96;
+            const y = 78 + row * 104;
+            panel.add(this.add.image(x, y, key).setScale(4));
+            panel.add(this.add.text(x, y + 44, key, { ...FONTS.monoSmall, fontSize: '10px' }).setOrigin(0.5, 0));
+        });
+        this.artPreview = panel;
     };
 
     // ---- Keyboard navigation ----------------------------------------------
@@ -596,7 +626,7 @@ export class MenuScene extends Scene {
         const loadout = this.loadouts[slot] as SkillLoadout;
         const spent = loadoutCost(loadout);
         this.editorPoints.setText(editorPoints(spent));
-        this.editorPoints.setColor(spent >= SKILL_BUDGET ? '#ffd23f' : COLORS.ink);
+        this.editorPoints.setColor(spent >= SKILL_BUDGET ? COLORS.goldCss : COLORS.ink);
 
         const targets: NavTarget[] = [];
         SKILL_DEFS.forEach((def, row) => {
@@ -861,7 +891,7 @@ export class MenuScene extends Scene {
             'color:#e8edf2;padding:8px;font-family:inherit;font-size:12px;" />' +
             '<div class="replay-error" style="color:#ff5d5d;font-size:12px;min-height:18px;margin-top:6px;"></div>' +
             '<div style="display:flex;gap:8px;margin-top:8px;">' +
-            '<button class="replay-watch" style="flex:1;background:#1d2530;border:2px solid #ffb340;' +
+            `<button class="replay-watch" style="flex:1;background:${COLORS.panelHoverCss};border:2px solid #ffb340;` +
             `color:#e8edf2;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${REPLAY_DIALOG.watch}</button>` +
             '<button class="replay-cancel" style="flex:1;background:#141a21;border:2px solid #2b3542;' +
             `color:#9aa7b4;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${COMMON.cancel}</button>` +
@@ -940,7 +970,7 @@ export class MenuScene extends Scene {
             .join('');
         panel.innerHTML =
             `<div style="color:#e8edf2;font-size:14px;margin-bottom:4px;">${IMPORT_DIALOG.title}</div>` +
-            `<div style="color:#ffd23f;font-size:12px;margin-bottom:12px;">${IMPORT_DIALOG.warning}</div>` +
+            `<div style="color:${COLORS.goldCss};font-size:12px;margin-bottom:12px;">${IMPORT_DIALOG.warning}</div>` +
             `<div style="color:#9aa7b4;font-size:12px;margin-bottom:8px;">${IMPORT_DIALOG.fileLabel}</div>` +
             '<input type="file" accept=".js,.mjs" class="import-file" ' +
             'style="width:100%;box-sizing:border-box;color:#e8edf2;font-family:inherit;font-size:12px;margin-bottom:8px;" />' +
@@ -954,7 +984,7 @@ export class MenuScene extends Scene {
             `${slotOptions}</select>` +
             '<div class="import-status" style="color:#ff5d5d;font-size:12px;min-height:18px;margin-top:6px;"></div>' +
             '<div style="display:flex;gap:8px;margin-top:8px;">' +
-            '<button class="import-go" style="flex:1;background:#1d2530;border:2px solid #ffb340;' +
+            `<button class="import-go" style="flex:1;background:${COLORS.panelHoverCss};border:2px solid #ffb340;` +
             `color:#e8edf2;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${IMPORT_DIALOG.import}</button>` +
             '<button class="import-cancel" style="flex:1;background:#141a21;border:2px solid #2b3542;' +
             `color:#9aa7b4;padding:12px;font-family:inherit;font-size:12px;cursor:pointer;">${COMMON.cancel}</button>` +

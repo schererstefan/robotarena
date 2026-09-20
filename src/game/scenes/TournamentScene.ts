@@ -310,8 +310,8 @@ export class TournamentScene extends Scene {
                 const isLive = this.live !== null && this.live.round === r && this.live.index === i;
                 const edge = isLive ? COLORS.team[0] : COLORS.panelEdge;
                 this.trackBracket(this.add.rectangle(pos.x, pos.y, boxW, boxH, COLORS.panel).setStrokeStyle(2, edge));
-                const colorA = slot.winner === null ? COLORS.ink : slot.winner === slot.a ? '#ffd23f' : '#5d6a78';
-                const colorB = slot.winner === null ? COLORS.ink : slot.winner === slot.b ? '#ffd23f' : '#5d6a78';
+                const colorA = slot.winner === null ? COLORS.ink : slot.winner === slot.a ? COLORS.goldCss : COLORS.faint;
+                const colorB = slot.winner === null ? COLORS.ink : slot.winner === slot.b ? COLORS.goldCss : COLORS.faint;
                 const textA = this.trackBracket(
                     this.add.text(pos.x - boxW / 2 + 12, pos.y - 26, this.nameOf(slot.a), FONTS.buttonSmall).setOrigin(0, 0.5),
                 );
@@ -354,7 +354,7 @@ export class TournamentScene extends Scene {
             const label = this.trackBracket(
                 this.add.text(CX, 678, championLabel(champ ? this.nameOf(champ) : null), FONTS.heading).setOrigin(0.5),
             );
-            label.setColor('#ffd23f');
+            label.setColor(COLORS.goldCss);
             this.bracketButton(CX - 240, 726, 200, 36, TOURNAMENT.runAgain, () => this.startTournament());
             this.bracketButton(CX, 726, 200, 36, TOURNAMENT.lineup, () => {
                 for (const obj of this.bracketObjects) obj.destroy();

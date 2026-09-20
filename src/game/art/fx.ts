@@ -1,13 +1,9 @@
 // FX sprite drafts: explosion sequence, shockwave ring, charge aura.
 // Format matches src/game/art.ts: string pixel maps, '.' = transparent.
-// Base palette chars: k d m l w r g y. Extra colors below in PALETTE_ADDITIONS.
+// Base palette chars: k d m l w r g y, plus o (fire mid-tone) and
+// s (smoke gray), both in the base PALETTE.
 
 type PixelMap = string[];
-
-export const PALETTE_ADDITIONS: Record<string, string> = {
-    o: '#ff8c1a', // blaze orange (fire mid-tone)
-    s: '#4b4b55', // dark smoke gray
-};
 
 // Frame 1: white flash ball with amber rim + vertical spark tips.
 export const BOOM_1: PixelMap = [

@@ -22,7 +22,8 @@ import { CHASSIS_V2 } from './art/chassis';
 import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_VENT } from './art/decor';
 import { FLOOR_A, FLOOR_B, FLOOR_C, FLOOR_D } from './art/floor';
 import { BOOM_1, BOOM_2, BOOM_3, BOOM_4, CHARGE_AURA, RING_FX } from './art/fx';
-import { LOGO_BAR, PANEL_TILE, SKILL_ICONS } from './art/menu';
+import { LOGO_BAR, SKILL_ICONS } from './art/menu';
+import { validateArt } from './art/validate';
 import { BULLET_CHARGED, BULLET_V2, SPARK_V2, TRACER } from './art/projectiles';
 import { HUB_V2, MUZZLE_V2, TOWER_HEAVY, TOWER_LIGHT, TOWER_TWIN } from './art/towers';
 import { WALL_CORNER, WALL_GATE, WALL_V2 } from './art/walls';
@@ -48,6 +49,62 @@ const PALETTE: Record<string, string> = {
     a: '#8a6d1f',
     h: '#3d444c',
 };
+
+/** Legal pixel-map chars: '.' (transparent) + every palette key. */
+export const ART_CHARSET = `.${Object.keys(PALETTE).join('')}`;
+
+export interface ArtEntry {
+    key: string;
+    map: PixelMap;
+    /** Declared bake dims, locked by the ?debugart validator. */
+    w: number;
+    h: number;
+}
+
+/**
+ * Every texture key baked by ensureArtTextures (minus floor_big, which is a
+ * 960x640 composite). Single source of truth for baking + validation.
+ */
+export function artRegistry(): ArtEntry[] {
+    const entries: ArtEntry[] = [];
+    for (const [id, map] of Object.entries(CHASSIS_V2)) entries.push({ key: `chassis_${id}`, map, w: 16, h: 16 });
+    for (const [id, map] of Object.entries(WRECKS)) entries.push({ key: `wreck_${id}`, map, w: 16, h: 16 });
+    for (const [id, map] of Object.entries(SKILL_ICONS)) entries.push({ key: `skill_${id}`, map: map as PixelMap, w: 8, h: 8 });
+    const fixed: Array<[string, PixelMap, number, number]> = [
+        ['tower_light', TOWER_LIGHT, 16, 16],
+        ['tower_heavy', TOWER_HEAVY, 16, 16],
+        ['tower_twin', TOWER_TWIN, 16, 16],
+        ['hub', HUB_V2, 16, 16],
+        ['muzzle', MUZZLE_V2, 8, 8],
+        ['muzzle_big', BIG_MUZZLE, 8, 8],
+        ['bullet', BULLET_V2, 4, 4],
+        ['bullet_hot', BULLET_CHARGED, 6, 6],
+        ['spark', SPARK_V2, 2, 2],
+        ['tracer', TRACER, 8, 2],
+        ['tile_wall', WALL_V2, 16, 16],
+        ['wall_corner', WALL_CORNER, 16, 16],
+        ['wall_gate', WALL_GATE, 16, 16],
+        ['boom_1', BOOM_1, 16, 16],
+        ['boom_2', BOOM_2, 16, 16],
+        ['boom_3', BOOM_3, 16, 16],
+        ['boom_4', BOOM_4, 16, 16],
+        ['ring_fx', RING_FX, 16, 16],
+        ['charge_aura', CHARGE_AURA, 16, 16],
+        ['logo_bar', LOGO_BAR, 32, 8],
+        ['decor_crate', DECOR_CRATE, 16, 16],
+        ['decor_barrel', DECOR_BARREL, 16, 16],
+        ['decor_lamp', DECOR_LAMP, 16, 16],
+        ['decor_vent', DECOR_VENT, 16, 16],
+        ['spawn_a', SPAWN_A, 16, 16],
+        ['spawn_b', SPAWN_B, 16, 16],
+        ['recoil_a', RECOIL_A, 16, 16],
+        ['recoil_b', RECOIL_B, 16, 16],
+        ['treads_a', TREADS_A, 16, 4],
+        ['treads_b', TREADS_B, 16, 4],
+    ];
+    for (const [key, map, w, h] of fixed) entries.push({ key, map, w, h });
+    return entries;
+}
 
 const TOWER_FOR_ROBOT: Record<string, string> = {
     rusher: 'tower_twin',
@@ -100,7 +157,16 @@ function floorTileAt(tx: number, ty: number): PixelMap {
     return FLOOR_A;
 }
 
-/** Compose the full 960x640 arena floor once; render as a single image. */
+function hexToRgb(hex: string): [number, number, number] {
+    return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+}
+
+/**
+ * Compose the full 960x640 arena floor once; render as a single image.
+ * Single ImageData blit: each floor tile pre-expands to RGBA once via an
+ * RGB LUT, then rows memcpy into place (~10-50x faster than per-pixel
+ * fillRect; 614k fillStyle swaps was the boot bottleneck).
+ */
 function bakeArenaFloor(scene: Scene): void {
     if (scene.textures.exists('floor_big')) {
         bakedKeys.add('floor_big');
@@ -109,62 +175,73 @@ function bakeArenaFloor(scene: Scene): void {
     const texture = scene.textures.createCanvas('floor_big', 960, 640);
     if (!texture) return;
     bakedKeys.add('floor_big');
+    const lut = new Map<string, [number, number, number]>();
+    for (const [ch, hex] of Object.entries(PALETTE)) lut.set(ch, hexToRgb(hex));
+    const tileCache = new Map<PixelMap, Uint8ClampedArray>();
+    const expand = (tile: PixelMap): Uint8ClampedArray => {
+        const hit = tileCache.get(tile);
+        if (hit) return hit;
+        const rgba = new Uint8ClampedArray(16 * 16 * 4);
+        tile.forEach((row, y) => {
+            for (let x = 0; x < 16; x += 1) {
+                const rgb = lut.get(row[x] as string);
+                const o = (y * 16 + x) * 4;
+                if (rgb === undefined) continue; // transparent holds zeros
+                rgba[o] = rgb[0];
+                rgba[o + 1] = rgb[1];
+                rgba[o + 2] = rgb[2];
+                rgba[o + 3] = 255;
+            }
+        });
+        tileCache.set(tile, rgba);
+        return rgba;
+    };
     const context = texture.getContext();
+    const image = context.createImageData(960, 640);
     for (let ty = 0; ty < 40; ty += 1) {
         for (let tx = 0; tx < 60; tx += 1) {
-            const tile = floorTileAt(tx, ty);
-            tile.forEach((row, y) => {
-                for (let x = 0; x < row.length; x += 1) {
-                    const color = PALETTE[row[x] as string];
-                    if (color === undefined) continue;
-                    context.fillStyle = color;
-                    context.fillRect(tx * 16 + x, ty * 16 + y, 1, 1);
-                }
-            });
+            const tile = expand(floorTileAt(tx, ty));
+            for (let y = 0; y < 16; y += 1) {
+                image.data.set(tile.subarray(y * 64, y * 64 + 64), ((ty * 16 + y) * 960 + tx * 16) * 4);
+            }
         }
     }
+    context.putImageData(image, 0, 0);
     texture.refresh();
+}
+
+function debugArtRequested(): boolean {
+    try {
+        return typeof window !== 'undefined' && window.location.search.includes('debugart');
+    } catch {
+        return false;
+    }
+}
+
+function nowMs(): number {
+    try {
+        return typeof performance !== 'undefined' ? performance.now() : Date.now();
+    } catch {
+        return Date.now();
+    }
 }
 
 /** Bake every procedural texture. Safe to call from any scene. */
 export function ensureArtTextures(scene: Scene): void {
-    for (const [id, map] of Object.entries(CHASSIS_V2)) bake(scene, `chassis_${id}`, map);
-    for (const [id, map] of Object.entries(WRECKS)) bake(scene, `wreck_${id}`, map);
-    for (const [id, map] of Object.entries(SKILL_ICONS)) bake(scene, `skill_${id}`, map as PixelMap);
-    bake(scene, 'tower_light', TOWER_LIGHT);
-    bake(scene, 'tower_heavy', TOWER_HEAVY);
-    bake(scene, 'tower_twin', TOWER_TWIN);
-    bake(scene, 'tower', TOWER_LIGHT);
-    bake(scene, 'hub', HUB_V2);
-    bake(scene, 'muzzle', MUZZLE_V2);
-    bake(scene, 'muzzle_big', BIG_MUZZLE);
-    bake(scene, 'bullet', BULLET_V2);
-    bake(scene, 'bullet_hot', BULLET_CHARGED);
-    bake(scene, 'spark', SPARK_V2);
-    bake(scene, 'tracer', TRACER);
-    bake(scene, 'tile_floor', FLOOR_A);
-    bake(scene, 'tile_wall', WALL_V2);
-    bake(scene, 'wall_corner', WALL_CORNER);
-    bake(scene, 'wall_gate', WALL_GATE);
-    bake(scene, 'boom_1', BOOM_1);
-    bake(scene, 'boom_2', BOOM_2);
-    bake(scene, 'boom_3', BOOM_3);
-    bake(scene, 'boom_4', BOOM_4);
-    bake(scene, 'ring_fx', RING_FX);
-    bake(scene, 'charge_aura', CHARGE_AURA);
-    bake(scene, 'panel_tile', PANEL_TILE);
-    bake(scene, 'logo_bar', LOGO_BAR);
-    bake(scene, 'decor_crate', DECOR_CRATE);
-    bake(scene, 'decor_barrel', DECOR_BARREL);
-    bake(scene, 'decor_lamp', DECOR_LAMP);
-    bake(scene, 'decor_vent', DECOR_VENT);
-    bake(scene, 'spawn_a', SPAWN_A);
-    bake(scene, 'spawn_b', SPAWN_B);
-    bake(scene, 'recoil_a', RECOIL_A);
-    bake(scene, 'recoil_b', RECOIL_B);
-    bake(scene, 'treads_a', TREADS_A);
-    bake(scene, 'treads_b', TREADS_B);
+    const t0 = nowMs();
+    // Purged dead keys (Phase 0): tile_floor, panel_tile, tower dup-key.
+    // tracer/ring_fx/treads_*/recoil_* stay: claimed by fidelity Phases 1-3.
+    for (const { key, map } of artRegistry()) bake(scene, key, map);
     bakeArenaFloor(scene);
+    if (debugArtRequested()) {
+        const ms = (nowMs() - t0).toFixed(1);
+        const issues = validateArt();
+        if (issues.length === 0) {
+            console.info(`[debugart] clean: ${artRegistry().length} maps + floor_big in ${ms}ms`);
+        } else {
+            for (const issue of issues) console.warn(`[debugart] ${issue.key}: ${issue.detail}`);
+        }
+    }
 }
 
 export function chassisKey(robotId: string): string {

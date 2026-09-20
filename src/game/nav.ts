@@ -3,6 +3,7 @@
 // top overlay. The ring hides on pointer input and reappears on key input.
 
 import { Scene } from 'phaser';
+import { COLORS } from './theme';
 
 export interface NavTarget {
     x: number;
@@ -102,7 +103,7 @@ export class FocusNav {
             return;
         }
         this.g.clear();
-        this.g.lineStyle(2, 0xffd23f, 1);
+        this.g.lineStyle(2, COLORS.gold, 1);
         this.g.strokeRect(target.x - target.w / 2 - 3, target.y - target.h / 2 - 3, target.w + 6, target.h + 6);
         this.g.setVisible(true);
     }

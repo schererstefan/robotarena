@@ -346,7 +346,7 @@ export class BattleScene extends Scene {
             tags.push(exhibitionTag(parts));
         }
         const seedText = this.add.text(AX + ARENA_WIDTH - 12, 26, seedLabel(this.request.seed, tags), FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
-        if (this.exhibition) seedText.setColor('#ffd23f');
+        if (this.exhibition) seedText.setColor(COLORS.goldCss);
         if (this.request.pilot === true) {
             this.add.rectangle(AX + ARENA_WIDTH / 2, AY + 14, 560, 20, 0x000000, 0.6).setDepth(10);
             this.add
@@ -362,7 +362,7 @@ export class BattleScene extends Scene {
         // Damage-number pool + live minimap (bottom HUD strip).
         for (let i = 0; i < DMG_POOL; i += 1) {
             const text = this.add.text(-50, -50, '', FONTS.monoSmall).setOrigin(0.5).setDepth(10).setVisible(false);
-            text.setColor('#ffffff');
+            text.setColor(COLORS.whiteCss);
             text.setStroke('#0b0e12', 3);
             this.dmgTexts.push(text);
             this.dmgToken.push(0);
@@ -679,7 +679,7 @@ export class BattleScene extends Scene {
                 this.explode(i, cx, cy);
             }
             if (s.alive && s.health <= 30 && s.health > 0 && this.match.result.tick % 12 === 0) {
-                this.burst(cx, cy - 10, 0x5d6a78, 1, 30, -60);
+                this.burst(cx, cy - 10, COLORS.faintNum, 1, 30, -60);
             }
         });
         this.prev = snaps;
@@ -689,7 +689,7 @@ export class BattleScene extends Scene {
         const snap = this.match.robotSnapshots[i] as RobotSnapshot;
         const robotId = displayRobotId(this.request.lineupIds[i] as string);
         this.burst(cx, cy, teamColor(snap.team), 22, 260, 200);
-        this.burst(cx, cy, 0xffffff, 8, 140, 100);
+        this.burst(cx, cy, COLORS.white, 8, 140, 100);
         if (!this.reducedMotion) this.cameras.main.shake(180, 0.006);
         playExplosion();
         // Framed explosion from the pool (6 slots for 6 robots max), then a
@@ -888,7 +888,7 @@ export class BattleScene extends Scene {
             }
             const label = this.nameTexts[i] as Phaser.GameObjects.Text;
             label.setVisible(true).setPosition(cx, cy - 40);
-            if (!s.alive) label.setColor('#5d6a78');
+            if (!s.alive) label.setColor(COLORS.faint);
             // Cooldown pips under the chassis; text only re-renders on change.
             const pips = this.pipTexts[i] as Phaser.GameObjects.Text;
             pips.setVisible(visible).setPosition(cx, cy + 30);
@@ -956,7 +956,7 @@ export class BattleScene extends Scene {
             const r = Math.max(circle.r, 1);
             g.lineStyle(3, COLORS.danger, 0.9);
             g.strokeCircle(AX + circle.x, AY + circle.y, r);
-            g.lineStyle(1, 0xffffff, 0.5);
+            g.lineStyle(1, COLORS.white, 0.5);
             g.strokeCircle(AX + circle.x, AY + circle.y, Math.max(r - 4, 1));
         }
         // Pilot aim reticle: faint sight line plus a crosshair at the cursor.
@@ -965,9 +965,9 @@ export class BattleScene extends Scene {
             if (s0 && s0.alive) {
                 const ax = clamp(AX + this.pilot.aimX, AX, AX + ARENA_WIDTH);
                 const ay = clamp(AY + this.pilot.aimY, AY, AY + ARENA_HEIGHT);
-                g.lineStyle(1, 0xffffff, 0.3);
+                g.lineStyle(1, COLORS.white, 0.3);
                 g.lineBetween(AX + s0.x, AY + s0.y, ax, ay);
-                g.lineStyle(2, 0xffffff, 0.8);
+                g.lineStyle(2, COLORS.white, 0.8);
                 g.lineBetween(ax - 6, ay, ax + 6, ay);
                 g.lineBetween(ax, ay - 6, ax, ay + 6);
             }
@@ -1098,7 +1098,7 @@ export class BattleScene extends Scene {
             this.add
                 .text(512, 250, exhibitionResultsLine(parts), {
                     ...FONTS.monoSmall,
-                    color: '#ffd23f',
+                    color: COLORS.goldCss,
                 })
                 .setOrigin(0.5)
                 .setDepth(20);
@@ -1106,7 +1106,7 @@ export class BattleScene extends Scene {
             this.add
                 .text(512, 250, showcaseResultsLine(), {
                     ...FONTS.monoSmall,
-                    color: '#ffd23f',
+                    color: COLORS.goldCss,
                 })
                 .setOrigin(0.5)
                 .setDepth(20);
@@ -1118,9 +1118,9 @@ export class BattleScene extends Scene {
             const skin = this.request.skins[i] as SlotSkin;
             const row = resultRow(s.alive, skin.callsign, s.name, s.kills, Math.round(s.damageDealt), s.shotsFired);
             const code = this.add.text(232, y + 13, s.code, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
-            code.setColor('#5d6a78');
+            code.setColor(COLORS.faint);
             const text = this.add.text(232, y, row, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
-            text.setColor(s.alive ? teamCss(s.team) : '#5d6a78');
+            text.setColor(s.alive ? teamCss(s.team) : COLORS.faint);
             const hit = this.add.rectangle(512, y, 560, 26).setDepth(20);
             hit.setInteractive({ useHandCursor: true });
             hit.on('pointerdown', () => this.exportRobot(s.id));
@@ -1139,7 +1139,7 @@ export class BattleScene extends Scene {
         if (this.customMatch) {
             // The code can't restore imported robots, so don't show one.
             this.add
-                .text(512, hintY + 26, BATTLE.replayUnavailable, { ...FONTS.monoSmall, color: '#ffd23f' })
+                .text(512, hintY + 26, BATTLE.replayUnavailable, { ...FONTS.monoSmall, color: COLORS.goldCss })
                 .setOrigin(0.5)
                 .setDepth(20);
         } else {
@@ -1247,7 +1247,7 @@ export class BattleScene extends Scene {
             .setOrigin(0.5)
             .setDepth(20);
         const codeText = this.add
-            .text(512, hintY + 40, code, { ...FONTS.monoSmall, color: '#ffd23f' })
+            .text(512, hintY + 40, code, { ...FONTS.monoSmall, color: COLORS.goldCss })
             .setOrigin(0.5, 0)
             .setDepth(20);
         codeText.setWordWrapWidth(560);

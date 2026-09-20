@@ -1,5 +1,6 @@
-// Chassis V2 drafts: all face EAST (+x), 16x16. Palette chars: . k d m l w r g y.
-// No PALETTE_ADDITIONS needed — existing palette only.
+// Chassis V2 drafts: all face EAST (+x), 16x16.
+// Palette chars: . k d m l w r g y, plus c (sniper scope glass) and
+// b (ghost lens). No additions needed — existing palette only.
 
 export const CHASSIS_V2: Record<string, string[]> = {
     // Aggressive wedge: narrow rear, armored nose pointing east, red lens.
