@@ -11,7 +11,10 @@ import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/type
 import { createBrain, pickTarget, type BrainParams } from './brain';
 import { aimed, aimTurret, leadAngle, manageCharge, rayClearance, steerTo, throttleFor } from './common';
 import { castFocusVote, focusTarget } from './comms';
-import { createRoleTracker, roleGoal } from './roles';
+import { createRoleTracker, roleGoal, type RoleState } from './roles';
+
+/** Idle role state: tracker bypassed (1v1 shape, so behavior is byte-identical without roles). */
+const IDLE_ROLE: RoleState = { role: null, slot: 0, slots: 1, radio: null };
 import type { Genome } from './genome';
 import { createOpponentModel, MODEL_DEFAULTS, type ModelParams } from './model';
 
@@ -37,6 +40,8 @@ export interface HunterParams {
     closeThrottle: number;
     scanTurn: number;
     targetPolicy: TargetPolicy;
+    /** Squad roles on/off; absent = on. False restores the pre-B3 brain+model hunter (role ablation gate). */
+    roles?: boolean;
     /** Brain mode utilities (brain.* genome group); absent = preset defaults. */
     brain?: Partial<BrainParams>;
     /** Opponent-model counter-lead (model.* genome group); absent = model defaults. */
@@ -159,6 +164,7 @@ export function createWithParams(overrides?: Partial<HunterParams>): RobotContro
     });
     const model = createOpponentModel(p.model ?? {});
     const roles = createRoleTracker();
+    const rolesOn = p.roles !== false;
 
     function update(sense: SenseState): Intent {
         model.update(sense);
@@ -249,7 +255,7 @@ export function createWithParams(overrides?: Partial<HunterParams>): RobotContro
         // 1v1 the tracker idles so solo behavior is byte-identical. Tower,
         // fire, and charge always stay with the brain + opponent model
         // above — this is drive-only.
-        const roleState = roles.update(sense);
+        const roleState = rolesOn ? roles.update(sense) : IDLE_ROLE;
         if (roleState.role !== null && brain.mode === 'flank' && sense.foes.length > 0) {
             const self = sense.self;
             const slot = roleGoal(sense, roleState.role, roleState.slots);

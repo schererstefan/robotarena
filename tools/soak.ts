@@ -2897,6 +2897,26 @@ console.log('comms');
     const heldRoles = new Set(trioHolds.map((m) => m.role));
     check('hunter trio heartbeats distinct slots', trioHolds.length > 0 && heldRoles.size === 2, `holds=${trioHolds.length} roles=${[...heldRoles]}`);
     check('trio focus votes still chain', trioVotes.length > 0, `votes=${trioVotes.length}`);
+    // Ablation flag: roles:false sends no claim/slot mail (pre-B3 radio).
+    const ablationLog: FullMailEntry[] = [];
+    const wiredAblation = new Match(
+        [
+            { team: 0, controller: createHunterParams({ roles: false }), loadout: { ...cleanEntry.loadout } },
+            { team: 0, controller: createHunterParams({ roles: false }), loadout: { ...cleanEntry.loadout } },
+            { team: 0, controller: fullmail(ablationLog) },
+            { team: 1, controller: sitter('a') },
+            { team: 1, controller: sitter('b') },
+            { team: 1, controller: sitter('c') },
+        ],
+        5,
+    );
+    for (let i = 0; i < 400 && !wiredAblation.result.over; i += 1) wiredAblation.step();
+    const ablationMail = ablationLog.flatMap((e) => e.inbox);
+    check(
+        'roles:false sends no claim/slot mail',
+        ablationMail.length > 0 && ablationMail.every((m) => m.kind !== 'claim' && m.kind !== 'slot'),
+        `mail=${ablationMail.length}`,
+    );
     const ghostEntry = ROBOTS.find((r) => r.meta.id === 'ghost');
     if (!ghostEntry) throw new Error('no ghost');
     const ghostLog: MailboxEntry[] = [];
