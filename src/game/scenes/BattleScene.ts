@@ -10,7 +10,23 @@ import { decodeReplay, encodeReplay } from '../../sim/replay';
 import { getRobot } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
 import { bakedTextureCount, chassisTeamKey, ensureArtTextures, towerKey, wreckKey } from '../art';
-import { playClick, playExplosion, playHit, playShoot, playSting, playWin, toggleMuted, unlockAudio } from '../audio';
+import {
+    playBattleStart,
+    playClick,
+    playDash,
+    playDraw,
+    playEmp,
+    playExplosion,
+    playHit,
+    playLose,
+    playShoot,
+    playSting,
+    playSuddenDeath,
+    playWin,
+    stopMusic,
+    toggleMuted,
+    unlockAudio,
+} from '../audio';
 import { bulletColor, isReducedMotion, teamColor, teamCss } from '../accessibility';
 import { recordDailyResult, recordMatch } from '../history';
 import { displayRobotId, isImportedId, resolveLineupEntry } from '../importRobot';
@@ -135,6 +151,7 @@ export class BattleScene extends Scene {
     private hotSlot: boolean[] = [];
     private hotLive = false;
     private lastMapTick = -99;
+    private lastSdCueTick = -9999;
     private prev!: RobotSnapshot[];
     private acc = 0;
     private paused = false;
@@ -218,6 +235,7 @@ export class BattleScene extends Scene {
         this.hotSlot = [];
         this.hotLive = false;
         this.lastMapTick = -99;
+        this.lastSdCueTick = -9999;
         this.hitstop = 0;
         this.trauma = 0;
         this.traumaClean = true;
@@ -489,6 +507,7 @@ export class BattleScene extends Scene {
 
         this.syncSprites(this.match.robotSnapshots, this.match.bulletSnapshots);
         this.drawDynamic(this.match.robotSnapshots);
+        playBattleStart();
     }
 
     // ---- Onboarding tutorial: scripted spectated battle + coach marks ------
@@ -749,7 +768,7 @@ export class BattleScene extends Scene {
                     .setTexture(p.charge > 0.4 ? 'muzzle_big' : 'muzzle')
                     .setScale(2 + Math.random() * 0.8);
                 this.burst(cx + Math.cos(s.tower) * 26, cy + Math.sin(s.tower) * 26, 0xffe28a, 4, 120, 0);
-                playShoot();
+                playShoot(p.charge > 0.4, s.x);
             }
             if (s.health < p.health) {
                 const dmg = Math.round(p.health - s.health);
@@ -765,12 +784,12 @@ export class BattleScene extends Scene {
                     this.addTrauma(0.35);
                     this.fireRing(cx, cy, false);
                     if (!this.reducedMotion) this.hitstop = Math.max(this.hitstop, 2);
-                    playHit();
+                    playHit(dmg, s.x);
                 } else {
                     this.spawnDamageNumber(cx, cy - 18, dmg, 'hit');
                     this.hurtT[i] = 2;
                     this.burst(cx, cy, COLORS.danger, 6, 170, 300);
-                    playHit();
+                    playHit(dmg, s.x);
                 }
                 if (topDealer >= 0 && topDealer !== i) {
                     const a = snaps[topDealer] as RobotSnapshot;
@@ -785,6 +804,14 @@ export class BattleScene extends Scene {
                     this.healAcc[i] = 0;
                     this.lastHealTick[i] = tick;
                 }
+            }
+            // Dash/EMP cues are render-side: cooldown edges from snapshots.
+            // Dash confirms with a position-delta spike (dashes always move).
+            if (s.alive && p.dashCd <= 0 && s.dashCd > 0 && Math.hypot(s.x - p.x, s.y - p.y) > 3) {
+                playDash(s.x);
+            }
+            if (s.alive && p.empCd <= 0 && s.empCd > 0) {
+                playEmp(s.x);
             }
             if (p.alive && !s.alive) {
                 this.explode(i, cx, cy, topDealer);
@@ -810,7 +837,7 @@ export class BattleScene extends Scene {
             this.cameras.main.flash(70, 255, 255, 255);
         }
         this.fireRing(cx, cy, true);
-        playExplosion();
+        playExplosion(snap.x);
         // Framed explosion from the pool (6 slots for 6 robots max), then a
         // persistent per-archetype wreck. The fallback allocates only if a
         // seventh flash is somehow live within 430 ms. Frame 1 holds 60 ms
@@ -1294,6 +1321,14 @@ export class BattleScene extends Scene {
             this.sdAnnounced = true;
             this.queueBanner(BATTLE.bannerSuddenDeath, COLORS.dangerCss);
         }
+        // SD alarm, throttled ~1/s by tick (silent while paused).
+        if (this.match.result.suddenDeath && !this.match.result.over) {
+            const tick = this.match.result.tick;
+            if (tick - this.lastSdCueTick >= 60) {
+                this.lastSdCueTick = tick;
+                playSuddenDeath();
+            }
+        }
         let alive0 = 0;
         let alive1 = 0;
         for (const s of snaps) {
@@ -1371,7 +1406,15 @@ export class BattleScene extends Scene {
                 seed: this.request.seed,
             });
         }
-        if (result.winner !== -1) playWin();
+        stopMusic();
+        if (result.winner === -1) {
+            playDraw();
+        } else if (this.request.pilot === true) {
+            if (result.winner === 0) playWin();
+            else playLose();
+        } else {
+            playWin();
+        }
         const title = resultsTitle(this.request.pilot === true, result.winner);
         const color = result.winner === -1 ? COLORS.ink : teamCss(result.winner);
         this.add.rectangle(512, 384, 620, 440, 0x0b0e12, 0.94).setStrokeStyle(2, COLORS.panelEdge).setDepth(20);

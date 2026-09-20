@@ -2,6 +2,7 @@
 
 import { Scene } from 'phaser';
 import { isReducedMotion } from './accessibility';
+import { playHover } from './audio';
 import { COLORS, FONTS } from './theme';
 
 export interface Button {
@@ -33,6 +34,7 @@ export function makeButton(
     const showHover = (): void => {
         bg.setFillStyle(COLORS.panelHover);
         bg.setStrokeStyle(2, COLORS.team[0]);
+        playHover();
     };
     const hideHover = (): void => {
         bg.setFillStyle(COLORS.panel);

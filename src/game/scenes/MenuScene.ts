@@ -7,7 +7,7 @@ import { modifierCodes, type ArenaId, type MatchModifiers } from '../../sim/cons
 import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { artRegistry, chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
-import { isMuted, playClick, toggleMuted, unlockAudio } from '../audio';
+import { isMuted, playClick, playConfirm, playError, toggleMuted, unlockAudio } from '../audio';
 import {
     clearDailyBoard,
     clearHistory,
@@ -912,14 +912,17 @@ export class MenuScene extends Scene {
             const data = decodeReplay(input.value);
             if (!data) {
                 error.textContent = REPLAY_DIALOG.invalidCode;
+                playError();
                 return;
             }
             for (const id of data.lineupIds) {
                 if (!getRobot(id)) {
                     error.textContent = replayUnknownRobot(id);
+                    playError();
                     return;
                 }
             }
+            playConfirm();
             this.closeReplayDialog();
             this.scene.start('Battle', {
                 teamSize: data.teamSize,
@@ -1009,6 +1012,7 @@ export class MenuScene extends Scene {
             const url = urlInput.value.trim();
             if (!file && url === '') {
                 status.textContent = IMPORT_DIALOG.noSource;
+                playError();
                 return;
             }
             status.style.color = '#9aa7b4';
@@ -1020,6 +1024,7 @@ export class MenuScene extends Scene {
                 if (!result.ok) {
                     status.style.color = '#ff5d5d';
                     status.textContent = result.error;
+                    playError();
                     return;
                 }
                 this.lineupIds[slot] = result.id;
@@ -1028,6 +1033,7 @@ export class MenuScene extends Scene {
                 this.showDescription(slot);
                 status.style.color = '#7de08a';
                 status.textContent = importDoneNotice(result.robot.meta.name, slot);
+                playConfirm();
                 this.time.delayedCall(900, () => this.closeImportDialog());
             });
         };

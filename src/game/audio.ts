@@ -3,16 +3,44 @@
 // The AudioContext is created lazily inside unlockAudio(), which scenes call
 // from a user gesture (autoplay policy: a context created outside a gesture
 // starts suspended). All play* functions are safe no-ops before unlock.
+//
+// Routing: voices -> bus (sfx/ui/music) -> master mute gain ->
+// DynamicsCompressor -> destination. Every voice carries a SHOOT_MIN_GAP-
+// style rate limit so furballs duck instead of clipping.
+
+import { ARENA_WIDTH } from '../sim/constants';
+import { clamp } from '../sim/math';
 
 const MUTE_KEY = 'robotarena_muted';
 const MASTER_GAIN = 0.35;
 const SHOOT_MIN_GAP = 0.06;
+const HIT_MIN_GAP = 0.05;
+const EXPLOSION_MIN_GAP = 0.15;
+const STING_MIN_GAP = 1.0;
+const DASH_MIN_GAP = 0.2;
+const EMP_MIN_GAP = 0.2;
+const SD_MIN_GAP = 0.9;
+const HOVER_MIN_GAP = 0.06;
+const UI_MIN_GAP = 0.05;
+
+type BusName = 'sfx' | 'ui' | 'music';
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+let sfxBus: GainNode | null = null;
+let uiBus: GainNode | null = null;
+let musicBus: GainNode | null = null;
 let noiseBuffer: AudioBuffer | null = null;
 let muted = loadMuted();
 let lastShootAt = 0;
+let lastHitAt = 0;
+let lastExplosionAt = 0;
+let lastStingAt = 0;
+let lastDashAt = 0;
+let lastEmpAt = 0;
+let lastSdAt = 0;
+let lastHoverAt = 0;
+let lastUiAt = 0;
 
 function loadMuted(): boolean {
     try {
@@ -36,7 +64,20 @@ export function unlockAudio(): void {
         ctx = new Ctor();
         master = ctx.createGain();
         master.gain.value = muted ? 0 : MASTER_GAIN;
-        master.connect(ctx.destination);
+        const comp = ctx.createDynamicsCompressor();
+        comp.threshold.value = -18;
+        comp.knee.value = 20;
+        comp.ratio.value = 8;
+        comp.attack.value = 0.003;
+        comp.release.value = 0.2;
+        master.connect(comp);
+        comp.connect(ctx.destination);
+        sfxBus = ctx.createGain();
+        uiBus = ctx.createGain();
+        musicBus = ctx.createGain();
+        sfxBus.connect(master);
+        uiBus.connect(master);
+        musicBus.connect(master);
     }
     if (ctx.state === 'suspended') void ctx.resume();
 }
@@ -62,24 +103,83 @@ export function toggleMuted(): boolean {
     return muted;
 }
 
-function tone(type: OscillatorType, fromHz: number, toHz: number, dur: number, gain: number, delay = 0): void {
-    if (ctx === null || master === null || muted) return;
+/** Stop the battle loop before result stingers (Phase 6 owns the loop). */
+export function stopMusic(): void {
+    if (ctx === null || musicBus === null) return;
+    musicBus.gain.cancelScheduledValues(ctx.currentTime);
+    musicBus.gain.setValueAtTime(1, ctx.currentTime);
+}
+
+function busFor(name: BusName): GainNode | null {
+    return name === 'sfx' ? sfxBus : name === 'ui' ? uiBus : musicBus;
+}
+
+/** Arena x -> stereo pan (-0.8 left .. +0.8 right). */
+export function panFor(x: number): number {
+    return clamp(x / ARENA_WIDTH, 0, 1) * 1.6 - 0.8;
+}
+
+/** Slight center attenuation: mono-ish voices sit back a touch. */
+function attenuate(pan: number): number {
+    return 0.85 + 0.15 * Math.min(Math.abs(pan), 1);
+}
+
+/** ±8% pitch jitter: stacked voices never phase-flange. */
+function pitch(hz: number): number {
+    return hz * (1 + (Math.random() * 2 - 1) * 0.08);
+}
+
+/** ±20% gain jitter: repeated hits stay organic. */
+function level(gain: number): number {
+    return gain * (1 + (Math.random() * 2 - 1) * 0.2);
+}
+
+function tone(
+    type: OscillatorType,
+    fromHz: number,
+    toHz: number,
+    dur: number,
+    gain: number,
+    delay = 0,
+    bus: BusName = 'sfx',
+    pan = 0,
+): void {
+    if (ctx === null || muted) return;
+    const out = busFor(bus);
+    if (out === null) return;
     const t0 = ctx.currentTime + delay;
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(Math.max(fromHz, 1), t0);
     osc.frequency.exponentialRampToValueAtTime(Math.max(toHz, 1), t0 + dur);
-    g.gain.setValueAtTime(gain, t0);
+    g.gain.setValueAtTime(gain * attenuate(pan), t0);
     g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
     osc.connect(g);
-    g.connect(master);
+    if (pan !== 0 && typeof ctx.createStereoPanner === 'function') {
+        const panner = ctx.createStereoPanner();
+        panner.pan.value = clamp(pan, -1, 1);
+        g.connect(panner);
+        panner.connect(out);
+    } else {
+        g.connect(out);
+    }
     osc.start(t0);
     osc.stop(t0 + dur + 0.02);
 }
 
-function noise(dur: number, gain: number, fromHz: number, toHz: number, delay = 0): void {
-    if (ctx === null || master === null || muted) return;
+function noise(
+    dur: number,
+    gain: number,
+    fromHz: number,
+    toHz: number,
+    delay = 0,
+    bus: BusName = 'sfx',
+    pan = 0,
+): void {
+    if (ctx === null || muted) return;
+    const out = busFor(bus);
+    if (out === null) return;
     if (noiseBuffer === null) {
         noiseBuffer = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
         const data = noiseBuffer.getChannelData(0);
@@ -91,48 +191,167 @@ function noise(dur: number, gain: number, fromHz: number, toHz: number, delay = 
     src.loop = true;
     const filter = ctx.createBiquadFilter();
     filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(fromHz, t0);
+    filter.frequency.setValueAtTime(Math.max(fromHz, 20), t0);
     filter.frequency.exponentialRampToValueAtTime(Math.max(toHz, 20), t0 + dur);
     const g = ctx.createGain();
-    g.gain.setValueAtTime(gain, t0);
+    g.gain.setValueAtTime(gain * attenuate(pan), t0);
     g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
     src.connect(filter);
     filter.connect(g);
-    g.connect(master);
+    if (pan !== 0 && typeof ctx.createStereoPanner === 'function') {
+        const panner = ctx.createStereoPanner();
+        panner.pan.value = clamp(pan, -1, 1);
+        g.connect(panner);
+        panner.connect(out);
+    } else {
+        g.connect(out);
+    }
     src.start(t0);
     src.stop(t0 + dur + 0.02);
 }
 
-/** Short laser blip. Rate-limited: battles fire several shots per second. */
-export function playShoot(): void {
+/** Laser blip, layered when charged. Rate-limited: battles fire constantly. */
+export function playShoot(charged: boolean, x: number = ARENA_WIDTH / 2): void {
     if (ctx === null || muted) return;
     const now = ctx.currentTime;
     if (now - lastShootAt < SHOOT_MIN_GAP) return;
     lastShootAt = now;
-    tone('square', 720 + Math.random() * 240, 180, 0.08, 0.1);
+    const pan = panFor(x);
+    tone('square', pitch(720 + Math.random() * 240), 180, 0.08, level(0.1), 0, 'sfx', pan);
+    if (charged) {
+        tone('sawtooth', pitch(190), 60, 0.18, level(0.16), 0, 'sfx', pan);
+        noise(0.12, level(0.08), 4000, 500, 0, 'sfx', pan);
+    }
 }
 
-export function playHit(): void {
-    tone('triangle', 260, 70, 0.12, 0.22);
-    noise(0.08, 0.1, 3000, 800);
+/** Impact in 3 tiers by damage: light / heavy / massive. */
+export function playHit(damage: number, x: number = ARENA_WIDTH / 2): void {
+    if (ctx === null || muted) return;
+    const now = ctx.currentTime;
+    if (now - lastHitAt < HIT_MIN_GAP) return;
+    lastHitAt = now;
+    const pan = panFor(x);
+    const tier = damage <= 14 ? 0 : damage <= 28 ? 1 : 2;
+    tone('triangle', pitch(260), 70, 0.12, level(0.22), 0, 'sfx', pan);
+    noise(0.08, level(0.1), 3000, 800, 0, 'sfx', pan);
+    if (tier >= 1) {
+        tone('square', pitch(180), 50, 0.15, level(0.22), 0.01, 'sfx', pan);
+        noise(0.12, level(0.14), 4500, 600, 0, 'sfx', pan);
+    }
+    if (tier >= 2) {
+        tone('sine', pitch(120), 30, 0.3, level(0.3), 0.02, 'sfx', pan);
+    }
 }
 
-export function playExplosion(): void {
-    tone('sine', 130, 28, 0.5, 0.35);
-    noise(0.45, 0.25, 2500, 120);
+/** Kill: initial crack + fireball body + low rumble tail. */
+export function playExplosion(x: number = ARENA_WIDTH / 2): void {
+    if (ctx === null || muted) return;
+    const now = ctx.currentTime;
+    if (now - lastExplosionAt < EXPLOSION_MIN_GAP) return;
+    lastExplosionAt = now;
+    const pan = panFor(x);
+    noise(0.06, 0.3, 6000, 1000, 0, 'sfx', pan);
+    tone('square', pitch(300), 60, 0.1, level(0.2), 0, 'sfx', pan);
+    tone('sine', pitch(130), 28, 0.5, level(0.35), 0, 'sfx', pan);
+    noise(0.45, level(0.25), 2500, 120, 0, 'sfx', pan);
+    tone('sine', 70, 24, 0.9, 0.2, 0.1, 'sfx', pan);
+    noise(0.8, 0.1, 300, 60, 0.1, 'sfx', pan);
 }
 
-export function playClick(): void {
-    tone('square', 1400, 1100, 0.035, 0.06);
+/** Dash whoosh: rising air + a light lift tone. */
+export function playDash(x: number = ARENA_WIDTH / 2): void {
+    if (ctx === null || muted) return;
+    const now = ctx.currentTime;
+    if (now - lastDashAt < DASH_MIN_GAP) return;
+    lastDashAt = now;
+    const pan = panFor(x);
+    noise(0.18, level(0.14), 800, 4200, 0, 'sfx', pan);
+    tone('sine', 200, 520, 0.15, 0.07, 0, 'sfx', pan);
 }
 
-/** Two-note kill sting (first blood). Phase 2 builds the full voice floor. */
+/** EMP zap: collapsing saw + static burst. */
+export function playEmp(x: number = ARENA_WIDTH / 2): void {
+    if (ctx === null || muted) return;
+    const now = ctx.currentTime;
+    if (now - lastEmpAt < EMP_MIN_GAP) return;
+    lastEmpAt = now;
+    const pan = panFor(x);
+    tone('sawtooth', 1200, 100, 0.25, level(0.16), 0, 'sfx', pan);
+    noise(0.15, level(0.1), 5000, 500, 0, 'sfx', pan);
+}
+
+/** Sudden-death alarm: double low pulse (scene-throttled ~1/s). */
+export function playSuddenDeath(): void {
+    if (ctx === null || muted) return;
+    const now = ctx.currentTime;
+    if (now - lastSdAt < SD_MIN_GAP) return;
+    lastSdAt = now;
+    tone('square', 220, 220, 0.14, 0.12);
+    tone('square', 220, 220, 0.14, 0.12, 0.2);
+}
+
+/** Battle start: rising triad over the spawn-in. */
+export function playBattleStart(): void {
+    if (ctx === null || muted) return;
+    const notes = [261.63, 392.0, 523.25];
+    notes.forEach((hz, i) => tone('triangle', hz, hz, 0.12, 0.14, i * 0.09, 'ui'));
+}
+
+/** Two-note kill sting (first blood). Gated: ducks, never stacks. */
 export function playSting(): void {
+    if (ctx === null || muted) return;
+    const now = ctx.currentTime;
+    if (now - lastStingAt < STING_MIN_GAP) return;
+    lastStingAt = now;
     tone('square', 440, 440, 0.09, 0.14);
     tone('square', 660, 660, 0.14, 0.14, 0.09);
 }
 
+export function playClick(): void {
+    tone('square', 1400, 1100, 0.035, 0.06, 0, 'ui');
+}
+
+/** Button hover tick. Throttled: pointerover fires per control. */
+export function playHover(): void {
+    if (ctx === null || muted) return;
+    const now = ctx.currentTime;
+    if (now - lastHoverAt < HOVER_MIN_GAP) return;
+    lastHoverAt = now;
+    tone('square', 1800, 1600, 0.025, 0.035, 0, 'ui');
+}
+
+/** Dialog success (replay accepted, import landed). */
+export function playConfirm(): void {
+    if (ctx === null || muted) return;
+    const now = ctx.currentTime;
+    if (now - lastUiAt < UI_MIN_GAP) return;
+    lastUiAt = now;
+    tone('triangle', 660, 880, 0.09, 0.12, 0, 'ui');
+    tone('triangle', 990, 990, 0.08, 0.1, 0.07, 'ui');
+}
+
+/** Dialog error (bad code, failed import). */
+export function playError(): void {
+    if (ctx === null || muted) return;
+    const now = ctx.currentTime;
+    if (now - lastUiAt < UI_MIN_GAP) return;
+    lastUiAt = now;
+    tone('square', 220, 160, 0.12, 0.12, 0, 'ui');
+}
+
 export function playWin(): void {
     const notes = [523.25, 659.25, 783.99, 1046.5];
-    notes.forEach((hz, i) => tone('triangle', hz, hz, 0.16, 0.18, i * 0.12));
+    notes.forEach((hz, i) => tone('triangle', hz, hz, 0.16, 0.18, i * 0.12, 'music'));
+}
+
+/** Defeat: descending line, same weight as the win arp. */
+export function playLose(): void {
+    const notes = [392.0, 311.13, 261.63, 196.0];
+    notes.forEach((hz, i) => tone('triangle', hz, hz, 0.16, 0.18, i * 0.15, 'music'));
+}
+
+/** Draw: neutral resolving pair (neither triumph nor defeat). */
+export function playDraw(): void {
+    tone('triangle', 493.88, 493.88, 0.15, 0.16, 0, 'music');
+    tone('triangle', 440.0, 440.0, 0.22, 0.16, 0.16, 'music');
 }
