@@ -33,6 +33,9 @@ interface TuneOptions {
     restarts: number;
     generations: number;
     challengers: number;
+    /** True when the flag was passed explicitly (disables genome-aware scaling for that knob). */
+    generationsSet: boolean;
+    challengersSet: boolean;
     earlyStop: number;
     trainSeedCount: number;
     validSeedCount: number;
@@ -50,6 +53,8 @@ function parseArgs(argv: string[]): TuneOptions {
         restarts: 8,
         generations: 25,
         challengers: 4,
+        generationsSet: false,
+        challengersSet: false,
         earlyStop: 8,
         trainSeedCount: 32,
         validSeedCount: 16,
@@ -75,8 +80,13 @@ function parseArgs(argv: string[]): TuneOptions {
         else if (arg === '--seed') opts.runSeed = nextInt('--seed', 0);
         else if (arg === '--stageA') opts.stageACandidates = nextInt('--stageA', 8);
         else if (arg === '--restarts') opts.restarts = nextInt('--restarts', 1);
-        else if (arg === '--generations') opts.generations = nextInt('--generations', 1);
-        else if (arg === '--challengers') opts.challengers = nextInt('--challengers', 1);
+        else if (arg === '--generations') {
+            opts.generations = nextInt('--generations', 1);
+            opts.generationsSet = true;
+        } else if (arg === '--challengers') {
+            opts.challengers = nextInt('--challengers', 1);
+            opts.challengersSet = true;
+        }
         else if (arg === '--early-stop') opts.earlyStop = nextInt('--early-stop', 0);
         else if (arg === '--train-seeds') opts.trainSeedCount = nextInt('--train-seeds', 4);
         else if (arg === '--valid-seeds') opts.validSeedCount = nextInt('--valid-seeds', 4);
@@ -101,8 +111,10 @@ function helpText(): string {
         '  --seed N              run seed (default 0xc11cb5)',
         '  --stageA N            Stage-A loadout candidates (default 256)',
         '  --restarts N          Stage-B restarts (default 8)',
-        '  --generations N       max generations per restart (default 25)',
-        '  --challengers N       challengers per generation (default 4)',
+        '  --generations N       max generations per restart (default 25 for 12-param genomes,',
+        '                          scales as round(25*sqrt(n/12)) clamped 25-60; n excludes loadout)',
+        '  --challengers N       challengers per generation (default 4 for 12-param genomes,',
+        '                          scales as round(4*sqrt(n/12)) clamped 4-12)',
         '  --early-stop N        stop a restart after N accept-free gens, 0 disables (default 8)',
         '  --train-seeds N       training seeds (default 32)',
         '  --valid-seeds N       held-out validation seeds (default 16)',
@@ -193,7 +205,19 @@ function tune(opts: TuneOptions, root: string): number {
     const runId = runIdNow();
     const { trainSeeds, validSeeds, vetoSeeds } = deriveSeeds(opts.runSeed, opts.trainSeedCount, opts.validSeedCount, 16);
     const rng = rngFromSeed(opts.runSeed);
+    // Genome-aware search budget: scale Stage-B effort with the behavior-param
+    // count n (excluding loadout) — challengers = clamp(round(4·√(n/12)),4,12),
+    // generations = clamp(round(25·√(n/12)),25,60). Explicit flags override;
+    // 12-param genomes (and smaller, via the clamp floor) keep 25×4 exactly.
+    const behaviorParams = Object.values(def.params).filter((p) => p.type !== 'loadout').length;
+    const budgetScale = Math.sqrt(behaviorParams / 12);
+    if (!opts.generationsSet) opts.generations = Math.min(60, Math.max(25, Math.round(25 * budgetScale)));
+    if (!opts.challengersSet) opts.challengers = Math.min(12, Math.max(4, Math.round(4 * budgetScale)));
     console.log(`tune ${opts.archetype} ${teamMode ? `${opts.teamSize}v${opts.teamSize}` : '1v1'}: run ${runId}, seed ${opts.runSeed}, opponents ${opponents.length} (train fold ${folds.train.length}, held-out ${folds.heldOut.length})`);
+    console.log(
+        `budget: ${behaviorParams} behavior params -> ${opts.generations} gens x ${opts.challengers} challengers` +
+            (!opts.generationsSet || !opts.challengersSet ? ' (genome-aware defaults)' : ' (explicit flags)'),
+    );
 
     // Stage A: loadout-first halving at default params (train fold only).
     console.log(`stage A: ${opts.stageACandidates} loadouts, survivors ${opts.restarts}`);
