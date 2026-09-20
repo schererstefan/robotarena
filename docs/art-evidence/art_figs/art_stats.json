@@ -1,0 +1,2865 @@
+{
+ "wrecks:WRECKS:sniper": {
+  "name": "wrecks:WRECKS:sniper",
+  "w": 16,
+  "h": 16,
+  "fill": 146,
+  "fillpct": 57.03125,
+  "colors": 6,
+  "used": [
+   [
+    "k",
+    77,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "m",
+    30,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "d",
+    21,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "w",
+    15,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "y",
+    2,
+    "#ffb340",
+    " 36\u00b0"
+   ],
+   [
+    "l",
+    1,
+    "#9aa7b4",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "211\u00b0": "m",
+   "212\u00b0": "d",
+   "gray": "wl",
+   " 36\u00b0": "y"
+  },
+  "kedge": 38,
+  "kinner": 39,
+  "dither_pairs": 0,
+  "mirrorsym": 89.0625
+ },
+ "wrecks:WRECKS:brawler": {
+  "name": "wrecks:WRECKS:brawler",
+  "w": 16,
+  "h": 16,
+  "fill": 156,
+  "fillpct": 60.9375,
+  "colors": 6,
+  "used": [
+   [
+    "k",
+    72,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "m",
+    37,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "d",
+    21,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "w",
+    15,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "l",
+    8,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "y",
+    3,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "211\u00b0": "m",
+   "212\u00b0": "d",
+   "gray": "wl",
+   " 36\u00b0": "y"
+  },
+  "kedge": 35,
+  "kinner": 37,
+  "dither_pairs": 1,
+  "mirrorsym": 64.84375
+ },
+ "wrecks:WRECKS:ghost": {
+  "name": "wrecks:WRECKS:ghost",
+  "w": 16,
+  "h": 16,
+  "fill": 130,
+  "fillpct": 50.78125,
+  "colors": 6,
+  "used": [
+   [
+    "w",
+    56,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "k",
+    34,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "l",
+    22,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "m",
+    12,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "d",
+    5,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "y",
+    1,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "gray": "wl",
+   "214\u00b0": "k",
+   "211\u00b0": "m",
+   "212\u00b0": "d",
+   " 36\u00b0": "y"
+  },
+  "kedge": 25,
+  "kinner": 9,
+  "dither_pairs": 2,
+  "mirrorsym": 81.25
+ },
+ "wrecks:WRECKS:rusher": {
+  "name": "wrecks:WRECKS:rusher",
+  "w": 16,
+  "h": 16,
+  "fill": 140,
+  "fillpct": 54.6875,
+  "colors": 6,
+  "used": [
+   [
+    "k",
+    78,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "m",
+    26,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "d",
+    18,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "w",
+    12,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "l",
+    4,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "y",
+    2,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "211\u00b0": "m",
+   "212\u00b0": "d",
+   "gray": "wl",
+   " 36\u00b0": "y"
+  },
+  "kedge": 45,
+  "kinner": 33,
+  "dither_pairs": 2,
+  "mirrorsym": 73.4375
+ },
+ "wrecks:WRECKS:turret": {
+  "name": "wrecks:WRECKS:turret",
+  "w": 16,
+  "h": 16,
+  "fill": 151,
+  "fillpct": 58.984375,
+  "colors": 6,
+  "used": [
+   [
+    "k",
+    74,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "d",
+    30,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "w",
+    18,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "m",
+    18,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "l",
+    10,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "y",
+    1,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "gray": "wl",
+   "211\u00b0": "m",
+   " 36\u00b0": "y"
+  },
+  "kedge": 46,
+  "kinner": 28,
+  "dither_pairs": 0,
+  "mirrorsym": 95.3125
+ },
+ "wrecks:WRECKS:orbiter": {
+  "name": "wrecks:WRECKS:orbiter",
+  "w": 16,
+  "h": 16,
+  "fill": 112,
+  "fillpct": 43.75,
+  "colors": 5,
+  "used": [
+   [
+    "k",
+    54,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "m",
+    36,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "w",
+    16,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "l",
+    4,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "y",
+    2,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "211\u00b0": "m",
+   "gray": "wl",
+   " 36\u00b0": "y"
+  },
+  "kedge": 28,
+  "kinner": 26,
+  "dither_pairs": 2,
+  "mirrorsym": 82.03125
+ },
+ "wrecks:WRECKS:wanderer": {
+  "name": "wrecks:WRECKS:wanderer",
+  "w": 16,
+  "h": 16,
+  "fill": 133,
+  "fillpct": 51.953125,
+  "colors": 6,
+  "used": [
+   [
+    "m",
+    51,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "k",
+    31,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    24,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "l",
+    21,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "d",
+    5,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "y",
+    1,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "211\u00b0": "m",
+   "214\u00b0": "k",
+   "gray": "wl",
+   "212\u00b0": "d",
+   " 36\u00b0": "y"
+  },
+  "kedge": 26,
+  "kinner": 5,
+  "dither_pairs": 0,
+  "mirrorsym": 79.6875
+ },
+ "wrecks:WRECKS:hunter": {
+  "name": "wrecks:WRECKS:hunter",
+  "w": 16,
+  "h": 16,
+  "fill": 143,
+  "fillpct": 55.859375,
+  "colors": 6,
+  "used": [
+   [
+    "k",
+    77,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "m",
+    30,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "d",
+    18,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "w",
+    15,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "y",
+    2,
+    "#ffb340",
+    " 36\u00b0"
+   ],
+   [
+    "l",
+    1,
+    "#9aa7b4",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "211\u00b0": "m",
+   "212\u00b0": "d",
+   "gray": "wl",
+   " 36\u00b0": "y"
+  },
+  "kedge": 40,
+  "kinner": 37,
+  "dither_pairs": 0,
+  "mirrorsym": 91.40625
+ },
+ "walls:WALL_V2": {
+  "name": "walls:WALL_V2",
+  "w": 16,
+  "h": 16,
+  "fill": 256,
+  "fillpct": 100.0,
+  "colors": 5,
+  "used": [
+   [
+    "k",
+    100,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "d",
+    76,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "m",
+    52,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "y",
+    24,
+    "#ffb340",
+    " 36\u00b0"
+   ],
+   [
+    "w",
+    4,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "211\u00b0": "m",
+   " 36\u00b0": "y",
+   "gray": "w"
+  },
+  "kedge": 56,
+  "kinner": 44,
+  "dither_pairs": 0,
+  "mirrorsym": 35.9375
+ },
+ "walls:WALL_CORNER": {
+  "name": "walls:WALL_CORNER",
+  "w": 16,
+  "h": 16,
+  "fill": 256,
+  "fillpct": 100.0,
+  "colors": 5,
+  "used": [
+   [
+    "k",
+    108,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "d",
+    64,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "m",
+    53,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "y",
+    27,
+    "#ffb340",
+    " 36\u00b0"
+   ],
+   [
+    "w",
+    4,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "211\u00b0": "m",
+   " 36\u00b0": "y",
+   "gray": "w"
+  },
+  "kedge": 56,
+  "kinner": 52,
+  "dither_pairs": 0,
+  "mirrorsym": 38.28125
+ },
+ "walls:OBSTACLE_TOP": {
+  "name": "walls:OBSTACLE_TOP",
+  "w": 16,
+  "h": 16,
+  "fill": 256,
+  "fillpct": 100.0,
+  "colors": 5,
+  "used": [
+   [
+    "d",
+    142,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "k",
+    60,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "l",
+    36,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "s",
+    14,
+    "#3a4656",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    4,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "212\u00b0": "d",
+   "214\u00b0": "ks",
+   "gray": "lw"
+  },
+  "kedge": 60,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 84.375
+ },
+ "walls:WALL_GATE": {
+  "name": "walls:WALL_GATE",
+  "w": 16,
+  "h": 16,
+  "fill": 256,
+  "fillpct": 100.0,
+  "colors": 5,
+  "used": [
+   [
+    "k",
+    126,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "m",
+    62,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "d",
+    36,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "y",
+    28,
+    "#ffb340",
+    " 36\u00b0"
+   ],
+   [
+    "w",
+    4,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "211\u00b0": "m",
+   "212\u00b0": "d",
+   " 36\u00b0": "y",
+   "gray": "w"
+  },
+  "kedge": 56,
+  "kinner": 70,
+  "dither_pairs": 0,
+  "mirrorsym": 44.53125
+ },
+ "walls:WALL_GATE_B": {
+  "name": "walls:WALL_GATE_B",
+  "w": 16,
+  "h": 16,
+  "fill": 256,
+  "fillpct": 100.0,
+  "colors": 5,
+  "used": [
+   [
+    "k",
+    124,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "m",
+    62,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "d",
+    34,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "y",
+    24,
+    "#ffb340",
+    " 36\u00b0"
+   ],
+   [
+    "w",
+    12,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "211\u00b0": "m",
+   "212\u00b0": "d",
+   " 36\u00b0": "y",
+   "gray": "w"
+  },
+  "kedge": 56,
+  "kinner": 68,
+  "dither_pairs": 0,
+  "mirrorsym": 42.96875
+ },
+ "towers:TOWER_LIGHT": {
+  "name": "towers:TOWER_LIGHT",
+  "w": 16,
+  "h": 16,
+  "fill": 64,
+  "fillpct": 25.0,
+  "colors": 6,
+  "used": [
+   [
+    "k",
+    26,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "d",
+    14,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "w",
+    13,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "m",
+    6,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "l",
+    4,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "y",
+    1,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "gray": "wl",
+   "211\u00b0": "m",
+   " 36\u00b0": "y"
+  },
+  "kedge": 25,
+  "kinner": 1,
+  "dither_pairs": 0,
+  "mirrorsym": 82.8125
+ },
+ "towers:TOWER_HEAVY": {
+  "name": "towers:TOWER_HEAVY",
+  "w": 16,
+  "h": 16,
+  "fill": 68,
+  "fillpct": 26.5625,
+  "colors": 6,
+  "used": [
+   [
+    "k",
+    27,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "d",
+    16,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "w",
+    12,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "m",
+    10,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "l",
+    2,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "y",
+    1,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "gray": "wl",
+   "211\u00b0": "m",
+   " 36\u00b0": "y"
+  },
+  "kedge": 25,
+  "kinner": 2,
+  "dither_pairs": 0,
+  "mirrorsym": 75.78125
+ },
+ "towers:TOWER_TWIN": {
+  "name": "towers:TOWER_TWIN",
+  "w": 16,
+  "h": 16,
+  "fill": 75,
+  "fillpct": 29.296875,
+  "colors": 6,
+  "used": [
+   [
+    "k",
+    36,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "d",
+    14,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "w",
+    14,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "m",
+    6,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "l",
+    4,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "y",
+    1,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "gray": "wl",
+   "211\u00b0": "m",
+   " 36\u00b0": "y"
+  },
+  "kedge": 32,
+  "kinner": 4,
+  "dither_pairs": 0,
+  "mirrorsym": 68.75
+ },
+ "towers:HUB_V2": {
+  "name": "towers:HUB_V2",
+  "w": 16,
+  "h": 16,
+  "fill": 51,
+  "fillpct": 19.921875,
+  "colors": 6,
+  "used": [
+   [
+    "k",
+    20,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    12,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "d",
+    10,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "m",
+    6,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "l",
+    2,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "y",
+    1,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "gray": "wl",
+   "212\u00b0": "d",
+   "211\u00b0": "m",
+   " 36\u00b0": "y"
+  },
+  "kedge": 20,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 81.25
+ },
+ "towers:MUZZLE_V2": {
+  "name": "towers:MUZZLE_V2",
+  "w": 8,
+  "h": 8,
+  "fill": 36,
+  "fillpct": 56.25,
+  "colors": 2,
+  "used": [
+   [
+    "y",
+    20,
+    "#ffb340",
+    " 36\u00b0"
+   ],
+   [
+    "w",
+    16,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   " 36\u00b0": "y",
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "projectiles:BULLET_V2": {
+  "name": "projectiles:BULLET_V2",
+  "w": 4,
+  "h": 4,
+  "fill": 12,
+  "fillpct": 75.0,
+  "colors": 2,
+  "used": [
+   [
+    "w",
+    8,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "y",
+    4,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "gray": "w",
+   " 36\u00b0": "y"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "projectiles:BULLET_CHARGED": {
+  "name": "projectiles:BULLET_CHARGED",
+  "w": 6,
+  "h": 6,
+  "fill": 24,
+  "fillpct": 66.66666666666667,
+  "colors": 2,
+  "used": [
+   [
+    "y",
+    12,
+    "#ffb340",
+    " 36\u00b0"
+   ],
+   [
+    "w",
+    12,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   " 36\u00b0": "y",
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "projectiles:SPARK_V2": {
+  "name": "projectiles:SPARK_V2",
+  "w": 2,
+  "h": 2,
+  "fill": 4,
+  "fillpct": 100.0,
+  "colors": 2,
+  "used": [
+   [
+    "w",
+    2,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "y",
+    2,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "gray": "w",
+   " 36\u00b0": "y"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 1,
+  "mirrorsym": 0.0
+ },
+ "projectiles:TRACER": {
+  "name": "projectiles:TRACER",
+  "w": 8,
+  "h": 2,
+  "fill": 12,
+  "fillpct": 75.0,
+  "colors": 4,
+  "used": [
+   [
+    "w",
+    6,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "m",
+    2,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "l",
+    2,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "y",
+    2,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "gray": "wl",
+   "211\u00b0": "m",
+   " 36\u00b0": "y"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "menu:PANEL_TILE": {
+  "name": "menu:PANEL_TILE",
+  "w": 16,
+  "h": 16,
+  "fill": 256,
+  "fillpct": 100.0,
+  "colors": 5,
+  "used": [
+   [
+    "d",
+    164,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "l",
+    33,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "k",
+    30,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "m",
+    28,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "w",
+    1,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "212\u00b0": "d",
+   "gray": "lw",
+   "214\u00b0": "k",
+   "211\u00b0": "m"
+  },
+  "kedge": 29,
+  "kinner": 1,
+  "dither_pairs": 0,
+  "mirrorsym": 75.78125
+ },
+ "menu:LOGO_BAR": {
+  "name": "menu:LOGO_BAR",
+  "w": 32,
+  "h": 8,
+  "fill": 40,
+  "fillpct": 15.625,
+  "colors": 1,
+  "used": [
+   [
+    "y",
+    40,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   " 36\u00b0": "y"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 68.75
+ },
+ "menu:SKILL_ICONS:overdrive": {
+  "name": "menu:SKILL_ICONS:overdrive",
+  "w": 8,
+  "h": 8,
+  "fill": 20,
+  "fillpct": 31.25,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    20,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "menu:SKILL_ICONS:gyro": {
+  "name": "menu:SKILL_ICONS:gyro",
+  "w": 8,
+  "h": 8,
+  "fill": 20,
+  "fillpct": 31.25,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    20,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 75.0
+ },
+ "menu:SKILL_ICONS:servos": {
+  "name": "menu:SKILL_ICONS:servos",
+  "w": 8,
+  "h": 8,
+  "fill": 36,
+  "fillpct": 56.25,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    36,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "menu:SKILL_ICONS:longscan": {
+  "name": "menu:SKILL_ICONS:longscan",
+  "w": 8,
+  "h": 8,
+  "fill": 18,
+  "fillpct": 28.125,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    18,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 56.25
+ },
+ "menu:SKILL_ICONS:wideband": {
+  "name": "menu:SKILL_ICONS:wideband",
+  "w": 8,
+  "h": 8,
+  "fill": 20,
+  "fillpct": 31.25,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    20,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 50.0
+ },
+ "menu:SKILL_ICONS:trigger": {
+  "name": "menu:SKILL_ICONS:trigger",
+  "w": 8,
+  "h": 8,
+  "fill": 20,
+  "fillpct": 31.25,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    20,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "menu:SKILL_ICONS:marksman": {
+  "name": "menu:SKILL_ICONS:marksman",
+  "w": 8,
+  "h": 8,
+  "fill": 32,
+  "fillpct": 50.0,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    32,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "menu:SKILL_ICONS:charger": {
+  "name": "menu:SKILL_ICONS:charger",
+  "w": 8,
+  "h": 8,
+  "fill": 17,
+  "fillpct": 26.5625,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    17,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 71.875
+ },
+ "menu:SKILL_ICONS:plating": {
+  "name": "menu:SKILL_ICONS:plating",
+  "w": 8,
+  "h": 8,
+  "fill": 32,
+  "fillpct": 50.0,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    32,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 37.5
+ },
+ "menu:SKILL_ICONS:nanorepair": {
+  "name": "menu:SKILL_ICONS:nanorepair",
+  "w": 8,
+  "h": 8,
+  "fill": 28,
+  "fillpct": 43.75,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    28,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "menu:SKILL_ICONS:slipstream": {
+  "name": "menu:SKILL_ICONS:slipstream",
+  "w": 8,
+  "h": 8,
+  "fill": 13,
+  "fillpct": 20.3125,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    13,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 59.375
+ },
+ "menu:SKILL_ICONS:deadeye": {
+  "name": "menu:SKILL_ICONS:deadeye",
+  "w": 8,
+  "h": 8,
+  "fill": 32,
+  "fillpct": 50.0,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    32,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "menu:SKILL_ICONS:scout": {
+  "name": "menu:SKILL_ICONS:scout",
+  "w": 8,
+  "h": 8,
+  "fill": 26,
+  "fillpct": 40.625,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    26,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 68.75
+ },
+ "menu:UI_ICONS:dash": {
+  "name": "menu:UI_ICONS:dash",
+  "w": 8,
+  "h": 8,
+  "fill": 18,
+  "fillpct": 28.125,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    18,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 81.25
+ },
+ "menu:UI_ICONS:emp": {
+  "name": "menu:UI_ICONS:emp",
+  "w": 8,
+  "h": 8,
+  "fill": 21,
+  "fillpct": 32.8125,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    21,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 65.625
+ },
+ "menu:UI_ICONS:trophy": {
+  "name": "menu:UI_ICONS:trophy",
+  "w": 8,
+  "h": 8,
+  "fill": 24,
+  "fillpct": 37.5,
+  "colors": 1,
+  "used": [
+   [
+    "w",
+    24,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 56.25
+ },
+ "menu:UI_ICONS:skull": {
+  "name": "menu:UI_ICONS:skull",
+  "w": 8,
+  "h": 8,
+  "fill": 28,
+  "fillpct": 43.75,
+  "colors": 2,
+  "used": [
+   [
+    "w",
+    26,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "k",
+    2,
+    "#0b0e12",
+    "214\u00b0"
+   ]
+  ],
+  "huefams": {
+   "gray": "w",
+   "214\u00b0": "k"
+  },
+  "kedge": 0,
+  "kinner": 2,
+  "dither_pairs": 0,
+  "mirrorsym": 43.75
+ },
+ "menu:UI_ICONS:copy": {
+  "name": "menu:UI_ICONS:copy",
+  "w": 8,
+  "h": 8,
+  "fill": 27,
+  "fillpct": 42.1875,
+  "colors": 2,
+  "used": [
+   [
+    "k",
+    20,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    7,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "gray": "w"
+  },
+  "kedge": 17,
+  "kinner": 3,
+  "dither_pairs": 2,
+  "mirrorsym": 56.25
+ },
+ "fx:BOOM_1": {
+  "name": "fx:BOOM_1",
+  "w": 16,
+  "h": 16,
+  "fill": 56,
+  "fillpct": 21.875,
+  "colors": 2,
+  "used": [
+   [
+    "w",
+    34,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "y",
+    22,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "gray": "w",
+   " 36\u00b0": "y"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 95.3125
+ },
+ "fx:BOOM_2": {
+  "name": "fx:BOOM_2",
+  "w": 16,
+  "h": 16,
+  "fill": 100,
+  "fillpct": 39.0625,
+  "colors": 4,
+  "used": [
+   [
+    "r",
+    36,
+    "#ff5d5d",
+    "  0\u00b0"
+   ],
+   [
+    "w",
+    32,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "y",
+    20,
+    "#ffb340",
+    " 36\u00b0"
+   ],
+   [
+    "o",
+    12,
+    "#e06a2d",
+    " 20\u00b0"
+   ]
+  ],
+  "huefams": {
+   "  0\u00b0": "r",
+   "gray": "w",
+   " 36\u00b0": "y",
+   " 20\u00b0": "o"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "fx:BOOM_3": {
+  "name": "fx:BOOM_3",
+  "w": 16,
+  "h": 16,
+  "fill": 68,
+  "fillpct": 26.5625,
+  "colors": 4,
+  "used": [
+   [
+    "r",
+    26,
+    "#ff5d5d",
+    "  0\u00b0"
+   ],
+   [
+    "o",
+    22,
+    "#e06a2d",
+    " 20\u00b0"
+   ],
+   [
+    "s",
+    16,
+    "#3a4656",
+    "214\u00b0"
+   ],
+   [
+    "y",
+    4,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "  0\u00b0": "r",
+   " 20\u00b0": "o",
+   "214\u00b0": "s",
+   " 36\u00b0": "y"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "fx:BOOM_4": {
+  "name": "fx:BOOM_4",
+  "w": 16,
+  "h": 16,
+  "fill": 105,
+  "fillpct": 41.015625,
+  "colors": 3,
+  "used": [
+   [
+    "s",
+    99,
+    "#3a4656",
+    "214\u00b0"
+   ],
+   [
+    "r",
+    5,
+    "#ff5d5d",
+    "  0\u00b0"
+   ],
+   [
+    "o",
+    1,
+    "#e06a2d",
+    " 20\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "s",
+   "  0\u00b0": "r",
+   " 20\u00b0": "o"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 92.96875
+ },
+ "fx:RING_FX": {
+  "name": "fx:RING_FX",
+  "w": 16,
+  "h": 16,
+  "fill": 68,
+  "fillpct": 26.5625,
+  "colors": 2,
+  "used": [
+   [
+    "y",
+    36,
+    "#ffb340",
+    " 36\u00b0"
+   ],
+   [
+    "w",
+    32,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   " 36\u00b0": "y",
+   "gray": "w"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "fx:CHARGE_AURA": {
+  "name": "fx:CHARGE_AURA",
+  "w": 16,
+  "h": 16,
+  "fill": 44,
+  "fillpct": 17.1875,
+  "colors": 2,
+  "used": [
+   [
+    "w",
+    28,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "y",
+    16,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "gray": "w",
+   " 36\u00b0": "y"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "floor:FLOOR_A": {
+  "name": "floor:FLOOR_A",
+  "w": 16,
+  "h": 16,
+  "fill": 256,
+  "fillpct": 100.0,
+  "colors": 3,
+  "used": [
+   [
+    "p",
+    192,
+    "#12171d",
+    "212\u00b0"
+   ],
+   [
+    "k",
+    52,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "q",
+    12,
+    "#1b232d",
+    "213\u00b0"
+   ]
+  ],
+  "huefams": {
+   "212\u00b0": "p",
+   "214\u00b0": "k",
+   "213\u00b0": "q"
+  },
+  "kedge": 0,
+  "kinner": 52,
+  "dither_pairs": 0,
+  "mirrorsym": 90.625
+ },
+ "floor:FLOOR_B": {
+  "name": "floor:FLOOR_B",
+  "w": 16,
+  "h": 16,
+  "fill": 256,
+  "fillpct": 100.0,
+  "colors": 4,
+  "used": [
+   [
+    "k",
+    132,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "p",
+    72,
+    "#12171d",
+    "212\u00b0"
+   ],
+   [
+    "h",
+    40,
+    "#3d444c",
+    "212\u00b0"
+   ],
+   [
+    "q",
+    12,
+    "#1b232d",
+    "213\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "212\u00b0": "ph",
+   "213\u00b0": "q"
+  },
+  "kedge": 0,
+  "kinner": 132,
+  "dither_pairs": 0,
+  "mirrorsym": 59.375
+ },
+ "floor:FLOOR_C": {
+  "name": "floor:FLOOR_C",
+  "w": 16,
+  "h": 16,
+  "fill": 256,
+  "fillpct": 100.0,
+  "colors": 4,
+  "used": [
+   [
+    "p",
+    157,
+    "#12171d",
+    "212\u00b0"
+   ],
+   [
+    "k",
+    75,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "q",
+    12,
+    "#1b232d",
+    "213\u00b0"
+   ],
+   [
+    "a",
+    12,
+    "#8a6d1f",
+    " 43\u00b0"
+   ]
+  ],
+  "huefams": {
+   "212\u00b0": "p",
+   "214\u00b0": "k",
+   "213\u00b0": "q",
+   " 43\u00b0": "a"
+  },
+  "kedge": 0,
+  "kinner": 75,
+  "dither_pairs": 0,
+  "mirrorsym": 67.96875
+ },
+ "floor:FLOOR_D": {
+  "name": "floor:FLOOR_D",
+  "w": 16,
+  "h": 16,
+  "fill": 256,
+  "fillpct": 100.0,
+  "colors": 4,
+  "used": [
+   [
+    "p",
+    184,
+    "#12171d",
+    "212\u00b0"
+   ],
+   [
+    "k",
+    56,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "q",
+    12,
+    "#1b232d",
+    "213\u00b0"
+   ],
+   [
+    "m",
+    4,
+    "#5d6a78",
+    "211\u00b0"
+   ]
+  ],
+  "huefams": {
+   "212\u00b0": "p",
+   "214\u00b0": "k",
+   "213\u00b0": "q",
+   "211\u00b0": "m"
+  },
+  "kedge": 0,
+  "kinner": 56,
+  "dither_pairs": 0,
+  "mirrorsym": 89.0625
+ },
+ "decor:DECOR_CRATE": {
+  "name": "decor:DECOR_CRATE",
+  "w": 16,
+  "h": 16,
+  "fill": 168,
+  "fillpct": 65.625,
+  "colors": 4,
+  "used": [
+   [
+    "k",
+    72,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "d",
+    56,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "m",
+    32,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "l",
+    8,
+    "#9aa7b4",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "211\u00b0": "m",
+   "gray": "l"
+  },
+  "kedge": 48,
+  "kinner": 24,
+  "dither_pairs": 4,
+  "mirrorsym": 100.0
+ },
+ "decor:DECOR_BARREL": {
+  "name": "decor:DECOR_BARREL",
+  "w": 16,
+  "h": 16,
+  "fill": 160,
+  "fillpct": 62.5,
+  "colors": 5,
+  "used": [
+   [
+    "d",
+    76,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "k",
+    61,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "y",
+    11,
+    "#ffb340",
+    " 36\u00b0"
+   ],
+   [
+    "l",
+    6,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "m",
+    6,
+    "#5d6a78",
+    "211\u00b0"
+   ]
+  ],
+  "huefams": {
+   "212\u00b0": "d",
+   "214\u00b0": "k",
+   " 36\u00b0": "y",
+   "gray": "l",
+   "211\u00b0": "m"
+  },
+  "kedge": 42,
+  "kinner": 19,
+  "dither_pairs": 0,
+  "mirrorsym": 86.71875
+ },
+ "decor:DECOR_LAMP": {
+  "name": "decor:DECOR_LAMP",
+  "w": 16,
+  "h": 16,
+  "fill": 46,
+  "fillpct": 17.96875,
+  "colors": 4,
+  "used": [
+   [
+    "k",
+    26,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "m",
+    14,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "l",
+    4,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "y",
+    2,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "211\u00b0": "m",
+   "gray": "l",
+   " 36\u00b0": "y"
+  },
+  "kedge": 24,
+  "kinner": 2,
+  "dither_pairs": 0,
+  "mirrorsym": 81.25
+ },
+ "decor:DECOR_LAMP_B": {
+  "name": "decor:DECOR_LAMP_B",
+  "w": 16,
+  "h": 16,
+  "fill": 48,
+  "fillpct": 18.75,
+  "colors": 3,
+  "used": [
+   [
+    "k",
+    26,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "m",
+    14,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "w",
+    8,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "211\u00b0": "m",
+   "gray": "w"
+  },
+  "kedge": 24,
+  "kinner": 2,
+  "dither_pairs": 0,
+  "mirrorsym": 79.6875
+ },
+ "decor:DECOR_VENT": {
+  "name": "decor:DECOR_VENT",
+  "w": 16,
+  "h": 16,
+  "fill": 144,
+  "fillpct": 56.25,
+  "colors": 4,
+  "used": [
+   [
+    "k",
+    56,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "d",
+    40,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "m",
+    24,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "l",
+    24,
+    "#9aa7b4",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "211\u00b0": "m",
+   "gray": "l"
+  },
+  "kedge": 44,
+  "kinner": 12,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "chassis:CHASSIS_V2:rusher": {
+  "name": "chassis:CHASSIS_V2:rusher",
+  "w": 16,
+  "h": 16,
+  "fill": 156,
+  "fillpct": 60.9375,
+  "colors": 6,
+  "used": [
+   [
+    "w",
+    72,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "k",
+    46,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "l",
+    20,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "d",
+    14,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "m",
+    2,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "r",
+    2,
+    "#ff5d5d",
+    "  0\u00b0"
+   ]
+  ],
+  "huefams": {
+   "gray": "wl",
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "211\u00b0": "m",
+   "  0\u00b0": "r"
+  },
+  "kedge": 40,
+  "kinner": 6,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "chassis:CHASSIS_V2:turret": {
+  "name": "chassis:CHASSIS_V2:turret",
+  "w": 16,
+  "h": 16,
+  "fill": 210,
+  "fillpct": 82.03125,
+  "colors": 6,
+  "used": [
+   [
+    "k",
+    60,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "d",
+    48,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "w",
+    36,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "m",
+    32,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "l",
+    22,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "y",
+    12,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "gray": "wl",
+   "211\u00b0": "m",
+   " 36\u00b0": "y"
+  },
+  "kedge": 50,
+  "kinner": 10,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "chassis:CHASSIS_V2:orbiter": {
+  "name": "chassis:CHASSIS_V2:orbiter",
+  "w": 16,
+  "h": 16,
+  "fill": 108,
+  "fillpct": 42.1875,
+  "colors": 6,
+  "used": [
+   [
+    "w",
+    48,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "k",
+    40,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "l",
+    12,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "d",
+    4,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "m",
+    2,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "g",
+    2,
+    "#7de08a",
+    "127\u00b0"
+   ]
+  ],
+  "huefams": {
+   "gray": "wl",
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "211\u00b0": "m",
+   "127\u00b0": "g"
+  },
+  "kedge": 36,
+  "kinner": 4,
+  "dither_pairs": 0,
+  "mirrorsym": 57.03125
+ },
+ "chassis:CHASSIS_V2:wanderer": {
+  "name": "chassis:CHASSIS_V2:wanderer",
+  "w": 16,
+  "h": 16,
+  "fill": 142,
+  "fillpct": 55.46875,
+  "colors": 5,
+  "used": [
+   [
+    "k",
+    44,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    36,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "l",
+    30,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "d",
+    28,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "g",
+    4,
+    "#7de08a",
+    "127\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "gray": "wl",
+   "212\u00b0": "d",
+   "127\u00b0": "g"
+  },
+  "kedge": 42,
+  "kinner": 2,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "chassis:CHASSIS_V2:sniper": {
+  "name": "chassis:CHASSIS_V2:sniper",
+  "w": 16,
+  "h": 16,
+  "fill": 178,
+  "fillpct": 69.53125,
+  "colors": 6,
+  "used": [
+   [
+    "d",
+    58,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "k",
+    50,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    36,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "l",
+    28,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "c",
+    4,
+    "#ffd28a",
+    " 36\u00b0"
+   ],
+   [
+    "m",
+    2,
+    "#5d6a78",
+    "211\u00b0"
+   ]
+  ],
+  "huefams": {
+   "212\u00b0": "d",
+   "214\u00b0": "k",
+   "gray": "wl",
+   " 36\u00b0": "c",
+   "211\u00b0": "m"
+  },
+  "kedge": 42,
+  "kinner": 8,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "chassis:CHASSIS_V2:brawler": {
+  "name": "chassis:CHASSIS_V2:brawler",
+  "w": 16,
+  "h": 16,
+  "fill": 194,
+  "fillpct": 75.78125,
+  "colors": 6,
+  "used": [
+   [
+    "w",
+    64,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "k",
+    48,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "d",
+    38,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "l",
+    34,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "m",
+    6,
+    "#5d6a78",
+    "211\u00b0"
+   ],
+   [
+    "r",
+    4,
+    "#ff5d5d",
+    "  0\u00b0"
+   ]
+  ],
+  "huefams": {
+   "gray": "wl",
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "211\u00b0": "m",
+   "  0\u00b0": "r"
+  },
+  "kedge": 46,
+  "kinner": 2,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "chassis:CHASSIS_V2:ghost": {
+  "name": "chassis:CHASSIS_V2:ghost",
+  "w": 16,
+  "h": 16,
+  "fill": 146,
+  "fillpct": 57.03125,
+  "colors": 5,
+  "used": [
+   [
+    "k",
+    40,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    38,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "l",
+    36,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "d",
+    28,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "b",
+    4,
+    "#3a7ca5",
+    "202\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "gray": "wl",
+   "212\u00b0": "d",
+   "202\u00b0": "b"
+  },
+  "kedge": 36,
+  "kinner": 4,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "chassis:CHASSIS_V2:hunter": {
+  "name": "chassis:CHASSIS_V2:hunter",
+  "w": 16,
+  "h": 16,
+  "fill": 180,
+  "fillpct": 70.3125,
+  "colors": 6,
+  "used": [
+   [
+    "d",
+    62,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "k",
+    50,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    36,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "l",
+    26,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "r",
+    4,
+    "#ff5d5d",
+    "  0\u00b0"
+   ],
+   [
+    "m",
+    2,
+    "#5d6a78",
+    "211\u00b0"
+   ]
+  ],
+  "huefams": {
+   "212\u00b0": "d",
+   "214\u00b0": "k",
+   "gray": "wl",
+   "  0\u00b0": "r",
+   "211\u00b0": "m"
+  },
+  "kedge": 42,
+  "kinner": 8,
+  "dither_pairs": 2,
+  "mirrorsym": 100.0
+ },
+ "anim:TREADS_A": {
+  "name": "anim:TREADS_A",
+  "w": 16,
+  "h": 4,
+  "fill": 64,
+  "fillpct": 100.0,
+  "colors": 3,
+  "used": [
+   [
+    "k",
+    36,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "l",
+    16,
+    "#9aa7b4",
+    "gray"
+   ],
+   [
+    "d",
+    12,
+    "#232e3b",
+    "212\u00b0"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "gray": "l",
+   "212\u00b0": "d"
+  },
+  "kedge": 36,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "anim:TREADS_B": {
+  "name": "anim:TREADS_B",
+  "w": 16,
+  "h": 4,
+  "fill": 64,
+  "fillpct": 100.0,
+  "colors": 3,
+  "used": [
+   [
+    "k",
+    36,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "d",
+    16,
+    "#232e3b",
+    "212\u00b0"
+   ],
+   [
+    "l",
+    12,
+    "#9aa7b4",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "212\u00b0": "d",
+   "gray": "l"
+  },
+  "kedge": 36,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "anim:RECOIL_A": {
+  "name": "anim:RECOIL_A",
+  "w": 16,
+  "h": 16,
+  "fill": 37,
+  "fillpct": 14.453125,
+  "colors": 2,
+  "used": [
+   [
+    "k",
+    26,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    11,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "gray": "w"
+  },
+  "kedge": 22,
+  "kinner": 4,
+  "dither_pairs": 0,
+  "mirrorsym": 87.5
+ },
+ "anim:RECOIL_B": {
+  "name": "anim:RECOIL_B",
+  "w": 16,
+  "h": 16,
+  "fill": 31,
+  "fillpct": 12.109375,
+  "colors": 2,
+  "used": [
+   [
+    "k",
+    22,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    9,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "gray": "w"
+  },
+  "kedge": 18,
+  "kinner": 4,
+  "dither_pairs": 0,
+  "mirrorsym": 90.625
+ },
+ "anim:SPAWN_A": {
+  "name": "anim:SPAWN_A",
+  "w": 16,
+  "h": 16,
+  "fill": 36,
+  "fillpct": 14.0625,
+  "colors": 2,
+  "used": [
+   [
+    "k",
+    20,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    16,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "gray": "w"
+  },
+  "kedge": 20,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "anim:SPAWN_B": {
+  "name": "anim:SPAWN_B",
+  "w": 16,
+  "h": 16,
+  "fill": 72,
+  "fillpct": 28.125,
+  "colors": 2,
+  "used": [
+   [
+    "k",
+    40,
+    "#0b0e12",
+    "214\u00b0"
+   ],
+   [
+    "w",
+    32,
+    "#e8edf2",
+    "gray"
+   ]
+  ],
+  "huefams": {
+   "214\u00b0": "k",
+   "gray": "w"
+  },
+  "kedge": 40,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ },
+ "anim:BIG_MUZZLE": {
+  "name": "anim:BIG_MUZZLE",
+  "w": 8,
+  "h": 8,
+  "fill": 40,
+  "fillpct": 62.5,
+  "colors": 2,
+  "used": [
+   [
+    "w",
+    28,
+    "#e8edf2",
+    "gray"
+   ],
+   [
+    "y",
+    12,
+    "#ffb340",
+    " 36\u00b0"
+   ]
+  ],
+  "huefams": {
+   "gray": "w",
+   " 36\u00b0": "y"
+  },
+  "kedge": 0,
+  "kinner": 0,
+  "dither_pairs": 0,
+  "mirrorsym": 100.0
+ }
+}

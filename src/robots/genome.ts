@@ -53,7 +53,7 @@ export interface Genome {
  * Tunable ranges per bot. Defaults reproduce each bot's legacy behavior
  * exactly (soak checks default-params fingerprints against `create()`).
  * Groups: steer.* turret.* fire.* drive.* engage.* orbit.* weave.* anchor.*
- * kite.* dodge.* dash.* target.* search.* brain.* plus the loadout chromosome.
+ * kite.* dodge.* dash.* target.* search.* brain.* model.* plus the loadout chromosome.
  */
 export const PARAM_RANGES: Record<string, Record<string, ParamDef>> = {
     hunter: {
@@ -72,6 +72,10 @@ export const PARAM_RANGES: Record<string, Record<string, ParamDef>> = {
         'brain.aggression': { type: 'float', min: 0, max: 2, default: 1 },
         'brain.focusBonus': { type: 'float', min: 0, max: 1, default: 0.3 },
         'brain.orbitDir': { type: 'enum', values: [-1, 1], default: 1 },
+        'model.leadScale': { type: 'float', min: 0, max: 1.5, default: 1 },
+        'model.counterGain': { type: 'float', min: -0.5, max: 1.5, default: 0 },
+        'model.minConf': { type: 'float', min: 0.5, max: 1, default: 0.7 },
+        'model.aimTolBoost': { type: 'float', min: 0, max: 0.2, default: 0.04 },
         loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { overdrive: 2, trigger: 2, plating: 2 } },
     },
     orbiter: {

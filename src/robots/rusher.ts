@@ -1,20 +1,24 @@
-// Rusher: charges the nearest visible foe, guns blazing. When blind, it
-// sweeps its tower while driving to the last known contact (or midfield).
+// Rusher: charges the nearest visible foe, guns blazing. Runs the
+// adaptive brain (engage / retreat / kite / flank / focus / roam) on its
+// near-hunter aggressive preset; the pre-brain logic stays available as
+// createLegacyWithParams for the regression gate and the frozen hillclimb
+// champion.
 
-import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, TOWER_RATE } from '../sim/constants';
 import { clamp } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
-import { pickTarget, type BrainTargetPolicy } from './brain';
+import { BRAIN_PRESETS, createBrain, pickTarget, type BrainParams, type BrainTargetPolicy } from './brain';
 import { aimed, aimTurret, steerTo, throttleFor } from './common';
+import { castFocusVote } from './comms';
 import type { Genome } from './genome';
 
 export const meta: RobotMeta = {
     id: 'rusher',
     name: 'Rusher',
     author: 'RobotArena',
-    version: '2.0.0',
-    description: 'Charges the nearest foe head-on. Simple, fast, and rude.',
+    version: '3.0.0',
+    description: 'Adaptive rusher: charges, kites, flanks, and focuses with its team.',
 };
 
 export const loadout: SkillLoadout = { overdrive: 1, longscan: 1, trigger: 2, plating: 2 };
@@ -29,6 +33,8 @@ export interface RusherParams {
     weavePeriod: number;
     scanRate: number;
     targetPolicy: BrainTargetPolicy;
+    /** Brain mode utilities (brain.* genome group); absent = preset defaults. */
+    brain?: Partial<BrainParams>;
 }
 
 export const RUSHER_DEFAULTS: RusherParams = {
@@ -61,10 +67,20 @@ export function rusherParamsFromGenome(genome: Genome): RusherParams {
             typeof policy === 'string' && (TARGET_POLICIES as ReadonlyArray<string>).includes(policy)
                 ? (policy as BrainTargetPolicy)
                 : RUSHER_DEFAULTS.targetPolicy,
+        brain: {
+            retreatHp: num('brain.retreatHp', 0.15),
+            kiteRange: num('brain.kiteRange', 120),
+            flankRange: num('brain.flankRange', 350),
+            stayBonus: num('brain.stayBonus', 0.15),
+            aggression: num('brain.aggression', 1.4),
+            focusBonus: num('brain.focusBonus', 0.3),
+            orbitDir: p['brain.orbitDir'] === -1 ? -1 : 1,
+        },
     };
 }
 
-export function createWithParams(overrides?: Partial<RusherParams>): RobotController {
+/** Pre-brain rusher, frozen: charge the foe, weave while closing. */
+export function createLegacyWithParams(overrides?: Partial<RusherParams>): RobotController {
     const p: RusherParams = { ...RUSHER_DEFAULTS, ...overrides };
     let lastX = ARENA_WIDTH / 2;
     let lastY = ARENA_HEIGHT / 2;
@@ -93,6 +109,42 @@ export function createWithParams(overrides?: Partial<RusherParams>): RobotContro
             fire,
             charge: false,
         };
+    }
+
+    return { meta, loadout, update };
+}
+
+/**
+ * Brain rusher: the same execution, steered by the 6-mode scorer.
+ * Bank/close knobs come from the preset (rusher has no such genome
+ * group); scanRate maps onto the brain's scanTurn so the knob stays
+ * live; everything else passes through.
+ */
+export function createWithParams(overrides?: Partial<RusherParams>): RobotController {
+    const p: RusherParams = { ...RUSHER_DEFAULTS, ...overrides };
+    const preset = BRAIN_PRESETS['rusher'] as BrainParams;
+    const brain = createBrain({
+        steerGain: p.steerGain,
+        turretGain: p.turretGain,
+        aimTol: p.aimTol,
+        bankRangeFrac: preset.bankRangeFrac,
+        closeRangeFrac: preset.closeRangeFrac,
+        closeThrottle: preset.closeThrottle,
+        scanTurn: clamp(p.scanRate / TOWER_RATE, -1, 1),
+        targetPolicy: p.targetPolicy,
+        retreatHp: preset.retreatHp,
+        kiteRange: preset.kiteRange,
+        flankRange: preset.flankRange,
+        stayBonus: preset.stayBonus,
+        aggression: preset.aggression,
+        focusBonus: preset.focusBonus,
+        orbitDir: preset.orbitDir,
+        ...(p.brain ?? {}),
+    });
+
+    function update(sense: SenseState): Intent {
+        const out = brain.update(sense);
+        return { ...out.intent, radio: out.targetId !== null ? castFocusVote(out.targetId) : null };
     }
 
     return { meta, loadout, update };
