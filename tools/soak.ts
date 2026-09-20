@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSOR_RANGE, SENSOR_SHARE_DELAY, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
@@ -20,6 +20,7 @@ import {
     recordMatch,
     winRates,
 } from '../src/game/history';
+import { dodgeVector, leadAngle, leadShot, toGrid } from '../src/robots/common';
 import { ROBOTS } from '../src/robots/registry';
 import { canonicalStringify, defaultGenome, genomeDefFor, genomeHash, genomeLoadout, sha256Hex, validateGenome, type Genome } from '../src/robots/genome';
 import { createWithParams as createHunterParams, HUNTER_DEFAULTS, hunterParamsFromGenome } from '../src/robots/hunter';
@@ -1509,6 +1510,426 @@ console.log('genome');
 
     // leadAngle dedup: hunter still leads (sanity: it fires lead shots, not raw bearings).
     check('hunter lead helper shared via common', typeof createHunterParams === 'function');
+}
+
+// --- 11. Sense expansion: events, bullets, tracks, arena, zone, grid, match -
+console.log('senses');
+{
+    interface SenseDigest {
+        tick: number;
+        events: Array<{ kind: string; amount: number; bearing: number; fromId: number }>;
+        bullets: Array<{ x: number; y: number; distance: number; closing: number; damage: number }>;
+        tracks: Array<{ id: number; x: number; y: number; lastSeenTick: number; seenNow: boolean }>;
+        gridFoes: number[];
+        gridDanger: number[];
+        lastDamage: { tick: number; amount: number; fromId: number } | null;
+        blocked: number;
+        zoneInside: boolean;
+        zoneSafety: number;
+        killsYou: number;
+        aliveFoes: number;
+    }
+    const digest = (sense: SenseState): SenseDigest => ({
+        tick: sense.tick,
+        events: (sense.events ?? []).map((e) => ({ kind: e.kind, amount: e.amount ?? -1, bearing: e.bearing ?? -999, fromId: e.fromId ?? -1 })),
+        bullets: (sense.bullets ?? []).map((b) => ({ x: b.x, y: b.y, distance: b.distance, closing: b.closing, damage: b.damage })),
+        tracks: (sense.tracks ?? []).map((t) => ({ id: t.id, x: t.x, y: t.y, lastSeenTick: t.lastSeenTick, seenNow: t.seenNow })),
+        gridFoes: [...(sense.grid?.foes ?? [])],
+        gridDanger: [...(sense.grid?.danger ?? [])],
+        lastDamage: sense.self.lastDamage ? { tick: sense.self.lastDamage.tick, amount: sense.self.lastDamage.amount, fromId: sense.self.lastDamage.fromId } : null,
+        blocked: sense.self.blocked.ahead,
+        zoneInside: sense.zone?.inside ?? false,
+        zoneSafety: sense.zone?.distToSafety ?? -1,
+        killsYou: sense.match?.killsYou ?? -1,
+        aliveFoes: sense.match?.aliveFoes ?? -1,
+    });
+    // Channel presence + static values on the spawn tick, both arenas.
+    for (const arena of ARENA_IDS) {
+        let first: SenseState | null = null;
+        const probe: RobotController = {
+            meta: { id: 'probe', name: 'Probe', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                if (!first) first = sense;
+                return {};
+            },
+        };
+        const sitter: RobotController = {
+            meta: { id: 'sitter', name: 'Sitter', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({}),
+        };
+        new Match(
+            [
+                { team: 0, controller: probe },
+                { team: 1, controller: sitter },
+            ],
+            3,
+            { arena },
+        ).step();
+        const s = first as unknown as SenseState;
+        check(`spawn sense carries every channel (${arena})`, Array.isArray(s.events) && Array.isArray(s.bullets) && Array.isArray(s.tracks) && s.arena !== undefined && s.zone !== undefined && s.grid !== undefined && s.match !== undefined);
+        check(`spawn events/bullets/tracks start empty (${arena})`, s.events?.length === 0 && s.bullets?.length === 0 && s.tracks?.length === 0);
+        check(`arena reports ${arena} + center`, s.arena?.id === arena && s.arena?.centerX === ARENA_WIDTH / 2 && s.arena?.centerY === ARENA_HEIGHT / 2 && (s.arena?.obstacles.length ?? -1) === ARENA_OBSTACLES[arena].length);
+        check(`zone opens normal with ${MAX_TICKS} ticks to spare (${arena})`, s.zone?.phase === 'normal' && s.zone?.suddenDeathIn === MAX_TICKS && s.zone?.inside === true && s.zone?.distToSafety === 0);
+        check(`grid is 12x8 zeroed (${arena})`, s.grid?.w === SENSE_GRID_W && s.grid?.h === SENSE_GRID_H && s.grid?.cell === SENSE_GRID_CELL && s.grid?.foes.length === 96 && s.grid?.danger.length === 96 && (s.grid?.foes.every((v) => v === 0) ?? false));
+        check(`match reports arena + caps (${arena})`, s.match?.arena === arena && s.match?.tickCap === MAX_TICKS_TOTAL && s.match?.killsYou === 0 && s.match?.killsTeam === 0 && s.match?.aliveFoes === 1);
+        check(`lastDamage opens null (${arena})`, s.self.lastDamage === null);
+        check(`spawn whisker reads the far wall (${arena})`, s.self.blocked.ahead === ARENA_WIDTH - 130 - ROBOT_RADIUS, `ahead=${s.self.blocked.ahead}`);
+    }
+    // Determinism: identical spied digests across two full matches.
+    const runSpied = (): SenseDigest[][] => {
+        const logs: SenseDigest[][] = [[], []];
+        const mk = (id: string, team: 0 | 1, slot: number): LineupEntry => {
+            const entry = ROBOTS.find((r) => r.meta.id === id);
+            if (!entry) throw new Error(`unknown robot ${id}`);
+            const inner = entry.create();
+            return {
+                team,
+                controller: {
+                    meta: inner.meta,
+                    loadout: inner.loadout,
+                    onSpawn: inner.onSpawn,
+                    update: (sense: SenseState): Intent => {
+                        (logs[slot] as SenseDigest[]).push(digest(sense));
+                        return inner.update(sense);
+                    },
+                },
+                loadout: { ...entry.loadout },
+            };
+        };
+        const match = new Match([mk('hunter', 0, 0), mk('ghost', 1, 1)], 77, { arena: 'blocks' });
+        match.runToEnd();
+        return logs;
+    };
+    const senseA = runSpied();
+    const senseB = runSpied();
+    check('new sense channels are deterministic', JSON.stringify(senseA) === JSON.stringify(senseB));
+    // Shape invariants hold on every logged tick of a real match.
+    let shapeOk = senseA[0]?.length !== 0 && senseA[1]?.length !== 0;
+    let sawBullet = false;
+    let sawTrack = false;
+    let sawHit = false;
+    for (const log of senseA) {
+        for (const entry of log ?? []) {
+            if (entry.events.length > SENSE_EVENTS_MAX || entry.bullets.length > SENSE_BULLETS_MAX) shapeOk = false;
+            for (let i = 1; i < entry.events.length; i += 1) {
+                const a = entry.events[i - 1] as { kind: string; fromId: number };
+                const b = entry.events[i] as { kind: string; fromId: number };
+                if (a.kind > b.kind || (a.kind === b.kind && a.fromId > b.fromId)) shapeOk = false;
+            }
+            for (let i = 1; i < entry.bullets.length; i += 1) {
+                const a = entry.bullets[i - 1] as { distance: number };
+                const b = entry.bullets[i] as { distance: number };
+                if (a.distance > b.distance) shapeOk = false;
+            }
+            if (entry.bullets.length > 0) sawBullet = true;
+            if (entry.tracks.length > 0) sawTrack = true;
+            if (entry.lastDamage) sawHit = true;
+            if (!Number.isFinite(entry.blocked) || entry.blocked < 0) shapeOk = false;
+            if (entry.gridFoes.length !== 96 || entry.gridDanger.length !== 96) shapeOk = false;
+            if (!entry.gridFoes.every((v) => Number.isInteger(v) && v >= 0) || !entry.gridDanger.every((v) => Number.isInteger(v) && v >= 0)) shapeOk = false;
+        }
+    }
+    check('events sorted kind-then-id, caps + grid ints hold every tick', shapeOk);
+    check('real match sees bullets, tracks, and damage', sawBullet && sawTrack && sawHit);
+    // Scripted kill: hit-by + lastDamage on the victim, kill on the shooter,
+    // foe-down on the shooter's mate, ally-down on the victim's mate.
+    {
+        const shooter: RobotController = {
+            meta: { id: 'shooter', name: 'Shooter', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                const foe = sense.foes[0] ?? sense.scout[0];
+                if (!foe) return { throttle: 1, turn: 0, towerTurn: 0.8 };
+                const goal = Math.atan2(foe.y - sense.self.y, foe.x - sense.self.x);
+                let diff = goal - sense.self.heading;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                let tdiff = goal - sense.self.tower;
+                while (tdiff > Math.PI) tdiff -= Math.PI * 2;
+                while (tdiff < -Math.PI) tdiff += Math.PI * 2;
+                return {
+                    throttle: 1,
+                    turn: Math.max(-1, Math.min(1, diff * 2.5)),
+                    towerTurn: Math.max(-1, Math.min(1, tdiff * 3)),
+                    fire: foe.distance < sense.self.stats.gunRange && Math.abs(tdiff) < 0.07,
+                };
+            },
+        };
+        const sitter = (id: string): RobotController => ({
+            meta: { id, name: id, author: 'test', version: '0', description: '' },
+            update: (): Intent => ({}),
+        });
+        interface KillLog {
+            hitBy: number;
+            lastAmount: number;
+            kills: number[];
+            foeDown: number[];
+            allyDown: number[];
+        }
+        const logs = new Map<number, KillLog>();
+        const watch = (inner: RobotController): RobotController => ({
+            meta: inner.meta,
+            update: (sense: SenseState): Intent => {
+                let log = logs.get(sense.self.id);
+                if (!log) {
+                    log = { hitBy: 0, lastAmount: 0, kills: [], foeDown: [], allyDown: [] };
+                    logs.set(sense.self.id, log);
+                }
+                for (const e of sense.events ?? []) {
+                    if (e.kind === 'hit-by') {
+                        log.hitBy += 1;
+                        log.lastAmount = e.amount ?? 0;
+                    }
+                    if (e.kind === 'kill' && e.fromId !== undefined) log.kills.push(e.fromId);
+                    if (e.kind === 'foe-down' && e.fromId !== undefined) log.foeDown.push(e.fromId);
+                    if (e.kind === 'ally-down' && e.fromId !== undefined) log.allyDown.push(e.fromId);
+                }
+                if (sense.self.lastDamage) log.lastAmount = sense.self.lastDamage.amount;
+                return inner.update(sense);
+            },
+        });
+        const match = new Match(
+            [
+                { team: 0, controller: watch(shooter), loadout: { trigger: 3 } },
+                { team: 0, controller: watch(sitter('mate')) },
+                { team: 1, controller: watch(sitter('victim-a')) },
+                { team: 1, controller: watch(sitter('victim-b')) },
+            ],
+            3,
+        );
+        // Step to first blood: the match stays live, so every witness senses
+        // the next tick. (A match-ending kill's own events are never sensed —
+        // there is no next tick — so first blood is the assertable case.)
+        let first = -1;
+        for (let i = 0; i < 3000 && first < 0 && !match.result.over; i += 1) {
+            match.step();
+            const snaps = match.robotSnapshots;
+            if (snaps[2] && !snaps[2].alive) first = 2;
+            else if (snaps[3] && !snaps[3].alive) first = 3;
+        }
+        for (let i = 0; i < 5 && !match.result.over; i += 1) match.step();
+        const get = (id: number): KillLog => logs.get(id) as KillLog;
+        const survivor = first === 2 ? 3 : 2;
+        check('first blood lands (gun kill, pre-cap)', first > 0 && match.result.tick < MAX_TICKS, `victim=${first}`);
+        check('victim logs hit-by at 12 damage', first > 0 && get(first).hitBy > 0 && get(first).lastAmount === 12);
+        check('shooter logs the kill', first > 0 && JSON.stringify(get(0).kills) === JSON.stringify([first]), `kills=${JSON.stringify(get(0).kills)}`);
+        check("shooter's mate logs foe-down", first > 0 && JSON.stringify(get(1).foeDown) === JSON.stringify([first]));
+        check('surviving victim saw its mate go down', first > 0 && (logs.get(survivor)?.allyDown ?? []).includes(first));
+        match.runToEnd();
+        check('scripted 2v2 still finishes', match.result.over);
+    }
+    // Collisions: wall-bumps driving into a wall, rams head-on.
+    {
+        const waller: RobotController = {
+            meta: { id: 'waller', name: 'Waller', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => (sense.tick < 60 ? { turn: 1 } : { throttle: 1 }),
+        };
+        const sitter: RobotController = {
+            meta: { id: 'sitter', name: 'Sitter', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({}),
+        };
+        let bumps = 0;
+        const bumpSpy: RobotController = {
+            meta: waller.meta,
+            update: (sense: SenseState): Intent => {
+                if ((sense.events ?? []).some((e) => e.kind === 'wall-bump')) bumps += 1;
+                return waller.update(sense);
+            },
+        };
+        const wallMatch = new Match(
+            [
+                { team: 0, controller: bumpSpy },
+                { team: 1, controller: sitter },
+            ],
+            3,
+        );
+        for (let i = 0; i < 600 && !wallMatch.result.over; i += 1) wallMatch.step();
+        check('driving into a wall logs wall-bump', bumps > 0, `bumps=${bumps}`);
+        const rammer = (id: string): RobotController => ({
+            meta: { id, name: id, author: 'test', version: '0', description: '' },
+            update: (): Intent => ({ throttle: 1 }),
+        });
+        const rams: boolean[] = [false, false];
+        const ramSpy = (inner: RobotController, slot: number): RobotController => ({
+            meta: inner.meta,
+            update: (sense: SenseState): Intent => {
+                if ((sense.events ?? []).some((e) => e.kind === 'ram' && e.fromId === 1 - slot)) rams[slot] = true;
+                return inner.update(sense);
+            },
+        });
+        const ramMatch = new Match(
+            [
+                { team: 0, controller: ramSpy(rammer('a'), 0) },
+                { team: 1, controller: ramSpy(rammer('b'), 1) },
+            ],
+            3,
+        );
+        for (let i = 0; i < 600 && !ramMatch.result.over; i += 1) ramMatch.step();
+        check('head-on collision logs ram on both sides', rams[0] === true && rams[1] === true);
+    }
+    // Bullets are cone-gated: every sensed bullet sits inside range + FOV.
+    {
+        const sitter: RobotController = {
+            meta: { id: 'sitter', name: 'Sitter', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({}),
+        };
+        const gunner: RobotController = {
+            meta: { id: 'gunner', name: 'Gunner', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({ throttle: 1, turn: 0, towerTurn: 0, fire: true }),
+        };
+        let seen = 0;
+        let gated = true;
+        let closingSeen = false;
+        const spy: RobotController = {
+            meta: sitter.meta,
+            update: (sense: SenseState): Intent => {
+                for (const b of sense.bullets ?? []) {
+                    seen += 1;
+                    if (b.closing > 0) closingSeen = true;
+                    if (b.damage !== 12) gated = false;
+                    const fov = sense.self.stats.sensorFov;
+                    let diff = Math.abs(b.bearing - sense.self.tower) % (Math.PI * 2);
+                    if (diff > Math.PI) diff = Math.PI * 2 - diff;
+                    if (b.distance > sense.self.stats.sensorRange || diff > fov / 2 + 1e-9) gated = false;
+                }
+                return {};
+            },
+        };
+        const bulletMatch = new Match(
+            [
+                { team: 0, controller: gunner },
+                { team: 1, controller: spy },
+            ],
+            3,
+        );
+        for (let i = 0; i < 400 && !bulletMatch.result.over; i += 1) bulletMatch.step();
+        check('tower-facing victim senses incoming fire', seen > 0, `sightings=${seen}`);
+        check('every sensed bullet is cone-gated at full damage', gated && closingSeen);
+    }
+    // Tracks persist after the foe leaves the cone; grid stamps + decays.
+    {
+        const sitter: RobotController = {
+            meta: { id: 'sitter', name: 'Sitter', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({}),
+        };
+        let firstSeen = -1;
+        let stale: { lastSeenTick: number; seenNow: boolean } | null = null;
+        let stampAtSight = -1;
+        let decayed = false;
+        const tracker: RobotController = {
+            meta: { id: 'tracker', name: 'Tracker', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                if (sense.foes.length > 0 && firstSeen < 0) {
+                    firstSeen = sense.tick;
+                    const foe = sense.foes[0] as { x: number; y: number };
+                    const idx = toGrid(foe.x, foe.y, sense.grid?.cell ?? 80, sense.grid?.w ?? 12, sense.grid?.h ?? 8);
+                    stampAtSight = sense.grid?.foes[idx] ?? -1;
+                }
+                if (firstSeen >= 0 && sense.tick === firstSeen + 40) {
+                    const t = (sense.tracks ?? [])[0];
+                    if (t) stale = { lastSeenTick: t.lastSeenTick, seenNow: t.seenNow };
+                    decayed = sense.grid?.foes.every((v) => v === 0) ?? false;
+                }
+                if (firstSeen >= 0 && sense.tick > firstSeen) return { throttle: 0, towerTurn: 1 }; // look away
+                const foe = sense.foes[0];
+                if (!foe) return { throttle: 1, turn: 0, towerTurn: 0 };
+                return { throttle: 1, turn: 0, towerTurn: 0 };
+            },
+        };
+        const trackMatch = new Match(
+            [
+                { team: 0, controller: tracker },
+                { team: 1, controller: sitter },
+            ],
+            3,
+        );
+        for (let i = 0; i < 900 && !trackMatch.result.over; i += 1) trackMatch.step();
+        check('closing tracker acquires the sitter', firstSeen > 0, `tick=${firstSeen}`);
+        check('sighted foe cell stamps to 5', stampAtSight === SENSE_GRID_STAMP, `stamp=${stampAtSight}`);
+        check(
+            'track goes stale but persists after looking away',
+            stale !== null && stale.seenNow === false && stale.lastSeenTick >= firstSeen && stale.lastSeenTick < firstSeen + 40,
+            JSON.stringify(stale),
+        );
+        check('grid presence decays to zero once unseen', decayed);
+    }
+    // Allies carry tower, cooldown, and public loadout; tampering never leaks.
+    {
+        const mate: RobotController = {
+            meta: { id: 'mate', name: 'Mate', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({}),
+        };
+        const foe: RobotController = {
+            meta: { id: 'foe', name: 'Foe', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({}),
+        };
+        let allyOk = false;
+        const allySpy: RobotController = {
+            meta: { id: 'spy', name: 'Spy', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                const ally = sense.allies[0];
+                if (ally && typeof ally.tower === 'number' && typeof ally.cooldown === 'number' && ally.loadout.overdrive === 3) allyOk = true;
+                return {};
+            },
+        };
+        const allyMatch = new Match(
+            [
+                { team: 0, controller: allySpy },
+                { team: 0, controller: mate, loadout: { overdrive: 3 } },
+                { team: 1, controller: foe },
+            ],
+            3,
+        );
+        allyMatch.step();
+        check('allies expose tower, cooldown, and loadout', allyOk);
+        const tamperer: RobotController = {
+            meta: { id: 'tamperer', name: 'Tamperer', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                (sense.events ?? []).length = 0;
+                (sense.bullets ?? []).length = 0;
+                (sense.tracks ?? []).length = 0;
+                if (sense.arena) sense.arena.obstacles.length = 0;
+                if (sense.zone) sense.zone.circle.r = 0;
+                if (sense.grid) {
+                    sense.grid.foes.fill(999);
+                    sense.grid.danger.fill(999);
+                }
+                if (sense.match) sense.match.killsYou = 99;
+                if (sense.self.lastDamage) sense.self.lastDamage.amount = 999;
+                sense.self.blocked.ahead = 999;
+                sense.allies.length = 0;
+                return { throttle: 1, turn: 0, towerTurn: 0, fire: true };
+            },
+        };
+        const cleanEntry = ROBOTS.find((r) => r.meta.id === 'hunter');
+        if (!cleanEntry) throw new Error('no hunter');
+        const runSide = (controller: RobotController): string => {
+            const m = new Match(
+                [
+                    { team: 0, controller, loadout: {} },
+                    { team: 1, controller: cleanEntry.create(), loadout: { ...cleanEntry.loadout } },
+                ],
+                9,
+            );
+            m.runToEnd();
+            return fingerprint(m);
+        };
+        const driver: RobotController = {
+            meta: { id: 'driver', name: 'Driver', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({ throttle: 1, turn: 0, towerTurn: 0, fire: true }),
+        };
+        check('sense tampering cannot change the sim', runSide(tamperer) === runSide(driver));
+    }
+    // common.ts helpers: lead math agrees, dodge/toGrid behave.
+    {
+        const foe = { id: 1, team: 1 as const, x: 400, y: 300, heading: 0.5, speed: 100, health: 100, distance: Math.hypot(400 - 130, 300 - 320), bearing: 0 };
+        check('leadAngle delegates to leadShot exactly', leadAngle(130, 320, 430, foe) === leadShot(130, 320, 430, foe.x, foe.y, Math.cos(foe.heading) * foe.speed, Math.sin(foe.heading) * foe.speed));
+        check('dodge vector is zero with no bullets', dodgeVector(0, 0, []).x === 0 && dodgeVector(0, 0, []).y === 0);
+        const fleeing = dodgeVector(480, 320, [{ x: 400, y: 320, vx: 430, vy: 0, distance: 80, bearing: Math.PI, closing: -430, damage: 12 }]);
+        check('receding bullets do not dodge', fleeing.x === 0 && fleeing.y === 0);
+        const threat = dodgeVector(480, 320, [{ x: 400, y: 320, vx: 430, vy: 0, distance: 80, bearing: Math.PI, closing: 430, damage: 12 }]);
+        check('closing bullet pushes unit-length sideways', Math.abs(Math.hypot(threat.x, threat.y) - 1) < 1e-9 && Math.abs(threat.x) < 1e-9 && Math.abs(threat.y) === 1);
+        check('toGrid maps corners and rejects outside', toGrid(0, 0, 80, 12, 8) === 0 && toGrid(959, 639, 80, 12, 8) === 95 && toGrid(960, 320, 80, 12, 8) === -1 && toGrid(-1, 0, 80, 12, 8) === -1);
+    }
 }
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);

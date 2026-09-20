@@ -95,6 +95,15 @@ export const SENSOR_FOV = 1.1; // full cone width in radians (~63 deg)
 /** Team sensor sharing delay: ally sightings arrive this many ticks late. */
 export const SENSOR_SHARE_DELAY = 30;
 
+// Sense channels (hillclimb Phase 4): caps and heat-map geometry.
+export const SENSE_EVENTS_MAX = 8;
+export const SENSE_BULLETS_MAX = 12;
+export const SENSE_GRID_W = 12;
+export const SENSE_GRID_H = 8;
+export const SENSE_GRID_CELL = 80; // 12x80 = 960, 8x80 = 640
+/** Foe-presence value stamped on a sighted cell (decays 1/tick). */
+export const SENSE_GRID_STAMP = 5;
+
 // Gun base values (same for all robots; skills modify per loadout).
 export const GUN_RANGE = 470;
 export const GUN_COOLDOWN_TICKS = 24; // 0.4s between shots

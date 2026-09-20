@@ -52,13 +52,20 @@ y grows downward). The sim ticks at 60 Hz.
 | Field          | Contents                                                                 |
 | -------------- | ------------------------------------------------------------------------ |
 | `tick`, `time` | Match tick and seconds elapsed.                                          |
-| `self`         | Your `id`, `team`, `x`, `y`, `heading`, `tower`, `speed`, `health`, gun `cooldown` (ticks until ready, `0` = ready), plus `stats` (effective values after skills), `charge`/`charged` (banked charge), `dashCd`/`empCd` (active cooldowns, `0` = ready), `slowed` (enemy EMP on you), and your `loadout`. |
+| `self`         | Your `id`, `team`, `x`, `y`, `heading`, `tower`, `speed`, `health`, gun `cooldown` (ticks until ready, `0` = ready), plus `stats` (effective values after skills), `charge`/`charged` (banked charge), `dashCd`/`empCd` (active cooldowns, `0` = ready), `slowed` (enemy EMP on you), your `loadout`, `lastDamage` (`{tick, amount, bearing, fromId}` of your last hit, or `null`), and `blocked.ahead` (whisker distance to the nearest wall/block along your heading). |
 | `foes`         | Opponents **inside your sensor cone** this tick, nearest first: position, heading, speed, health, `distance`, absolute `bearing`. Empty when blind. |
-| `allies`       | Teammates, always known (radio link), same fields as foes.               |
+| `allies`       | Teammates, always known (radio link): foe fields plus `tower`, gun `cooldown`, `charge`/`charged`, and public `loadout`. |
 | `scout`        | Out-of-cone foe blips from the scout skill (empty without it), nearest first: live `x`, `y`, `distance`, `bearing`, but `heading`, `speed`, `health` always `0`. Covers foes within 2× your sensor range; never duplicates `foes`. |
 | `shared`       | Foe sightings shared by allies, delivered **30 ticks late**, nearest first. Position-only: `id`, `team`, `x`, `y`, `distance`, `bearing` are valid; `heading`, `speed`, `health` are always `0`. Never includes foes you see yourself, your own sightings echoed back, dead foes, or anything in 1v1 (no allies). |
 | `walls`        | Distance to each arena wall: `left`, `right`, `top`, `bottom`.           |
 | `rand()`       | Deterministic random draw in `[0, 1)`. Use this for any randomness.      |
+| `events`       | What happened during the step just completed (empty at tick 0): `hit-by`, `kill`, `ally-down`, `foe-down`, `sudden-death-pulse`, `wall-bump`, `ram`. Sorted kind-then-id, capped at 8. |
+| `bullets`      | Incoming foe-team bullets inside your sensor cone, nearest first, capped at 12: `x`, `y`, `vx`, `vy`, `distance`, `bearing`, `closing` (positive = approaching), `damage`. |
+| `tracks`       | Engine-kept memory: one entry per living foe ever in your cone (`id`, `x`, `y`, `heading`, `speed`, `lastSeenTick`, `seenNow`), refreshed on every sighting, sorted by id. |
+| `arena`        | Static layout: `id` (`open`/`blocks`), `obstacles` (`{x,y,w,h}`), `centerX`, `centerY`. Symmetric public state. |
+| `zone`         | Safe circle: `phase` (`normal`/`shrinking`), `suddenDeathIn` (ticks), `circle` (`{x,y,r}`), `distToSafety`, `inside`. |
+| `grid`         | Your team's 12×8 heat-map (`cell` 80): `foes` (presence from cone sightings, decays 1/tick) and `danger` (recent damage) integer arrays. |
+| `match`        | Match state: `arena`, `modifiers`, `tickCap`, `killsYou`, `killsTeam`, `aliveFoes`. |
 
 Sensor cone: 540 units range, ~63° wide, centered on your `tower` angle. You only
 see foes your tower points at — scanning is part of the game. In team games,
@@ -68,6 +75,22 @@ not as targeting data. The scout skill adds a second channel, `scout`: live
 position-only blips (no health) for foes anywhere within 2× your sensor range,
 even behind you. Unlike `shared`, blips are current positions — swinging your
 tower onto a blip bearing converts it into a full sighting.
+
+The second sense group is event and memory channels. `events` tells you what
+the last step did to you — being hit (`hit-by` carries `amount`/`bearing`/
+`fromId`, and `self.lastDamage` keeps the latest one all match), scoring
+(`kill`), deaths on either side (`ally-down`/`foe-down`), sudden-death ticks,
+and collisions (`wall-bump`, `ram`). `bullets` shows incoming rounds your
+tower currently covers, with closing speed for dodging. `tracks` is the
+engine's memory of every foe your cone has seen — stale positions stay
+available after the foe leaves the cone, flagged with `seenNow: false`.
+`arena` is the static (symmetric, public) obstacle map plus the
+`blocked.ahead` whisker for steering; `zone` is the sudden-death circle with
+your distance to safety; `grid` is your team's coarse 12×8 heat-map of foe
+presence and recent damage; `match` carries kills and the living-foe count.
+All seven are fresh copies every tick — mutate them freely, nothing leaks
+back into the sim. They are typed optional (treat them as possibly absent),
+but the engine always provides them.
 
 ## What you return: `Intent`
 
@@ -176,8 +199,9 @@ Modded matches replay exactly via the same replay codes.
 2. **Fast.** `update` runs 60×/second per robot. No heavy loops or allocations
    that grow over time.
 3. **Self-contained.** Import only from `../sim/*` and `./common.ts` (optional
-   steering helpers: `aimTurret`, `steerTo`, `throttleFor`, `aimed`). No Phaser,
-   no DOM, no Node APIs.
+   steering helpers: `aimTurret`, `steerTo`, `throttleFor`, `aimed`,
+   `leadAngle`/`leadShot`, `dodgeVector`, `rayClearance`, `toGrid`,
+   `manageCharge`, `createStallTracker`). No Phaser, no DOM, no Node APIs.
 4. **No throwing.** Exceptions are caught and your robot idles that tick — but a
    robot that throws constantly is just parked scrap. Guard your math.
 5. **State in closures.** Module-level mutable state is shared across matches;

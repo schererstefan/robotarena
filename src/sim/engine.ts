@@ -1,11 +1,11 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSOR_SHARE_DELAY, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
+import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
 import { angleDiff, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
-import { IDLE_INTENT, type Intent, type RobotController, type SensedRobot, type SenseState } from './types';
+import { IDLE_INTENT, type DamageSite, type Intent, type RobotController, type SensedAlly, type SensedBullet, type SensedRobot, type SenseEvent, type SenseState, type TrackedFoe } from './types';
 
 export interface RobotSnapshot {
     id: number;
@@ -80,6 +80,9 @@ interface Robot {
     damageDealt: number;
     shotsFired: number;
     errors: number;
+    lastDamage: DamageSite | null;
+    /** Last cone sighting per foe id (engine-kept memory for `tracks`). */
+    tracks: Map<number, { x: number; y: number; heading: number; speed: number; lastSeenTick: number }>;
 }
 
 interface Bullet {
@@ -144,6 +147,12 @@ export class Match {
     private readonly mods: MatchModifiers;
     /** Recent ally sightings, pruned to the last SENSOR_SHARE_DELAY ticks. */
     private sightings: SharedSighting[] = [];
+    /** Per-team heat-map channels (index 0/1 by team), decayed each tick. */
+    private gridFoes: number[][] = [[], []];
+    private gridDanger: number[][] = [[], []];
+    /** Events of the last completed step (delivered) and the current step (building), per robot id. */
+    private prevEvents: SenseEvent[][] = [];
+    private curEvents: SenseEvent[][] = [];
 
     constructor(lineups: LineupEntry[], seed: number, options: MatchOptions = {}) {
         this.seed = seed;
@@ -185,8 +194,15 @@ export class Match {
                 damageDealt: 0,
                 shotsFired: 0,
                 errors: setupErrors,
+                lastDamage: null,
+                tracks: new Map(),
             });
+            this.prevEvents.push([]);
+            this.curEvents.push([]);
         });
+        const cells = SENSE_GRID_W * SENSE_GRID_H;
+        this.gridFoes = [new Array<number>(cells).fill(0), new Array<number>(cells).fill(0)];
+        this.gridDanger = [new Array<number>(cells).fill(0), new Array<number>(cells).fill(0)];
         // Aim towers at the nearest foe and fire spawn hooks in fixed order.
         for (const robot of this.robots) {
             const foe = this.nearestFoe(robot);
@@ -261,6 +277,9 @@ export class Match {
 
     step(): void {
         if (this.over) return;
+        // Fresh event buffer for this step; the brains below still read the
+        // last completed step's events via prevEvents.
+        this.curEvents = this.robots.map(() => []);
         // Drop sightings too old to ever be delivered (exact-delay window).
         if (this.sightings.length > 0 && this.tick > SENSOR_SHARE_DELAY) {
             const cutoff = this.tick - SENSOR_SHARE_DELAY;
@@ -356,8 +375,119 @@ export class Match {
         this.stepBullets();
         // 6. Sudden death: past the cap, robots outside the circle pulse damage.
         if (this.tick >= MAX_TICKS) this.suddenDeath();
+        // 7. Sense channels: freeze this step's events for delivery and roll
+        // the team heat-maps forward (decay, then stamp fresh sightings).
+        this.prevEvents = this.curEvents;
+        this.updateGrid();
         this.tick += 1;
         this.checkEnd();
+    }
+
+    /** Queue a per-tick event for one robot (sorted + capped at delivery). */
+    private emit(to: number, event: Omit<SenseEvent, 'tick'>): void {
+        (this.curEvents[to] as SenseEvent[]).push({ ...event, tick: this.tick });
+    }
+
+    /** Eliminate a robot, notifying the killer plus living teammates and foes. */
+    private slay(victim: Robot, killerId: number | null): void {
+        victim.health = 0;
+        victim.alive = false;
+        if (killerId !== null) {
+            const killer = this.robots[killerId] as Robot | undefined;
+            if (killer) {
+                killer.kills += 1;
+                this.emit(killer.id, { kind: 'kill', fromId: victim.id });
+            }
+        }
+        for (const other of this.robots) {
+            if (!other.alive || other.id === victim.id) continue;
+            this.emit(other.id, {
+                kind: other.team === victim.team ? 'ally-down' : 'foe-down',
+                fromId: victim.id,
+            });
+        }
+    }
+
+    /** Heat-map cell index for an arena position. */
+    private static gridCell(x: number, y: number): number {
+        const cx = clamp(Math.floor(x / SENSE_GRID_CELL), 0, SENSE_GRID_W - 1);
+        const cy = clamp(Math.floor(y / SENSE_GRID_CELL), 0, SENSE_GRID_H - 1);
+        return cy * SENSE_GRID_W + cx;
+    }
+
+    /** Stamp recent damage onto the victim's team heat-map. */
+    private stampDanger(victim: Robot, amount: number): void {
+        const channel = this.gridDanger[victim.team] as number[];
+        const cell = Match.gridCell(victim.x, victim.y);
+        channel[cell] = Math.min(99, (channel[cell] as number) + Math.max(1, Math.round(amount)));
+    }
+
+    /** Decay both team heat-maps by 1, then refresh sighted foe cells. */
+    private updateGrid(): void {
+        for (const team of [0, 1] as const) {
+            const foes = this.gridFoes[team] as number[];
+            const danger = this.gridDanger[team] as number[];
+            for (let i = 0; i < foes.length; i += 1) {
+                if ((foes[i] as number) > 0) foes[i] = (foes[i] as number) - 1;
+                if ((danger[i] as number) > 0) danger[i] = (danger[i] as number) - 1;
+            }
+        }
+        for (const robot of this.robots) {
+            if (!robot.alive) continue;
+            const channel = this.gridFoes[robot.team] as number[];
+            for (const foe of this.robots) {
+                if (!foe.alive || foe.team === robot.team) continue;
+                if (!Match.sees(robot, foe)) continue;
+                const cell = Match.gridCell(foe.x, foe.y);
+                if ((channel[cell] as number) < SENSE_GRID_STAMP) channel[cell] = SENSE_GRID_STAMP;
+            }
+        }
+    }
+
+    /**
+     * Whisker range-finder: distance from the chassis edge to the nearest
+     * wall or block along the heading ray. O(4 obstacles); the walls always
+     * hit, so the result is finite.
+     */
+    private whiskerAhead(robot: Robot): number {
+        const dx = Math.cos(robot.heading);
+        const dy = Math.sin(robot.heading);
+        let best = Infinity;
+        if (dx > 0) best = Math.min(best, (ARENA_WIDTH - robot.x) / dx);
+        else if (dx < 0) best = Math.min(best, (0 - robot.x) / dx);
+        if (dy > 0) best = Math.min(best, (ARENA_HEIGHT - robot.y) / dy);
+        else if (dy < 0) best = Math.min(best, (0 - robot.y) / dy);
+        for (const o of ARENA_OBSTACLES[this.arena]) {
+            const t = Match.rayBox(robot.x, robot.y, dx, dy, o);
+            if (t !== null && t < best) best = t;
+        }
+        return Math.max(0, best - ROBOT_RADIUS);
+    }
+
+    /** Ray vs rect entry distance, or null on a miss (slab method). */
+    private static rayBox(
+        x: number, y: number, dx: number, dy: number,
+        o: { x: number; y: number; w: number; h: number },
+    ): number | null {
+        let tmin = 0;
+        let tmax = Infinity;
+        if (dx !== 0) {
+            const t1 = (o.x - x) / dx;
+            const t2 = (o.x + o.w - x) / dx;
+            tmin = Math.max(tmin, Math.min(t1, t2));
+            tmax = Math.min(tmax, Math.max(t1, t2));
+        } else if (x < o.x || x > o.x + o.w) {
+            return null;
+        }
+        if (dy !== 0) {
+            const t1 = (o.y - y) / dy;
+            const t2 = (o.y + o.h - y) / dy;
+            tmin = Math.max(tmin, Math.min(t1, t2));
+            tmax = Math.min(tmax, Math.max(t1, t2));
+        } else if (y < o.y || y > o.y + o.h) {
+            return null;
+        }
+        return tmax >= tmin ? tmin : null;
     }
 
     /**
@@ -425,12 +555,31 @@ export class Match {
 
     private sense(robot: Robot): SenseState {
         const foes: SensedRobot[] = [];
-        const allies: SensedRobot[] = [];
+        const allies: SensedAlly[] = [];
         const scout: SensedRobot[] = [];
         for (const other of this.robots) {
             if (other.id === robot.id || !other.alive) continue;
             const d = dist(robot.x, robot.y, other.x, other.y);
             const bearing = Math.atan2(other.y - robot.y, other.x - robot.x);
+            if (other.team === robot.team) {
+                allies.push({
+                    id: other.id,
+                    team: other.team,
+                    x: other.x,
+                    y: other.y,
+                    heading: other.heading,
+                    speed: other.speed,
+                    health: other.health,
+                    distance: d,
+                    bearing,
+                    tower: other.tower,
+                    cooldown: other.cooldown,
+                    charge: other.charge,
+                    charged: other.charge >= 1,
+                    loadout: { ...other.loadout },
+                });
+                continue;
+            }
             const sensed: SensedRobot = {
                 id: other.id,
                 team: other.team,
@@ -442,9 +591,7 @@ export class Match {
                 distance: d,
                 bearing,
             };
-            if (other.team === robot.team) {
-                allies.push(sensed);
-            } else if (Match.sees(robot, other)) {
+            if (Match.sees(robot, other)) {
                 foes.push(sensed);
             } else if (robot.stats.scoutRange > 0 && d <= robot.stats.scoutRange) {
                 scout.push({
@@ -465,6 +612,52 @@ export class Match {
         scout.sort((a, b) => a.distance - b.distance || a.id - b.id);
         this.recordAllySightings(robot);
         const shared = this.sharedSightings(robot, new Set(foes.map((f) => f.id)));
+        // Tracks: refresh on every cone sighting, drop the dead, flag the seen.
+        const seenIds = new Set(foes.map((f) => f.id));
+        for (const foe of foes) {
+            robot.tracks.set(foe.id, {
+                x: foe.x,
+                y: foe.y,
+                heading: foe.heading,
+                speed: foe.speed,
+                lastSeenTick: this.tick,
+            });
+        }
+        for (const id of [...robot.tracks.keys()]) {
+            const foe = this.robots[id] as Robot | undefined;
+            if (!foe || !foe.alive || foe.team === robot.team) robot.tracks.delete(id);
+        }
+        const tracks: TrackedFoe[] = [...robot.tracks.entries()]
+            .map(([id, t]) => ({ id, x: t.x, y: t.y, heading: t.heading, speed: t.speed, lastSeenTick: t.lastSeenTick, seenNow: seenIds.has(id) }))
+            .sort((a, b) => a.id - b.id);
+        // Bullets: incoming foe-team rounds inside the sensor cone, nearest first.
+        const bullets: SensedBullet[] = [];
+        for (const bullet of this.bullets) {
+            if (bullet.team === robot.team) continue;
+            const d = dist(robot.x, robot.y, bullet.x, bullet.y);
+            if (d > robot.stats.sensorRange) continue;
+            const bearing = Math.atan2(bullet.y - robot.y, bullet.x - robot.x);
+            if (Math.abs(angleDiff(robot.tower, bearing)) > robot.stats.sensorFov / 2) continue;
+            const closing = d > 0 ? -((bullet.vx * (bullet.x - robot.x) + bullet.vy * (bullet.y - robot.y)) / d) : 0;
+            bullets.push({ x: bullet.x, y: bullet.y, vx: bullet.vx, vy: bullet.vy, distance: d, bearing, closing, damage: bullet.damage });
+        }
+        bullets.sort((a, b) => a.distance - b.distance || a.x - b.x || a.y - b.y);
+        // Events: the step just completed, sorted kind-then-id, capped.
+        const events = [...((this.prevEvents[robot.id] as SenseEvent[] | undefined) ?? [])]
+            .sort((a, b) =>
+                a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : (a.fromId ?? -1) - (b.fromId ?? -1),
+            )
+            .slice(0, SENSE_EVENTS_MAX)
+            .map((e) => ({ ...e }));
+        const circle = this.safeCircle;
+        const distCenter = dist(robot.x, robot.y, circle.x, circle.y);
+        const shrinking = this.tick >= MAX_TICKS;
+        let killsTeam = 0;
+        let aliveFoes = 0;
+        for (const other of this.robots) {
+            if (other.team === robot.team) killsTeam += other.kills;
+            else if (other.alive) aliveFoes += 1;
+        }
         return {
             tick: this.tick,
             time: this.tick * DT,
@@ -486,6 +679,8 @@ export class Match {
                 empCd: robot.empCd,
                 slowed: this.tick < robot.slowUntil,
                 loadout: { ...robot.loadout },
+                lastDamage: robot.lastDamage ? { ...robot.lastDamage } : null,
+                blocked: { ahead: this.whiskerAhead(robot) },
             },
             foes,
             allies,
@@ -501,6 +696,37 @@ export class Match {
             rand: createRng(
                 (this.seed ^ Math.imul(robot.id + 1, 2654435761) ^ Math.imul(this.tick + 1, 40503)) >>> 0,
             ),
+            events,
+            bullets: bullets.slice(0, SENSE_BULLETS_MAX),
+            tracks,
+            arena: {
+                id: this.arena,
+                obstacles: ARENA_OBSTACLES[this.arena].map((o) => ({ ...o })),
+                centerX: ARENA_WIDTH / 2,
+                centerY: ARENA_HEIGHT / 2,
+            },
+            zone: {
+                phase: shrinking ? 'shrinking' : 'normal',
+                suddenDeathIn: Math.max(0, MAX_TICKS - this.tick),
+                circle: { x: circle.x, y: circle.y, r: circle.r },
+                distToSafety: Math.max(0, distCenter - circle.r),
+                inside: distCenter < circle.r,
+            },
+            grid: {
+                w: SENSE_GRID_W,
+                h: SENSE_GRID_H,
+                cell: SENSE_GRID_CELL,
+                foes: [...(this.gridFoes[robot.team] as number[])],
+                danger: [...(this.gridDanger[robot.team] as number[])],
+            },
+            match: {
+                arena: this.arena,
+                modifiers: { ...this.mods },
+                tickCap: MAX_TICKS_TOTAL,
+                killsYou: robot.kills,
+                killsTeam,
+                aliveFoes,
+            },
         };
     }
 
@@ -525,19 +751,28 @@ export class Match {
             const maxX = ARENA_WIDTH - ROBOT_RADIUS;
             const minY = ROBOT_RADIUS;
             const maxY = ARENA_HEIGHT - ROBOT_RADIUS;
+            let bumped = false;
             if (robot.x < minX) {
                 robot.x = minX;
                 robot.speed *= 0.4;
+                bumped = true;
             } else if (robot.x > maxX) {
                 robot.x = maxX;
                 robot.speed *= 0.4;
+                bumped = true;
             }
             if (robot.y < minY) {
                 robot.y = minY;
                 robot.speed *= 0.4;
+                bumped = true;
             } else if (robot.y > maxY) {
                 robot.y = maxY;
                 robot.speed *= 0.4;
+                bumped = true;
+            }
+            // Once per step: this pass runs twice (separation can re-shove past walls).
+            if (bumped && !(this.curEvents[robot.id] as SenseEvent[]).some((e) => e.kind === 'wall-bump')) {
+                this.emit(robot.id, { kind: 'wall-bump' });
             }
         }
     }
@@ -561,6 +796,8 @@ export class Match {
                     ra.y -= ny * push;
                     rb.x += nx * push;
                     rb.y += ny * push;
+                    this.emit(ra.id, { kind: 'ram', fromId: rb.id });
+                    this.emit(rb.id, { kind: 'ram', fromId: ra.id });
                 } else if (d === 0) {
                     // Exact overlap: deterministic id-ordered split along x.
                     const push = minDist / 2;
@@ -571,6 +808,8 @@ export class Match {
                         ra.x += push;
                         rb.x -= push;
                     }
+                    this.emit(ra.id, { kind: 'ram', fromId: rb.id });
+                    this.emit(rb.id, { kind: 'ram', fromId: ra.id });
                 }
             }
         }
@@ -639,11 +878,11 @@ export class Match {
                     robot.health -= bullet.damage;
                     const owner = this.robots[bullet.owner] as Robot;
                     owner.damageDealt += bullet.damage;
-                    if (robot.health <= 0) {
-                        robot.health = 0;
-                        robot.alive = false;
-                        owner.kills += 1;
-                    }
+                    const bearing = Math.atan2(owner.y - robot.y, owner.x - robot.x);
+                    robot.lastDamage = { tick: this.tick, amount: bullet.damage, bearing, fromId: owner.id };
+                    this.emit(robot.id, { kind: 'hit-by', amount: bullet.damage, bearing, fromId: owner.id });
+                    this.stampDanger(robot, bullet.damage);
+                    if (robot.health <= 0) this.slay(robot, owner.id);
                     hit = true;
                     break;
                 }
@@ -661,10 +900,9 @@ export class Match {
             if (dist(robot.x, robot.y, circle.x, circle.y) < circle.r) continue;
             if ((this.tick + robot.id) % SUDDEN_DEATH_PERIOD !== 0) continue;
             robot.health -= SUDDEN_DEATH_DAMAGE;
-            if (robot.health <= 0) {
-                robot.health = 0;
-                robot.alive = false;
-            }
+            this.emit(robot.id, { kind: 'sudden-death-pulse', amount: SUDDEN_DEATH_DAMAGE });
+            this.stampDanger(robot, SUDDEN_DEATH_DAMAGE);
+            if (robot.health <= 0) this.slay(robot, null);
         }
     }
 

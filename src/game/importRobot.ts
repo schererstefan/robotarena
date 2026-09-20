@@ -105,6 +105,8 @@ function dryRunSense(): SenseState {
             empCd: 0,
             slowed: false,
             loadout: {},
+            lastDamage: null,
+            blocked: { ahead: 0 },
         },
         foes: [],
         allies: [],

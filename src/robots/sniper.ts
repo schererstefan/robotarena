@@ -4,8 +4,8 @@
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
 import { dist } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
-import type { Intent, RobotController, RobotMeta, SensedRobot, SenseState } from '../sim/types';
-import { aimed, aimTurret, createStallTracker, manageCharge, steerTo } from './common';
+import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
+import { aimed, aimTurret, createStallTracker, leadAngle, manageCharge, steerTo } from './common';
 
 export const meta: RobotMeta = {
     id: 'sniper',
@@ -16,13 +16,6 @@ export const meta: RobotMeta = {
 };
 
 export const loadout: SkillLoadout = { marksman: 2, longscan: 2, charger: 1, deadeye: 1 };
-
-function leadAngle(selfX: number, selfY: number, bulletSpeed: number, foe: SensedRobot): number {
-    const flightTime = foe.distance / bulletSpeed;
-    const px = foe.x + Math.cos(foe.heading) * foe.speed * flightTime;
-    const py = foe.y + Math.sin(foe.heading) * foe.speed * flightTime;
-    return Math.atan2(py - selfY, px - selfX);
-}
 
 export function create(): RobotController {
     let anchorX = 0;
@@ -45,9 +38,15 @@ export function create(): RobotController {
 
         // Rushed: kite away at full drive to re-establish standoff range.
         const rushed = foe !== undefined && foe.distance < self.stats.gunRange * 0.5;
+        // Sudden death outside the circle: the anchor is scrap, run to safety.
+        const zone = sense.zone;
+        const unsafe = zone !== undefined && zone.phase === 'shrinking' && (zone.distToSafety > 0 || !zone.inside);
         let throttle = 0;
         let goal = self.heading;
-        if (rushed && foe) {
+        if (unsafe && zone) {
+            goal = Math.atan2(zone.circle.y - self.y, zone.circle.x - self.x);
+            throttle = 1;
+        } else if (rushed && foe) {
             goal = Math.atan2(self.y - foe.y, self.x - foe.x);
             throttle = 1;
         } else if (!anchored) {
@@ -66,6 +65,18 @@ export function create(): RobotController {
         let towerTurn = 0.5; // slow scan while blind
         let fire = false;
         let charge = false;
+        // Blind but with a memory: swing the tower onto the freshest track
+        // instead of scanning empty air — re-acquire, don't wander.
+        const tracks = sense.tracks ?? [];
+        let memory = -1;
+        for (let i = 0; i < tracks.length; i += 1) {
+            const t = tracks[i] as { lastSeenTick: number };
+            if (!tracks[i]?.seenNow && (memory < 0 || t.lastSeenTick > (tracks[memory]?.lastSeenTick ?? -1))) memory = i;
+        }
+        const mem = memory >= 0 ? tracks[memory] : undefined;
+        if (!foe && mem) {
+            towerTurn = aimTurret(self.tower, Math.atan2(mem.y - self.y, mem.x - self.x));
+        }
         if (foe) {
             const shot = leadAngle(self.x, self.y, self.stats.bulletSpeed, foe);
             towerTurn = aimTurret(self.tower, shot);
