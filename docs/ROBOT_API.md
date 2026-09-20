@@ -66,6 +66,7 @@ y grows downward). The sim ticks at 60 Hz.
 | `zone`         | Safe circle: `phase` (`normal`/`shrinking`), `suddenDeathIn` (ticks), `circle` (`{x,y,r}`), `distToSafety`, `inside`. |
 | `grid`         | Your team's 12×8 heat-map (`cell` 80): `foes` (presence from cone sightings, decays 1/tick) and `danger` (recent damage) integer arrays. |
 | `match`        | Match state: `arena`, `modifiers`, `tickCap`, `killsYou`, `killsTeam`, `aliveFoes`. |
+| `inbox`        | Teammates' radio from exactly 6 ticks ago, sorted (`sent`, `from`), capped at 4. Never your own echo, never from the dead, never cross-team. Empty in 1v1. |
 
 Sensor cone: 540 units range, ~63° wide, centered on your `tower` angle. You only
 see foes your tower points at — scanning is part of the game. In team games,
@@ -139,13 +140,27 @@ is no way to exceed your loadout's stats.
   an aim assist is locked and the tower bears (within 0.07 rad), even with
   `fire: false`. The cooldown gate is unchanged.
 - **Radio** (`radio`): one `{kind, x, y, foe, role, slot, bid}` message per
-  tick to your team, delivered 6 ticks late via `sense.inbox` (routing
-  lands with the comms phase; until then messages are accepted and
-  dropped). Kinds: `ping`, `contact`, `claim`, `slot`, `focus`, `ack`.
-  Unknown kinds are dropped; dead robots neither send nor receive.
+  tick to your team, delivered 6 ticks late via `sense.inbox`. Kinds:
+  `ping`, `contact`, `claim`, `slot`, `focus`, `ack`. Unknown kinds are
+  dropped, `foe` ids are liveness-checked at send (`-1` = none), and dead
+  robots neither send nor receive (in-flight mail from a robot that dies
+  is dropped). Your own messages are never echoed back.
 
-Application order each tick: brains → dash/EMP → move assist → drive
-normalize → turret assist → fire gate → bullets → sudden death.
+Application order each tick: brains → radio collect → dash/EMP → move
+assist → drive normalize → turret assist → fire gate → bullets → sudden
+death.
+
+## Team radio: the `comms.ts` helpers
+
+The engine only routes mail; decisions live in `src/robots/comms.ts`
+(import it like `common.ts`). `castFocusVote`/`focusTarget` run focus
+fire: vote your target each tick, and take the lowest-id live sender's
+vote as your target override (firing still needs your own cone).
+`castContact`/`latestContact` share foe positions for blind teammates to
+chase. `resolveRoles` settles `claim{role,bid}` mail by sealed-bid
+auction (highest bid wins, ties to the lowest id), and `formationSlot`
+maps a slot index onto ring geometry around an anchor. Hunter votes
+focus, ghost reports contact — read them before rolling your own.
 
 ## Skills: symmetric loadouts
 
@@ -235,10 +250,12 @@ Modded matches replay exactly via the same replay codes.
    Use `sense.rand()`. Same seed + same robots must replay identically.
 2. **Fast.** `update` runs 60×/second per robot. No heavy loops or allocations
    that grow over time.
-3. **Self-contained.** Import only from `../sim/*` and `./common.ts` (optional
+3. **Self-contained.** Import only from `../sim/*`, `./common.ts` (optional
    steering helpers: `aimTurret`, `steerTo`, `throttleFor`, `aimed`,
    `leadAngle`/`leadShot`, `dodgeVector`, `rayClearance`, `toGrid`,
-   `manageCharge`, `createStallTracker`). No Phaser, no DOM, no Node APIs.
+   `manageCharge`, `createStallTracker`), and `./comms.ts` (team radio:
+   `castFocusVote`, `focusTarget`, `castContact`, `latestContact`,
+   `resolveRoles`, `formationSlot`). No Phaser, no DOM, no Node APIs.
 4. **No throwing.** Exceptions are caught and your robot idles that tick — but a
    robot that throws constantly is just parked scrap. Guard your math.
 5. **State in closures.** Module-level mutable state is shared across matches;

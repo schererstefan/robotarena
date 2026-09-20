@@ -260,7 +260,7 @@ export function checkRobotSource(source: string): WorkshopCheck[] {
     });
 
     const badImports = importSpecifiers(source).filter(
-        (spec) => !spec.startsWith('../sim/') && !spec.startsWith('./common'),
+        (spec) => !spec.startsWith('../sim/') && !spec.startsWith('./common') && !spec.startsWith('./comms'),
     );
     checks.push({
         id: 'imports',

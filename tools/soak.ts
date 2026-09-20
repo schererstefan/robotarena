@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, sanitizeIntent, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
@@ -21,6 +21,7 @@ import {
     winRates,
 } from '../src/game/history';
 import { dodgeVector, leadAngle, leadShot, toGrid } from '../src/robots/common';
+import { castContact, castFocusVote, focusTarget, formationSlot, latestContact, resolveRoles } from '../src/robots/comms';
 import { ROBOTS } from '../src/robots/registry';
 import { canonicalStringify, defaultGenome, genomeDefFor, genomeHash, genomeLoadout, sha256Hex, validateGenome, type Genome } from '../src/robots/genome';
 import { createWithParams as createHunterParams, HUNTER_DEFAULTS, hunterParamsFromGenome } from '../src/robots/hunter';
@@ -2245,6 +2246,353 @@ console.log('intent');
         check('garbage radio neither crashes nor steers', garbage.over && garbage.fp === quiet.fp);
         check('valid radio accepted, dropped pre-routing', valid.over && valid.fp === quiet.fp);
     }
+}
+
+// --- 13. Comms: exact-delay mailbox, team isolation, helpers, wired bots ----
+console.log('comms');
+{
+    check('comms delay is 6 ticks', COMMS_DELAY === 6);
+    check('inbox cap is 4 (both names)', COMMS_INBOX_MAX === 4 && INBOX_MAX === 4);
+    interface MailboxEntry {
+        tick: number;
+        inbox: Array<{ kind: string; x: number; y: number; foe: number; from: number; sent: number }>;
+    }
+    const sitter = (id: string): RobotController => ({
+        meta: { id, name: id, author: 'test', version: '0', description: '' },
+        update: (): Intent => ({}),
+    });
+    // Scripted chatter: sender pings every tick with the tick encoded.
+    const spammer: RobotController = {
+        meta: { id: 'spammer', name: 'Spammer', author: 'test', version: '0', description: '' },
+        update: (sense: SenseState): Intent => ({
+            radio: { kind: 'ping', x: sense.tick % ARENA_WIDTH, y: (sense.tick * 2) % ARENA_HEIGHT, foe: -1, role: 0, slot: 0, bid: sense.tick },
+        }),
+    };
+    const mailbox = (log: MailboxEntry[]): RobotController => ({
+        meta: { id: 'mailbox', name: 'Mailbox', author: 'test', version: '0', description: '' },
+        update: (sense: SenseState): Intent => {
+            log.push({ tick: sense.tick, inbox: sense.inbox.map((m) => ({ kind: m.kind, x: m.x, y: m.y, foe: m.foe, from: m.from, sent: m.sent })) });
+            return {};
+        },
+    });
+    // Nothing before tick 6; exact-delay content + stamps after.
+    const mateLog: MailboxEntry[] = [];
+    const foeLog: MailboxEntry[] = [];
+    const senderLog: MailboxEntry[] = [];
+    const scripted = new Match(
+        [
+            { team: 0, controller: { ...spammer, update: (sense: SenseState): Intent => { senderLog.push({ tick: sense.tick, inbox: sense.inbox.map((m) => ({ kind: m.kind, x: m.x, y: m.y, foe: m.foe, from: m.from, sent: m.sent })) }); return spammer.update(sense); } } },
+            { team: 0, controller: mailbox(mateLog) },
+            { team: 1, controller: mailbox(foeLog) },
+            { team: 1, controller: sitter('quiet') },
+        ],
+        3,
+    );
+    for (let i = 0; i < 60; i += 1) scripted.step();
+    check('nothing arrives before tick 6', mateLog.slice(0, 6).every((e) => e.inbox.length === 0));
+    let exactDelay = mateLog.length === 60;
+    for (const entry of mateLog) {
+        if (entry.tick < COMMS_DELAY) {
+            if (entry.inbox.length !== 0) exactDelay = false;
+        } else if (entry.inbox.length !== 1) {
+            exactDelay = false;
+        } else {
+            const m = entry.inbox[0] as MailboxEntry['inbox'][0];
+            const sent = entry.tick - COMMS_DELAY;
+            if (m.kind !== 'ping' || m.x !== sent % ARENA_WIDTH || m.y !== (sent * 2) % ARENA_HEIGHT || m.from !== 0 || m.sent !== sent) exactDelay = false;
+        }
+    }
+    check('exact-delay delivery with engine stamps', exactDelay);
+    check('cross-team mail never arrives', foeLog.every((e) => e.inbox.length === 0) && foeLog.length === 60);
+    check('own messages are never echoed', senderLog.every((e) => e.inbox.length === 0) && senderLog.length === 60);
+    // Ordering + cap bound with two chattering mates (3v3).
+    const trioLog: MailboxEntry[] = [];
+    const trio = new Match(
+        [
+            { team: 0, controller: mailbox(trioLog) },
+            { team: 0, controller: spammer },
+            { team: 0, controller: { ...spammer, meta: { ...spammer.meta, id: 'spammer2' } } },
+            { team: 1, controller: sitter('a') },
+            { team: 1, controller: sitter('b') },
+            { team: 1, controller: sitter('c') },
+        ],
+        3,
+    );
+    for (let i = 0; i < 30; i += 1) trio.step();
+    let trioOk = trioLog.length === 30;
+    for (const entry of trioLog) {
+        if (entry.tick < COMMS_DELAY) {
+            if (entry.inbox.length !== 0) trioOk = false;
+        } else {
+            if (entry.inbox.length > COMMS_INBOX_MAX) trioOk = false;
+            if (JSON.stringify(entry.inbox.map((m) => m.from)) !== JSON.stringify([1, 2])) trioOk = false;
+        }
+    }
+    check('two mates arrive sorted by from, within cap', trioOk);
+    // Foe-id liveness validated at send: live + -1 pass, dead/ally/999 drop.
+    const foeCycle: RobotController = {
+        meta: { id: 'cycler', name: 'Cycler', author: 'test', version: '0', description: '' },
+        update: (sense: SenseState): Intent => {
+            const foes = [2, 999, -1, 1]; // live foe, unknown, none, ally
+            return { radio: { kind: 'contact', x: 0, y: 0, foe: foes[sense.tick % 4] as number, role: 0, slot: 0, bid: 0 } };
+        },
+    };
+    const cycleLog: MailboxEntry[] = [];
+    const cycled = new Match(
+        [
+            { team: 0, controller: foeCycle },
+            { team: 0, controller: mailbox(cycleLog) },
+            { team: 1, controller: sitter('a') },
+            { team: 1, controller: sitter('b') },
+        ],
+        3,
+    );
+    for (let i = 0; i < 40; i += 1) cycled.step();
+    const seenFoes = new Set<number>();
+    let cycleOk = true;
+    for (const entry of cycleLog) {
+        for (const m of entry.inbox) {
+            seenFoes.add(m.foe);
+            if (m.foe !== 2 && m.foe !== -1) cycleOk = false;
+        }
+    }
+    check('only live-foe and -1 mail is sent', cycleOk && seenFoes.has(2) && seenFoes.has(-1) && !seenFoes.has(999) && !seenFoes.has(1));
+    // Garbage radio: unknown kinds never leave the sender.
+    const junkLog: MailboxEntry[] = [];
+    const junk: RobotController = {
+        meta: { id: 'junk', name: 'Junk', author: 'test', version: '0', description: '' },
+        update: (): Intent => ({ radio: { kind: 'bogus', x: 0, y: 0, foe: -1, role: 0, slot: 0, bid: 0 } as never }),
+    };
+    const junked = new Match(
+        [
+            { team: 0, controller: junk },
+            { team: 0, controller: mailbox(junkLog) },
+            { team: 1, controller: sitter('a') },
+            { team: 1, controller: sitter('b') },
+        ],
+        3,
+    );
+    for (let i = 0; i < 30; i += 1) junked.step();
+    check('unknown radio kinds are dropped at send', junkLog.every((e) => e.inbox.length === 0) && junkLog.length === 30);
+    // Dead senders: the spawn-sitter's mail stops the tick it dies, even
+    // in flight; the center-sitter keeps listening long after.
+    const deadLog: MailboxEntry[] = [];
+    const toCenter = (id: string): RobotController => ({
+        meta: { id, name: id, author: 'test', version: '0', description: '' },
+        update: (sense: SenseState): Intent => {
+            const dx = ARENA_WIDTH / 2 - sense.self.x;
+            const dy = ARENA_HEIGHT / 2 - sense.self.y;
+            if (Math.hypot(dx, dy) < 4) return {};
+            const want = Math.atan2(dy, dx);
+            let diff = (want - sense.self.heading) % (Math.PI * 2);
+            if (diff > Math.PI) diff -= Math.PI * 2;
+            if (diff < -Math.PI) diff += Math.PI * 2;
+            return { throttle: 1, turn: Math.max(-1, Math.min(1, diff * 2)) };
+        },
+    });
+    const dying = new Match(
+        [
+            { team: 0, controller: spammer },
+            {
+                team: 0,
+                controller: {
+                    meta: { id: 'listener', name: 'Listener', author: 'test', version: '0', description: '' },
+                    update: (sense: SenseState): Intent => {
+                        deadLog.push({ tick: sense.tick, inbox: sense.inbox.map((m) => ({ kind: m.kind, x: m.x, y: m.y, foe: m.foe, from: m.from, sent: m.sent })) });
+                        return toCenter('listener').update(sense);
+                    },
+                },
+            },
+            { team: 1, controller: toCenter('a') },
+            { team: 1, controller: toCenter('b') },
+        ],
+        11,
+    );
+    let deathTick = -1;
+    for (let i = 0; i < MAX_TICKS_TOTAL && !dying.result.over; i += 1) {
+        dying.step();
+        if (deathTick < 0 && dying.robotSnapshots[0] && !dying.robotSnapshots[0].alive) deathTick = dying.result.tick;
+    }
+    const heardWhileAlive = deadLog.filter((e) => e.tick >= COMMS_DELAY && e.tick < deathTick);
+    const heardAfterDeath = deadLog.filter((e) => e.tick >= deathTick);
+    check(
+        'in-flight mail dies with its sender',
+        deathTick > MAX_TICKS &&
+        heardWhileAlive.length > 100 && heardWhileAlive.every((e) => e.inbox.length === 1) &&
+        heardAfterDeath.length > 100 && heardAfterDeath.every((e) => e.inbox.length === 0),
+        `death=${deathTick} before=${heardWhileAlive.length} after=${heardAfterDeath.length}`,
+    );
+    // Tamper + determinism: inbox copies never leak, logs replay exactly.
+    const cleanEntry = ROBOTS.find((r) => r.meta.id === 'hunter');
+    if (!cleanEntry) throw new Error('no hunter');
+    const runSide = (tamper: boolean): string => {
+        const mate: RobotController = {
+            meta: { id: 'mate', name: 'Mate', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                if (tamper) {
+                    for (const m of sense.inbox) {
+                        m.kind = 'ping';
+                        m.x = 9999;
+                        (m as { from: number }).from = 99;
+                    }
+                    sense.inbox.length = 0;
+                }
+                return {};
+            },
+        };
+        const m = new Match(
+            [
+                { team: 0, controller: cleanEntry.create(), loadout: { ...cleanEntry.loadout } },
+                { team: 0, controller: mate },
+                { team: 1, controller: sitter('a') },
+                { team: 1, controller: sitter('b') },
+            ],
+            9,
+        );
+        m.runToEnd();
+        return fingerprint(m);
+    };
+    check('inbox tampering cannot change the sim', runSide(true) === runSide(false));
+    const inboxRun = (): string => {
+        const logs: MailboxEntry[][] = [[], []];
+        const mk = (id: string, team: 0 | 1, slot: number | null): LineupEntry => {
+            const entry = ROBOTS.find((r) => r.meta.id === id);
+            if (!entry) throw new Error(`unknown robot ${id}`);
+            const inner = entry.create();
+            return {
+                team,
+                controller: slot === null ? inner : { ...inner, update: (sense: SenseState): Intent => { (logs[slot] as MailboxEntry[]).push({ tick: sense.tick, inbox: sense.inbox.map((m) => ({ kind: m.kind, x: m.x, y: m.y, foe: m.foe, from: m.from, sent: m.sent })) }); return inner.update(sense); } },
+                loadout: { ...entry.loadout },
+            };
+        };
+        const m = new Match([mk('hunter', 0, 0), mk('ghost', 0, 1), mk('rusher', 1, null), mk('turret', 1, null)], 5);
+        for (let i = 0; i < 300; i += 1) m.step();
+        return JSON.stringify(logs);
+    };
+    check('inbox traffic is deterministic', inboxRun() === inboxRun());
+    // Pure resolution helpers.
+    check('focus vote builds the right shape', JSON.stringify(castFocusVote(3)) === JSON.stringify({ kind: 'focus', x: 0, y: 0, foe: 3, role: 0, slot: 0, bid: 0 }));
+    check('contact builds the right shape', JSON.stringify(castContact(10, 20, 2)) === JSON.stringify({ kind: 'contact', x: 10, y: 20, foe: 2, role: 0, slot: 0, bid: 0 }));
+    const ballot = (from: number, foe: number): { kind: 'focus'; x: number; y: number; foe: number; role: number; slot: number; bid: number; from: number; sent: number } =>
+        ({ kind: 'focus', x: 0, y: 0, foe, role: 0, slot: 0, bid: 0, from, sent: 0 });
+    check('lowest-id live sender wins focus', focusTarget([ballot(2, 5), ballot(1, 4)], new Set([1, 2]), new Set([4, 5])) === 4);
+    check('focus ignores dead senders', focusTarget([ballot(1, 4)], new Set([2]), new Set([4])) === null);
+    check('focus ignores dead foes', focusTarget([ballot(1, 4)], new Set([1]), new Set([5])) === null);
+    check('focus with no votes is null', focusTarget([], new Set([1]), new Set([4])) === null);
+    const roles = resolveRoles([
+        { from: 2, role: 1, bid: 10 },
+        { from: 1, role: 1, bid: 10 },
+        { from: 0, role: 2, bid: 3 },
+    ]);
+    check('auction ties go to the lowest id', roles.get(1) === 1 && roles.get(2) === 0 && !roles.has(0));
+    const roles2 = resolveRoles([
+        { from: 0, role: 0, bid: 1 },
+        { from: 1, role: 0, bid: 9 },
+    ]);
+    check('highest bid wins the role', roles2.get(0) === 1);
+    const slot0 = formationSlot(0, 4, 480, 320, 100);
+    const slot2 = formationSlot(2, 4, 480, 320, 100);
+    check(
+        'formation slots ring the anchor',
+        Math.abs(slot0.x - 480) < 0.001 && Math.abs(slot0.y - 220) < 0.001 && Math.abs(slot2.x - 480) < 0.001 && Math.abs(slot2.y - 420) < 0.001,
+    );
+    check('single formation slot is the anchor', JSON.stringify(formationSlot(0, 1, 480, 320, 100)) === JSON.stringify({ x: 480, y: 320 }));
+    const contacts = (from: number, x: number): { kind: 'contact'; x: number; y: number; foe: number; role: number; slot: number; bid: number; from: number; sent: number } =>
+        ({ kind: 'contact', x, y: 0, foe: 2, role: 0, slot: 0, bid: 0, from, sent: 6 });
+    check('latest contact prefers the lowest-id sender', latestContact([contacts(2, 9), contacts(1, 7)])?.x === 7);
+    check('no contacts is null', latestContact([]) === null);
+    // Wired bots: hunter votes reach a mate, ghost contacts reach a mate.
+    const wiredLog: MailboxEntry[] = [];
+    const wiredHunter = new Match(
+        [
+            { team: 0, controller: cleanEntry.create(), loadout: { ...cleanEntry.loadout } },
+            { team: 0, controller: mailbox(wiredLog) },
+            { team: 1, controller: sitter('a') },
+            { team: 1, controller: sitter('b') },
+        ],
+        5,
+    );
+    for (let i = 0; i < 400 && !wiredHunter.result.over; i += 1) wiredHunter.step();
+    const hunterVotes = wiredLog.flatMap((e) => e.inbox).filter((m) => m.kind === 'focus');
+    check('hunter focus votes reach its mate', hunterVotes.length > 0 && hunterVotes.every((m) => m.foe === 2 || m.foe === 3), `votes=${hunterVotes.length}`);
+    const ghostEntry = ROBOTS.find((r) => r.meta.id === 'ghost');
+    if (!ghostEntry) throw new Error('no ghost');
+    const ghostLog: MailboxEntry[] = [];
+    const wiredGhost = new Match(
+        [
+            { team: 0, controller: ghostEntry.create(), loadout: { ...ghostEntry.loadout } },
+            { team: 0, controller: mailbox(ghostLog) },
+            { team: 1, controller: sitter('a') },
+            { team: 1, controller: sitter('b') },
+        ],
+        5,
+    );
+    for (let i = 0; i < 400 && !wiredGhost.result.over; i += 1) wiredGhost.step();
+    const ghostContacts = ghostLog.flatMap((e) => e.inbox).filter((m) => m.kind === 'contact');
+    check(
+        'ghost contact reports reach its mate',
+        ghostContacts.length > 0 && ghostContacts.every((m) => (m.foe === 2 || m.foe === 3) && m.x >= 0 && m.x <= ARENA_WIDTH && m.y >= 0 && m.y <= ARENA_HEIGHT),
+        `contacts=${ghostContacts.length}`,
+    );
+    // 1v1 inbox stays empty all game (no allies, no echo).
+    const soloMate: MailboxEntry[] = [];
+    const solo2 = new Match(
+        [
+            { team: 0, controller: mailbox(soloMate) },
+            { team: 1, controller: ROBOTS[1]!.create() },
+        ],
+        5,
+    );
+    solo2.runToEnd();
+    check('1v1 inbox stays empty (no allies)', soloMate.every((e) => e.inbox.length === 0) && soloMate.length > 30);
+    // 3v3 focus-fire balance, muted-control style: the same hunters with
+    // blanked inboxes and stripped radio isolate what focus itself decides.
+    // Concentration is the intended effect (team play beats no team play);
+    // the tripwire is comms DECIDING a matchup that was already a sweep.
+    const hunterTeam = ROBOTS.find((r) => r.meta.id === 'hunter');
+    if (!hunterTeam) throw new Error('missing hunter');
+    const mute = (inner: RobotController): RobotController => ({
+        ...inner,
+        update: (sense: SenseState): Intent => {
+            const out = inner.update({ ...sense, inbox: [] });
+            return { ...out, radio: null };
+        },
+    });
+    let teamErrors = 0;
+    const run3v3 = (foeId: string, muted: boolean): { hw: number; fw: number } => {
+        const foeTeam = ROBOTS.find((r) => r.meta.id === foeId);
+        if (!foeTeam) throw new Error(`missing ${foeId}`);
+        let hw = 0;
+        let fw = 0;
+        for (const arena of ARENA_IDS) {
+            for (const seed of [5, 6, 7, 8]) {
+                const lineups: LineupEntry[] = [0, 1, 2].map(() => {
+                    const inner = hunterTeam.create();
+                    return { team: 0 as 0 | 1, controller: muted ? mute(inner) : inner, loadout: { ...hunterTeam.loadout } };
+                });
+                for (let i = 0; i < 3; i += 1) lineups.push({ team: 1, controller: foeTeam.create(), loadout: { ...foeTeam.loadout } });
+                const m = new Match(lineups, seed, { arena });
+                m.runToEnd();
+                teamErrors += m.robotSnapshots.reduce((sum, s) => sum + s.errors, 0);
+                if (m.result.winner === 0) hw += 1;
+                else if (m.result.winner === 1) fw += 1;
+            }
+        }
+        return { hw, fw };
+    };
+    const brawlFocus = run3v3('brawler', false);
+    const brawlMuted = run3v3('brawler', true);
+    console.log(`       3v3 hunters vs brawlers: focus=${brawlFocus.hw}-${brawlFocus.fw} muted=${brawlMuted.hw}-${brawlMuted.fw}`);
+    check(
+        'brawler sweep is pre-existing (muted parity)',
+        brawlFocus.hw === brawlMuted.hw && brawlFocus.fw === brawlMuted.fw,
+        `focus=${brawlFocus.hw}-${brawlFocus.fw} muted=${brawlMuted.hw}-${brawlMuted.fw}`,
+    );
+    const orbFocus = run3v3('orbiter', false);
+    const orbMuted = run3v3('orbiter', true);
+    console.log(`       3v3 hunters vs orbiters: focus=${orbFocus.hw}-${orbFocus.fw} muted=${orbMuted.hw}-${orbMuted.fw}`);
+    check('focus never hurts a split matchup', orbFocus.hw >= orbMuted.hw, `focus=${orbFocus.hw} muted=${orbMuted.hw}`);
+    check('3v3 focus-fire completes error-free', teamErrors === 0);
 }
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);

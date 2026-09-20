@@ -91,6 +91,13 @@ export const TURN_RATE = 2.7; // radians per second at full turn input
 // Lateral drive: strafe ±1 maps to this fraction of top speed (universal).
 export const STRAFE_FACTOR = 0.5;
 
+// Team radio: exact-delay delivery like sensor sharing, but fast (tactical,
+// not strategic). Inbox is capped; overflow keeps earliest-sent, lowest-id.
+export const COMMS_DELAY = 6;
+export const COMMS_INBOX_MAX = 4;
+/** Short alias for the inbox cap. */
+export const INBOX_MAX = COMMS_INBOX_MAX;
+
 // Sensor tower base values (same for all robots; skills modify per loadout).
 export const TOWER_RATE = 3.6; // radians per second at full tower input
 export const SENSOR_RANGE = 540;

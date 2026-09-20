@@ -7,6 +7,7 @@ import { angleDiff, TAU } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 import { aimed, aimTurret, createStallTracker, dodgeVector, leadAngle, rayClearance, steerTo } from './common';
+import { castContact, latestContact } from './comms';
 
 export const meta: RobotMeta = {
     id: 'ghost',
@@ -32,6 +33,13 @@ export function create(): RobotController {
         if (foe) {
             lastX = foe.x;
             lastY = foe.y;
+        }
+        // Team contacts: when blind, chase a teammate's reported position
+        // and swing the tower onto it — stale, but better than empty air.
+        const contact = foe ? null : latestContact(sense.inbox);
+        if (contact) {
+            lastX = contact.x;
+            lastY = contact.y;
         }
         const goalX = foe ? foe.x : lastX;
         const goalY = foe ? foe.y : lastY;
@@ -80,7 +88,8 @@ export function create(): RobotController {
         // intercept bearings, not tower-on-bearing snapshots. Blips carry
         // zero velocity, so the lead degrades to the bearing gracefully.
         const shot = shotAt;
-        const towerTurn = shot !== undefined ? aimTurret(self.tower, shot) : 1; // wide sweep
+        const contactBearing = contact ? Math.atan2(contact.y - self.y, contact.x - self.x) : null;
+        const towerTurn = shot !== undefined ? aimTurret(self.tower, shot) : contactBearing !== null ? aimTurret(self.tower, contactBearing) : 1; // wide sweep
         const fire = shot !== undefined && foe !== undefined && foe.distance < self.stats.gunRange && aimed(self.tower, shot);
         // Break contact on cooldown: dash out of the pocket and EMP the
         // pursuer so the next pass starts at our range, not theirs.
@@ -95,6 +104,7 @@ export function create(): RobotController {
             charge: false,
             dash,
             emp,
+            radio: foe ? castContact(foe.x, foe.y, foe.id) : null,
         };
     }
 

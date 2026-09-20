@@ -5,6 +5,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SensedRobot, SenseState } from '../sim/types';
 import { aimed, aimTurret, leadAngle, manageCharge, steerTo, throttleFor } from './common';
+import { castFocusVote, focusTarget } from './comms';
 import type { Genome } from './genome';
 
 export const meta: RobotMeta = {
@@ -87,7 +88,16 @@ export function createWithParams(overrides?: Partial<HunterParams>): RobotContro
 
     function update(sense: SenseState): Intent {
         const self = sense.self;
-        const foe = pickTarget(sense.foes, p.targetPolicy);
+        let foe = pickTarget(sense.foes, p.targetPolicy);
+        // Team focus: a live teammate's vote overrides the policy — but only
+        // onto a foe in our own cone. Votes steer, they never fire the gun.
+        if (sense.inbox.length > 0 && sense.foes.length > 0) {
+            const liveSenders = new Set(sense.allies.map((a) => a.id));
+            liveSenders.add(self.id);
+            const voted = focusTarget(sense.inbox, liveSenders, new Set(sense.foes.map((f) => f.id)));
+            const votedFoe = voted !== null ? sense.foes.find((f) => f.id === voted) : undefined;
+            if (votedFoe) foe = votedFoe;
+        }
         if (foe) {
             lastX = foe.x;
             lastY = foe.y;
@@ -116,6 +126,7 @@ export function createWithParams(overrides?: Partial<HunterParams>): RobotContro
             towerTurn,
             fire,
             charge,
+            radio: foe ? castFocusVote(foe.id) : null,
         };
     }
 

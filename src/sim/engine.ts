@@ -1,11 +1,11 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
+import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
 import { angleDiff, assistSteer, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
-import { COMMS_KINDS, IDLE_INTENT, type CommsKind, type DamageSite, type Intent, type OutboxMessage, type RobotController, type SensedAlly, type SensedBullet, type SensedRobot, type SenseEvent, type SenseState, type TrackedFoe } from './types';
+import { COMMS_KINDS, IDLE_INTENT, type CommsKind, type DamageSite, type InboxMessage, type Intent, type OutboxMessage, type RobotController, type SensedAlly, type SensedBullet, type SensedRobot, type SenseEvent, type SenseState, type TrackedFoe } from './types';
 
 export interface RobotSnapshot {
     id: number;
@@ -98,6 +98,14 @@ interface Bullet {
     speed: number;
 }
 
+/** One radio message in flight: delivered to living teammates COMMS_DELAY ticks later. */
+interface PendingRadio {
+    tick: number;
+    team: 0 | 1;
+    from: number;
+    msg: OutboxMessage;
+}
+
 /** One ally's sighting of a foe: position only, delivered 30 ticks later. */
 interface SharedSighting {
     tick: number;
@@ -180,6 +188,8 @@ export class Match {
     private readonly mods: MatchModifiers;
     /** Recent ally sightings, pruned to the last SENSOR_SHARE_DELAY ticks. */
     private sightings: SharedSighting[] = [];
+    /** Radio messages in flight, pruned to the last COMMS_DELAY ticks. */
+    private pendingRadio: PendingRadio[] = [];
     /** Per-team heat-map channels (index 0/1 by team), decayed each tick. */
     private gridFoes: number[][] = [[], []];
     private gridDanger: number[][] = [[], []];
@@ -318,6 +328,11 @@ export class Match {
             const cutoff = this.tick - SENSOR_SHARE_DELAY;
             this.sightings = this.sightings.filter((s) => s.tick >= cutoff);
         }
+        // Drop radio too old to ever be delivered (exact-delay window).
+        if (this.pendingRadio.length > 0 && this.tick > COMMS_DELAY) {
+            const cutoff = this.tick - COMMS_DELAY;
+            this.pendingRadio = this.pendingRadio.filter((p) => p.tick >= cutoff);
+        }
         // 1. Brains: fixed robot order keeps the shared RNG stream deterministic.
         const intents = this.robots.map((robot) => {
             if (!robot.alive) return { ...IDLE_INTENT };
@@ -327,6 +342,20 @@ export class Match {
                 robot.errors += 1;
                 return { ...IDLE_INTENT };
             }
+        });
+        // 1b. Radio collection: the engine only routes. Dead robots never
+        // reach this (idle intents carry no radio); foe-id liveness is
+        // validated at the send tick (-1 = no foe).
+        this.robots.forEach((robot, i) => {
+            if (!robot.alive) return;
+            const radio = (intents[i] as Required<Intent>).radio;
+            if (!radio) return;
+            if (!(COMMS_KINDS as readonly unknown[]).includes(radio.kind)) return;
+            if (radio.foe !== -1) {
+                const foe = this.robots[radio.foe] as Robot | undefined;
+                if (!foe || !foe.alive || foe.team === robot.team) return;
+            }
+            this.pendingRadio.push({ tick: this.tick, team: robot.team, from: robot.id, msg: { ...radio } });
         });
         // 2. Actives: dash bursts and EMP pulses trigger before the drive so
         // they apply the same tick. Positions are pre-move for every robot.
@@ -347,10 +376,10 @@ export class Match {
                 }
             }
         });
-        // 3. Drive + towers + charge. Application order: move assist first
-        // (overrides throttle/turn), then drive normalize (forward + strafe
-        // never exceed top speed), then turret assist, then fire below.
-        // `radio` is sanitized but not yet routed (Phase 6 wires delivery).
+        // 3. Drive + towers + charge. Application order: radio collection
+        // first (step 1b), then move assist (overrides throttle/turn), then
+        // drive normalize (forward + strafe never exceed top speed), then
+        // turret assist, then fire below.
         this.robots.forEach((robot, i) => {
             if (!robot.alive) return;
             const intent = intents[i] as Required<Intent>;
@@ -621,6 +650,21 @@ export class Match {
         }
     }
 
+    /** Teammates' radio from exactly COMMS_DELAY ticks ago, sorted (sent,from), capped. */
+    private inboxFor(robot: Robot): InboxMessage[] {
+        const want = this.tick - COMMS_DELAY;
+        if (want < 0) return [];
+        const inbox: InboxMessage[] = [];
+        for (const p of this.pendingRadio) {
+            if (p.tick !== want || p.team !== robot.team || p.from === robot.id) continue;
+            const sender = this.robots[p.from] as Robot | undefined;
+            if (!sender || !sender.alive) continue;
+            inbox.push({ ...p.msg, from: p.from, sent: p.tick });
+        }
+        inbox.sort((a, b) => a.sent - b.sent || a.from - b.from);
+        return inbox.slice(0, COMMS_INBOX_MAX);
+    }
+
     /** Ally sightings from exactly SENSOR_SHARE_DELAY ticks ago. */
     private sharedSightings(robot: Robot, ownFoeIds: Set<number>): SensedRobot[] {
         const shared: SensedRobot[] = [];
@@ -820,6 +864,7 @@ export class Match {
                 killsTeam,
                 aliveFoes,
             },
+            inbox: this.inboxFor(robot),
         };
     }
 

@@ -249,6 +249,12 @@ export interface SenseState {
     grid?: SenseGrid;
     /** Match-level state. Optional, engine-provided. */
     match?: SenseMatch;
+    /**
+     * Teammates' radio messages from exactly COMMS_DELAY ticks ago, sorted
+     * (sent, from), capped at COMMS_INBOX_MAX. Never your own echo, never
+     * from the dead, never cross-team. Empty in 1v1.
+     */
+    inbox: InboxMessage[];
 }
 
 /** Robot/controller contract version. Robots may export `api?: number` (default 1). */
