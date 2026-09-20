@@ -57,10 +57,10 @@
     }
    ],
    "board": {
-    "elo": 946.3,
-    "wins": 911,
-    "losses": 324,
-    "draws": 45
+    "elo": 862.7,
+    "wins": 866,
+    "losses": 367,
+    "draws": 47
    }
   },
   {
@@ -119,9 +119,9 @@
     }
    ],
    "board": {
-    "elo": 1153.2,
-    "wins": 1066,
-    "losses": 213,
+    "elo": 1075,
+    "wins": 1022,
+    "losses": 257,
     "draws": 1
    }
   },
@@ -179,9 +179,9 @@
     }
    ],
    "board": {
-    "elo": 1681.9,
-    "wins": 1147,
-    "losses": 132,
+    "elo": 1653.3,
+    "wins": 1065,
+    "losses": 214,
     "draws": 1
    }
   },
@@ -240,10 +240,10 @@
     }
    ],
    "board": {
-    "elo": 957.4,
-    "wins": 890,
-    "losses": 390,
-    "draws": 0
+    "elo": 948.2,
+    "wins": 822,
+    "losses": 457,
+    "draws": 1
    }
   },
   {
@@ -301,10 +301,10 @@
     }
    ],
    "board": {
-    "elo": 847,
-    "wins": 746,
-    "losses": 531,
-    "draws": 3
+    "elo": 602,
+    "wins": 669,
+    "losses": 600,
+    "draws": 11
    }
   },
   {
@@ -363,9 +363,9 @@
     }
    ],
    "board": {
-    "elo": 1202.6,
-    "wins": 495,
-    "losses": 785,
+    "elo": 1155.8,
+    "wins": 499,
+    "losses": 781,
     "draws": 0
    }
   },
@@ -424,9 +424,9 @@
     }
    ],
    "board": {
-    "elo": 1391.3,
-    "wins": 759,
-    "losses": 519,
+    "elo": 1386.5,
+    "wins": 677,
+    "losses": 601,
     "draws": 2
    }
   },
@@ -486,10 +486,10 @@
     }
    ],
    "board": {
-    "elo": 1180.7,
-    "wins": 645,
-    "losses": 581,
-    "draws": 54
+    "elo": 1162.3,
+    "wins": 638,
+    "losses": 586,
+    "draws": 56
    }
   }
  ]
