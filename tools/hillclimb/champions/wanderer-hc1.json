@@ -1,0 +1,352 @@
+{
+ "botId": "wanderer-hc1",
+ "baseBot": "wanderer",
+ "runId": "20260920-011225",
+ "genomeHash": "69a579d86419ecbf5167fb8b4493d20e0c62a1a98138c57f50c2e8c5c6b927d7",
+ "genome": {
+  "genome_version": 1,
+  "bot": "wanderer",
+  "params": {
+   "steer.gain": 2.5,
+   "turret.gain": 3,
+   "fire.aimTol": 0.07,
+   "search.margin": 60,
+   "search.arrive": 50,
+   "search.wallDist": 70,
+   "search.wallRetick": 30,
+   "drive.engageThrottle": 0.5,
+   "search.scanTurn": 1,
+   "target.policy": "first",
+   "loadout": {
+    "trigger": 3,
+    "plating": 1,
+    "slipstream": 1,
+    "scout": 1
+   }
+  }
+ },
+ "trainMean": 0.58984375,
+ "validMean": 0.6953125,
+ "featuredReplays": [
+  {
+   "label": "vs rusher (open, seed 1725761109)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInJ1c2hlciJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiMDozLDU6MSw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+   "outcome": "win"
+  },
+  {
+   "label": "vs rusher (open, seed 1725761109)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjA6Myw1OjEsODoyIiwiNTozLDg6MSwxMDoxLDEyOjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+   "outcome": "win"
+  },
+  {
+   "label": "vs rusher (blocks, seed 1725761109)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInJ1c2hlciJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiMDozLDU6MSw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs rusher (blocks, seed 1725761109)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjA6Myw1OjEsODoyIiwiNTozLDg6MSwxMDoxLDEyOjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret (open, seed 85229582)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTIyOTU4MiwidCI6MSwibCI6WyJ3YW5kZXJlci1oYzEiLCJ0dXJyZXQiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjI6MSwzOjIsNToyLDY6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret (open, seed 85229582)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTIyOTU4MiwidCI6MSwibCI6WyJ0dXJyZXQiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIyOjEsMzoyLDU6Miw2OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret (blocks, seed 85229582)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTIyOTU4MiwidCI6MSwibCI6WyJ3YW5kZXJlci1oYzEiLCJ0dXJyZXQiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjI6MSwzOjIsNToyLDY6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret (blocks, seed 85229582)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTIyOTU4MiwidCI6MSwibCI6WyJ0dXJyZXQiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIyOjEsMzoyLDU6Miw2OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs orbiter (open, seed 2739665351)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNzM5NjY1MzUxLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsIm9yYml0ZXIiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjA6MiwxOjIsNToxLDg6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs orbiter (open, seed 2739665351)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNzM5NjY1MzUxLCJ0IjoxLCJsIjpbIm9yYml0ZXIiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIwOjIsMToyLDU6MSw4OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs orbiter (blocks, seed 2739665351)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNzM5NjY1MzUxLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsIm9yYml0ZXIiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjA6MiwxOjIsNToxLDg6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs orbiter (blocks, seed 2739665351)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNzM5NjY1MzUxLCJ0IjoxLCJsIjpbIm9yYml0ZXIiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIwOjIsMToyLDU6MSw4OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs hunter (open, seed 1099133824)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxMDk5MTMzODI0LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsImh1bnRlciJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiNToyLDY6MSw3OjIsODoxIl0sImEiOiJvcGVuIiwibSI6IiJ9",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs hunter (open, seed 1099133824)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxMDk5MTMzODI0LCJ0IjoxLCJsIjpbImh1bnRlciIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjU6Miw2OjEsNzoyLDg6MSIsIjU6Myw4OjEsMTA6MSwxMjoxIl0sImEiOiJvcGVuIiwibSI6IiJ9",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs hunter (blocks, seed 1099133824)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxMDk5MTMzODI0LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsImh1bnRlciJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiNToyLDY6MSw3OjIsODoxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0",
+   "outcome": "win"
+  },
+  {
+   "label": "vs hunter (blocks, seed 1099133824)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxMDk5MTMzODI0LCJ0IjoxLCJsIjpbImh1bnRlciIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjU6Miw2OjEsNzoyLDg6MSIsIjU6Myw4OjEsMTA6MSwxMjoxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs sniper (open, seed 3753569593)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNzUzNTY5NTkzLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInNuaXBlciJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiMzoyLDY6Miw3OjEsMTE6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs sniper (open, seed 3753569593)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNzUzNTY5NTkzLCJ0IjoxLCJsIjpbInNuaXBlciIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjM6Miw2OjIsNzoxLDExOjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs sniper (blocks, seed 3753569593)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNzUzNTY5NTkzLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInNuaXBlciJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiMzoyLDY6Miw3OjEsMTE6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs sniper (blocks, seed 3753569593)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNzUzNTY5NTkzLCJ0IjoxLCJsIjpbInNuaXBlciIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjM6Miw2OjIsNzoxLDExOjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs brawler (open, seed 2113038066)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMTEzMDM4MDY2LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsImJyYXdsZXIiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjA6Miw1OjIsODoyIl0sImEiOiJvcGVuIiwibSI6IiJ9",
+   "outcome": "draw"
+  },
+  {
+   "label": "vs brawler (open, seed 2113038066)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMTEzMDM4MDY2LCJ0IjoxLCJsIjpbImJyYXdsZXIiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIwOjIsNToyLDg6MiIsIjU6Myw4OjEsMTA6MSwxMjoxIl0sImEiOiJvcGVuIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs brawler (blocks, seed 2113038066)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMTEzMDM4MDY2LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsImJyYXdsZXIiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjA6Miw1OjIsODoyIl0sImEiOiJibG9ja3MiLCJtIjoiIn0",
+   "outcome": "win"
+  },
+  {
+   "label": "vs brawler (blocks, seed 2113038066)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMTEzMDM4MDY2LCJ0IjoxLCJsIjpbImJyYXdsZXIiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIwOjIsNToyLDg6MiIsIjU6Myw4OjEsMTA6MSwxMjoxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0",
+   "outcome": "win"
+  },
+  {
+   "label": "vs ghost (open, seed 472506539)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0NzI1MDY1MzksInQiOjEsImwiOlsid2FuZGVyZXItaGMxIiwiZ2hvc3QiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjA6MiwxOjIsNDoxLDEyOjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs ghost (open, seed 472506539)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0NzI1MDY1MzksInQiOjEsImwiOlsiZ2hvc3QiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIwOjIsMToyLDQ6MSwxMjoxIiwiNTozLDg6MSwxMDoxLDEyOjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs ghost (blocks, seed 472506539)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0NzI1MDY1MzksInQiOjEsImwiOlsid2FuZGVyZXItaGMxIiwiZ2hvc3QiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjA6MiwxOjIsNDoxLDEyOjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs ghost (blocks, seed 472506539)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0NzI1MDY1MzksInQiOjEsImwiOlsiZ2hvc3QiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIwOjIsMToyLDQ6MSwxMjoxIiwiNTozLDg6MSwxMDoxLDEyOjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs hunter-hc1 (open, seed 3126942308)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozMTI2OTQyMzA4LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsImh1bnRlci1oYzEiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs hunter-hc1 (open, seed 3126942308)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozMTI2OTQyMzA4LCJ0IjoxLCJsIjpbImh1bnRlci1oYzEiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs hunter-hc1 (blocks, seed 3126942308)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozMTI2OTQyMzA4LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsImh1bnRlci1oYzEiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs hunter-hc1 (blocks, seed 3126942308)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozMTI2OTQyMzA4LCJ0IjoxLCJsIjpbImh1bnRlci1oYzEiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs rusher-hc1 (open, seed 1486410781)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNDg2NDEwNzgxLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInJ1c2hlci1oYzEiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjM6Miw1OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs rusher-hc1 (open, seed 1486410781)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNDg2NDEwNzgxLCJ0IjoxLCJsIjpbInJ1c2hlci1oYzEiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIzOjIsNToxLDg6Miw5OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs rusher-hc1 (blocks, seed 1486410781)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNDg2NDEwNzgxLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInJ1c2hlci1oYzEiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjM6Miw1OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs rusher-hc1 (blocks, seed 1486410781)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNDg2NDEwNzgxLCJ0IjoxLCJsIjpbInJ1c2hlci1oYzEiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIzOjIsNToxLDg6Miw5OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs orbiter-hc1 (open, seed 4140846550)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MTQwODQ2NTUwLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsIm9yYml0ZXItaGMxIl0sIm8iOlsiNTozLDg6MSwxMDoxLDEyOjEiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs orbiter-hc1 (open, seed 4140846550)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MTQwODQ2NTUwLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwid2FuZGVyZXItaGMxIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiNTozLDg6MSwxMDoxLDEyOjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+   "outcome": "win"
+  },
+  {
+   "label": "vs orbiter-hc1 (blocks, seed 4140846550)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MTQwODQ2NTUwLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsIm9yYml0ZXItaGMxIl0sIm8iOlsiNTozLDg6MSwxMDoxLDEyOjEiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs orbiter-hc1 (blocks, seed 4140846550)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MTQwODQ2NTUwLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwid2FuZGVyZXItaGMxIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiNTozLDg6MSwxMDoxLDEyOjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret-hc1 (open, seed 2500315023)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNTAwMzE1MDIzLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInR1cnJldC1oYzEiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret-hc1 (open, seed 2500315023)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNTAwMzE1MDIzLCJ0IjoxLCJsIjpbInR1cnJldC1oYzEiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret-hc1 (blocks, seed 2500315023)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNTAwMzE1MDIzLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInR1cnJldC1oYzEiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret-hc1 (blocks, seed 2500315023)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNTAwMzE1MDIzLCJ0IjoxLCJsIjpbInR1cnJldC1oYzEiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs rusher (open, seed 859783496)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTk3ODM0OTYsInQiOjEsImwiOlsid2FuZGVyZXItaGMxIiwicnVzaGVyIl0sIm8iOlsiNTozLDg6MSwxMDoxLDEyOjEiLCIwOjMsNToxLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs rusher (open, seed 859783496)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTk3ODM0OTYsInQiOjEsImwiOlsicnVzaGVyIiwid2FuZGVyZXItaGMxIl0sIm8iOlsiMDozLDU6MSw4OjIiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs rusher (blocks, seed 859783496)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTk3ODM0OTYsInQiOjEsImwiOlsid2FuZGVyZXItaGMxIiwicnVzaGVyIl0sIm8iOlsiNTozLDg6MSwxMDoxLDEyOjEiLCIwOjMsNToxLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs rusher (blocks, seed 859783496)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTk3ODM0OTYsInQiOjEsImwiOlsicnVzaGVyIiwid2FuZGVyZXItaGMxIl0sIm8iOlsiMDozLDU6MSw4OjIiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret (open, seed 3514219265)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNTE0MjE5MjY1LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInR1cnJldCJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiMjoxLDM6Miw1OjIsNjoxIl0sImEiOiJvcGVuIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret (open, seed 3514219265)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNTE0MjE5MjY1LCJ0IjoxLCJsIjpbInR1cnJldCIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjI6MSwzOjIsNToyLDY6MSIsIjU6Myw4OjEsMTA6MSwxMjoxIl0sImEiOiJvcGVuIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret (blocks, seed 3514219265)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNTE0MjE5MjY1LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInR1cnJldCJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiMjoxLDM6Miw1OjIsNjoxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0",
+   "outcome": "win"
+  },
+  {
+   "label": "vs turret (blocks, seed 3514219265)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNTE0MjE5MjY1LCJ0IjoxLCJsIjpbInR1cnJldCIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjI6MSwzOjIsNToyLDY6MSIsIjU6Myw4OjEsMTA6MSwxMjoxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0",
+   "outcome": "win"
+  },
+  {
+   "label": "vs orbiter (open, seed 1873687738)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxODczNjg3NzM4LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsIm9yYml0ZXIiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjA6MiwxOjIsNToxLDg6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs orbiter (open, seed 1873687738)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxODczNjg3NzM4LCJ0IjoxLCJsIjpbIm9yYml0ZXIiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIwOjIsMToyLDU6MSw4OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs orbiter (blocks, seed 1873687738)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxODczNjg3NzM4LCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsIm9yYml0ZXIiXSwibyI6WyI1OjMsODoxLDEwOjEsMTI6MSIsIjA6MiwxOjIsNToxLDg6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs orbiter (blocks, seed 1873687738)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxODczNjg3NzM4LCJ0IjoxLCJsIjpbIm9yYml0ZXIiLCJ3YW5kZXJlci1oYzEiXSwibyI6WyIwOjIsMToyLDU6MSw4OjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs hunter (open, seed 233156211)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMzMxNTYyMTEsInQiOjEsImwiOlsid2FuZGVyZXItaGMxIiwiaHVudGVyIl0sIm8iOlsiNTozLDg6MSwxMDoxLDEyOjEiLCI1OjIsNjoxLDc6Miw4OjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs hunter (open, seed 233156211)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMzMxNTYyMTEsInQiOjEsImwiOlsiaHVudGVyIiwid2FuZGVyZXItaGMxIl0sIm8iOlsiNToyLDY6MSw3OjIsODoxIiwiNTozLDg6MSwxMDoxLDEyOjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs hunter (blocks, seed 233156211)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMzMxNTYyMTEsInQiOjEsImwiOlsid2FuZGVyZXItaGMxIiwiaHVudGVyIl0sIm8iOlsiNTozLDg6MSwxMDoxLDEyOjEiLCI1OjIsNjoxLDc6Miw4OjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs hunter (blocks, seed 233156211)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMzMxNTYyMTEsInQiOjEsImwiOlsiaHVudGVyIiwid2FuZGVyZXItaGMxIl0sIm8iOlsiNToyLDY6MSw3OjIsODoxIiwiNTozLDg6MSwxMDoxLDEyOjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs sniper (open, seed 2887591980)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyODg3NTkxOTgwLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInNuaXBlciJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiMzoyLDY6Miw3OjEsMTE6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "loss"
+  },
+  {
+   "label": "vs sniper (open, seed 2887591980)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyODg3NTkxOTgwLCJ0IjoxLCJsIjpbInNuaXBlciIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjM6Miw2OjIsNzoxLDExOjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ",
+   "outcome": "win"
+  },
+  {
+   "label": "vs sniper (blocks, seed 2887591980)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyODg3NTkxOTgwLCJ0IjoxLCJsIjpbIndhbmRlcmVyLWhjMSIsInNuaXBlciJdLCJvIjpbIjU6Myw4OjEsMTA6MSwxMjoxIiwiMzoyLDY6Miw3OjEsMTE6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "win"
+  },
+  {
+   "label": "vs sniper (blocks, seed 2887591980)",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyODg3NTkxOTgwLCJ0IjoxLCJsIjpbInNuaXBlciIsIndhbmRlcmVyLWhjMSJdLCJvIjpbIjM6Miw2OjIsNzoxLDExOjEiLCI1OjMsODoxLDEwOjEsMTI6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+   "outcome": "loss"
+  }
+ ]
+}

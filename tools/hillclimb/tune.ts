@@ -95,8 +95,9 @@ function helpText(): string {
     return [
         'hillclimb tuner: Stage A halving + Stage B random-restart hillclimb',
         '',
-        '  --archetype ID        tunable bot (hunter, orbiter) [required]',
-        '  --teamSize 1          only 1v1 in the MVP (team search lands in Phase 8)',
+        '  --archetype ID        tunable bot: brawler, ghost, hunter, orbiter,',
+        '                          rusher, sniper, turret, wanderer [required]',
+        '  --teamSize 1          1v1 only (team search deferred: 8 strong 1v1 champions first)',
         '  --seed N              run seed (default 0xc11cb5)',
         '  --stageA N            Stage-A loadout candidates (default 256)',
         '  --restarts N          Stage-B restarts (default 8)',
@@ -159,7 +160,7 @@ function runIdNow(): string {
 function tune(opts: TuneOptions, root: string): number {
     const started = Date.now();
     if (!opts.archetype) throw new Error('--archetype is required (see --help)');
-    if (opts.teamSize !== 1) throw new Error(`--teamSize ${opts.teamSize} unsupported in the MVP (1v1 only; team search lands in Phase 8)`);
+    if (opts.teamSize !== 1) throw new Error(`--teamSize ${opts.teamSize} unsupported (1v1 only; team search deferred)`);
     const def = genomeDefFor(opts.archetype);
     if (!def) throw new Error(`no genome def for archetype ${opts.archetype}`);
     const create = adapterFor(opts.archetype);

@@ -301,6 +301,14 @@ index into it). Study them before writing your own.
 | Brawler | Plated bruiser; walks the gun into the clinch and rams through. | `OVR2 TRG2 PLT2` |
 | Ghost | Hit-and-run scout: strikes on a ready gun, breaks away on cooldown. | `OVR2 GYR2 WND1 SCT1` |
 | Hunter HC1 | Hillclimb champion bred from hunter (run 20260920-002309). | `TRG2 CHG1 PLT2 NRP1` |
+| Rusher HC1 | Hillclimb champion bred from rusher (run 20260920-010027). | `SCN2 TRG1 PLT2 NRP1` |
+| Orbiter HC1 | Hillclimb champion bred from orbiter (run 20260920-010338). | `TRG2 CHG1 PLT2 NRP1` |
+| Turret HC1 | Hillclimb champion bred from turret (run 20260920-010715). | `TRG2 CHG1 PLT2 NRP1` |
+| Wanderer HC1 | Hillclimb champion bred from wanderer (run 20260920-011225). | `TRG3 PLT1 SLP1 SCT1` |
+| Sniper HC1 | Hillclimb champion bred from sniper (run 20260920-011554). | `SCN2 CHG2 PLT1 NRP1` |
+| Brawler HC1 | Hillclimb champion bred from brawler (run 20260920-012043). | `TRG3 PLT1 SLP1 SCT1` |
+| Ghost HC1 | Hillclimb champion bred from ghost (run 20260920-012240). | `OVR1 TRG2 MRK2 SCT1` |
+| Hunter HC2 | Hillclimb champion bred from hunter (run 20260920-012539). | `TRG2 CHG1 PLT2 NRP1` |
 
 ## Test your robot
 

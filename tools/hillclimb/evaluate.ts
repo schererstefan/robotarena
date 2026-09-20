@@ -6,8 +6,14 @@ import type { ArenaId } from '../../src/sim/constants';
 import { Match } from '../../src/sim/engine';
 import type { Genome } from '../../src/robots/genome';
 import { genomeDefFor, genomeLoadout } from '../../src/robots/genome';
+import { createWithParams as createBrawler, brawlerParamsFromGenome } from '../../src/robots/brawler';
+import { createWithParams as createGhost, ghostParamsFromGenome } from '../../src/robots/ghost';
 import { createWithParams as createHunter, hunterParamsFromGenome } from '../../src/robots/hunter';
 import { createWithParams as createOrbiter, orbiterParamsFromGenome } from '../../src/robots/orbiter';
+import { createWithParams as createRusher, rusherParamsFromGenome } from '../../src/robots/rusher';
+import { createWithParams as createSniper, sniperParamsFromGenome } from '../../src/robots/sniper';
+import { createWithParams as createTurret, turretParamsFromGenome } from '../../src/robots/turret';
+import { createWithParams as createWanderer, wandererParamsFromGenome } from '../../src/robots/wanderer';
 import { getRobot, ROBOTS } from '../../src/robots/registry';
 import type { RobotController } from '../../src/sim/types';
 import { aggregate, matchScore, spyOn, tiebreak, type Aggregate, type ScoredMatch } from './fitness';
@@ -19,8 +25,14 @@ const SIDES: Array<0 | 1> = [0, 1];
 export type CreateFromGenome = (genome: Genome) => RobotController;
 
 const ADAPTERS: Record<string, CreateFromGenome> = {
+    brawler: (genome) => createBrawler(brawlerParamsFromGenome(genome)),
+    ghost: (genome) => createGhost(ghostParamsFromGenome(genome)),
     hunter: (genome) => createHunter(hunterParamsFromGenome(genome)),
     orbiter: (genome) => createOrbiter(orbiterParamsFromGenome(genome)),
+    rusher: (genome) => createRusher(rusherParamsFromGenome(genome)),
+    sniper: (genome) => createSniper(sniperParamsFromGenome(genome)),
+    turret: (genome) => createTurret(turretParamsFromGenome(genome)),
+    wanderer: (genome) => createWanderer(wandererParamsFromGenome(genome)),
 };
 
 export function adapterFor(archetype: string): CreateFromGenome {

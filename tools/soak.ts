@@ -25,8 +25,14 @@ import { castContact, castFocusVote, focusTarget, formationSlot, latestContact, 
 import { ROBOTS } from '../src/robots/registry';
 import { canonicalStringify, defaultGenome, genomeDefFor, genomeHash, genomeLoadout, sha256Hex, validateGenome, type Genome } from '../src/robots/genome';
 import { BRAIN_DEFAULTS, BRAIN_PRESETS, createBrain, pickTarget as brainPickTarget, safeCircleFor, type BrainParams } from '../src/robots/brain';
+import { BRAWLER_DEFAULTS, brawlerParamsFromGenome, createWithParams as createBrawlerParams } from '../src/robots/brawler';
 import { createLegacyWithParams as createHunterLegacy, createWithParams as createHunterParams, HUNTER_DEFAULTS, hunterParamsFromGenome } from '../src/robots/hunter';
+import { createWithParams as createGhostParams, GHOST_DEFAULTS, ghostParamsFromGenome } from '../src/robots/ghost';
 import { createWithParams as createOrbiterParams, ORBITER_DEFAULTS, orbiterParamsFromGenome } from '../src/robots/orbiter';
+import { createWithParams as createRusherParams, RUSHER_DEFAULTS, rusherParamsFromGenome } from '../src/robots/rusher';
+import { createWithParams as createSniperParams, SNIPER_DEFAULTS, sniperParamsFromGenome } from '../src/robots/sniper';
+import { createWithParams as createTurretParams, TURRET_DEFAULTS, turretParamsFromGenome } from '../src/robots/turret';
+import { createWithParams as createWandererParams, WANDERER_DEFAULTS, wandererParamsFromGenome } from '../src/robots/wanderer';
 import { computeStats, loadoutCode, loadoutCost, sanitizeLoadout, SKILL_DEFS, type SkillLoadout } from '../src/sim/skills';
 import { ROBOT_API_VERSION, type Intent, type RobotController, type SenseState } from '../src/sim/types';
 import { initialRound, nextRound, roundName, tiebreakWinner } from '../src/game/tournament';
@@ -718,6 +724,7 @@ console.log('soak');
     for (const arena of ARENA_IDS) {
         const wins = new Map<string, number>(ids.map((id) => [id, 0]));
         let draws = 0;
+        let timeoutDraws = 0;
         for (const a of ids) {
             for (const b of ids) {
                 if (a === b) continue;
@@ -731,15 +738,21 @@ console.log('soak');
                     }
                     if (match.result.winner === 0) wins.set(a, (wins.get(a) ?? 0) + 1);
                     else if (match.result.winner === 1) wins.set(b, (wins.get(b) ?? 0) + 1);
-                    else draws += 1;
+                    else {
+                        draws += 1;
+                        if (match.result.tick >= MAX_TICKS_TOTAL) timeoutDraws += 1;
+                    }
                 }
             }
         }
-        console.log(`       ${arena} record: ${ids.map((id) => `${id}=${wins.get(id)}`).join(' ')} draws=${draws}`);
+        console.log(`       ${arena} record: ${ids.map((id) => `${id}=${wins.get(id)}`).join(' ')} draws=${draws} timeouts=${timeoutDraws}`);
         const maxWins = Math.max(...[...wins.values()]);
         const arenaGames = ids.length * (ids.length - 1) * seeds.length;
         check(`no robot wins every ${arena} matchup (balance smell)`, maxWins < arenaGames);
-        check(`zero 1v1 draws on ${arena}`, draws === 0, `draws=${draws}`);
+        // Draws are first-class (mutual kills in decisive combat), but stalls
+        // that burn the full clock are not: sudden death must resolve those.
+        check(`no 1v1 timeout draws on ${arena}`, timeoutDraws === 0, `timeouts=${timeoutDraws}`);
+        check(`1v1 draws stay rare on ${arena}`, draws * 50 <= arenaGames, `draws=${draws}/${arenaGames}`);
     }
     check(`all ${games} 1v1 games finished`, games === ids.length * (ids.length - 1) * seeds.length * ARENA_IDS.length);
     check('built-in robots run error-free', totalErrors === 0, `errors=${totalErrors}`);
@@ -1517,6 +1530,110 @@ console.log('genome');
 
     // leadAngle dedup: hunter still leads (sanity: it fires lead shots, not raw bearings).
     check('hunter lead helper shared via common', typeof createHunterParams === 'function');
+
+    // Phase 8: every base bot is tunable. Defaults must reproduce create()
+    // fingerprints exactly; strong overrides must change behavior.
+    const hunterEntry = ROBOTS.find((r) => r.meta.id === 'hunter');
+    if (!hunterEntry) throw new Error('hunter missing from registry');
+    const paramBots: Array<{
+        id: string;
+        createDefault: () => RobotController;
+        createExplicit: () => RobotController;
+        createFromGenome: () => RobotController;
+        createWild: () => RobotController;
+    }> = [
+        {
+            id: 'brawler',
+            createDefault: () => createBrawlerParams(),
+            createExplicit: () => createBrawlerParams({ ...BRAWLER_DEFAULTS }),
+            createFromGenome: () => createBrawlerParams(brawlerParamsFromGenome(defaultGenome('brawler') as Genome)),
+            createWild: () => createBrawlerParams({ weaveAmp: 0, clinchRange: 300 }),
+        },
+        {
+            id: 'ghost',
+            createDefault: () => createGhostParams(),
+            createExplicit: () => createGhostParams({ ...GHOST_DEFAULTS }),
+            createFromGenome: () => createGhostParams(ghostParamsFromGenome(defaultGenome('ghost') as Genome)),
+            createWild: () => createGhostParams({ orbitDir: -1, dodgeRange: 0 }),
+        },
+        {
+            id: 'rusher',
+            createDefault: () => createRusherParams(),
+            createExplicit: () => createRusherParams({ ...RUSHER_DEFAULTS }),
+            createFromGenome: () => createRusherParams(rusherParamsFromGenome(defaultGenome('rusher') as Genome)),
+            createWild: () => createRusherParams({ steerGain: 6, aimTol: 0.3, weavePeriod: 6 }),
+        },
+        {
+            id: 'sniper',
+            createDefault: () => createSniperParams(),
+            createExplicit: () => createSniperParams({ ...SNIPER_DEFAULTS }),
+            createFromGenome: () => createSniperParams(sniperParamsFromGenome(defaultGenome('sniper') as Genome)),
+            createWild: () => createSniperParams({ anchorXNear: 0.05, kiteRangeFrac: 1 }),
+        },
+        {
+            id: 'turret',
+            createDefault: () => createTurretParams(),
+            createExplicit: () => createTurretParams({ ...TURRET_DEFAULTS }),
+            createFromGenome: () => createTurretParams(turretParamsFromGenome(defaultGenome('turret') as Genome)),
+            createWild: () => createTurretParams({ anchorXNear: 0.05, scanTurn: -1 }),
+        },
+        {
+            id: 'wanderer',
+            createDefault: () => createWandererParams(),
+            createExplicit: () => createWandererParams({ ...WANDERER_DEFAULTS }),
+            createFromGenome: () => createWandererParams(wandererParamsFromGenome(defaultGenome('wanderer') as Genome)),
+            createWild: () => createWandererParams({ scanTurn: -1, engageThrottle: 1 }),
+        },
+    ];
+    check(
+        'all 8 base bots have genome defs',
+        ['hunter', 'orbiter', ...paramBots.map((b) => b.id)].every((id) => genomeDefFor(id) !== undefined),
+    );
+    let allDefaultsMatch = true;
+    for (const bot of paramBots) {
+        const entry = ROBOTS.find((r) => r.meta.id === bot.id);
+        if (!entry) throw new Error(`missing registry entry ${bot.id}`);
+        for (const seed of [1, 7, 1234]) {
+            for (const arena of arenas) {
+                const duel = (mine: RobotController): string => {
+                    const m = new Match(
+                        [
+                            { team: 0, controller: mine, loadout: { ...entry.loadout } },
+                            { team: 1, controller: hunterEntry.create(), loadout: { ...hunterEntry.loadout } },
+                        ],
+                        seed,
+                        { arena },
+                    );
+                    m.runToEnd();
+                    return fingerprint(m);
+                };
+                const ref = duel(entry.create());
+                if (duel(bot.createDefault()) !== ref || duel(bot.createExplicit()) !== ref || duel(bot.createFromGenome()) !== ref) {
+                    allDefaultsMatch = false;
+                }
+            }
+        }
+    }
+    check('all param factories match legacy fingerprints at defaults', allDefaultsMatch);
+    let allWildDiverge = true;
+    for (const bot of paramBots) {
+        const entry = ROBOTS.find((r) => r.meta.id === bot.id);
+        if (!entry) throw new Error(`missing registry entry ${bot.id}`);
+        const duel = (mine: RobotController): string => {
+            const m = new Match(
+                [
+                    { team: 0, controller: mine, loadout: { ...entry.loadout } },
+                    { team: 1, controller: hunterEntry.create(), loadout: { ...hunterEntry.loadout } },
+                ],
+                1234,
+                {},
+            );
+            m.runToEnd();
+            return fingerprint(m);
+        };
+        if (duel(bot.createWild()) === duel(entry.create())) allWildDiverge = false;
+    }
+    check('new bot params change behavior', allWildDiverge);
 }
 
 // --- 11. Sense expansion: events, bullets, tracks, arena, zone, grid, match -

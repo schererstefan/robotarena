@@ -1,0 +1,1949 @@
+{
+ "runId": "20260920-010338",
+ "gitSha": "af1c08b",
+ "gameVersion": "0.1.0",
+ "robotApiVersion": 1,
+ "config": {
+  "archetype": "orbiter",
+  "teamSize": 1,
+  "runSeed": 12655797,
+  "stageACandidates": 256,
+  "restarts": 8,
+  "generations": 25,
+  "challengers": 4,
+  "earlyStop": 8,
+  "trainSeeds": 32,
+  "validSeeds": 16,
+  "opponents": [
+   "rusher",
+   "turret",
+   "wanderer",
+   "hunter",
+   "sniper",
+   "brawler",
+   "ghost",
+   "hunter-hc1",
+   "rusher-hc1"
+  ]
+ },
+ "trainSeeds": [
+  12655797,
+  2667091566,
+  1026560039,
+  3680995808,
+  2040464281,
+  399932754,
+  3054368523,
+  1413836996,
+  4068272765,
+  2427741238,
+  787209711,
+  3441645480,
+  1801113953,
+  160582426,
+  2815018195,
+  1174486668,
+  3828922437,
+  2188390910,
+  547859383,
+  3202295152,
+  1561763625,
+  4216199394,
+  2575667867,
+  935136340,
+  3589572109,
+  1949040582,
+  308509055,
+  2962944824,
+  1322413297,
+  3976849066,
+  2336317539,
+  695786012
+ ],
+ "validSeeds": [
+  1725761109,
+  85229582,
+  2739665351,
+  1099133824,
+  3753569593,
+  2113038066,
+  472506539,
+  3126942308,
+  1486410781,
+  4140846550,
+  2500315023,
+  859783496,
+  3514219265,
+  1873687738,
+  233156211,
+  2887591980
+ ],
+ "stageA": [
+  {
+   "rung": 0,
+   "candidates": 256,
+   "poolSize": 32,
+   "seeds": 4,
+   "topMean": 0.65625,
+   "cutoffMean": 0.40625,
+   "kept": 64
+  },
+  {
+   "rung": 1,
+   "candidates": 64,
+   "poolSize": 64,
+   "seeds": 8,
+   "topMean": 0.578125,
+   "cutoffMean": 0.375,
+   "kept": 16
+  },
+  {
+   "rung": 2,
+   "candidates": 16,
+   "poolSize": 128,
+   "seeds": 16,
+   "topMean": 0.5859375,
+   "cutoffMean": 0.4296875,
+   "kept": 8
+  }
+ ],
+ "restarts": [
+  {
+   "restart": 0,
+   "train": {
+    "n": 128,
+    "mean": 0.65625,
+    "meanF": 0.14578485273541872,
+    "wins": 84,
+    "draws": 0,
+    "losses": 44
+   },
+   "valid": {
+    "n": 64,
+    "mean": 0.546875,
+    "meanF": 0.03468685341249994,
+    "wins": 35,
+    "draws": 0,
+    "losses": 29
+   },
+   "promoted": false,
+   "stoppedEarly": true,
+   "matchesRun": 5184,
+   "history": [
+    {
+     "gen": 0,
+     "incumbentMean": 0.6015625,
+     "incumbentF": 0.08074956017925042,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6015625,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 1,
+     "incumbentMean": 0.578125,
+     "incumbentF": 0.07368188339313844,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.578125,
+     "signNonTied": 21,
+     "signWins": 8
+    },
+    {
+     "gen": 2,
+     "incumbentMean": 0.546875,
+     "incumbentF": 0.060224764380994576,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.546875,
+     "signNonTied": 42,
+     "signWins": 21
+    },
+    {
+     "gen": 3,
+     "incumbentMean": 0.578125,
+     "incumbentF": 0.06919977563636813,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.578125,
+     "signNonTied": 31,
+     "signWins": 16
+    },
+    {
+     "gen": 4,
+     "incumbentMean": 0.6171875,
+     "incumbentF": 0.089114155828363,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6171875,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 5,
+     "incumbentMean": 0.65625,
+     "incumbentF": 0.13717102811566387,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.65625,
+     "signNonTied": 24,
+     "signWins": 8
+    },
+    {
+     "gen": 6,
+     "incumbentMean": 0.6328125,
+     "incumbentF": 0.12874586944175745,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6328125,
+     "signNonTied": 21,
+     "signWins": 13
+    },
+    {
+     "gen": 7,
+     "incumbentMean": 0.65625,
+     "incumbentF": 0.14578485273541872,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.65625,
+     "signNonTied": 21,
+     "signWins": 21
+    }
+   ]
+  },
+  {
+   "restart": 1,
+   "train": {
+    "n": 128,
+    "mean": 0.765625,
+    "meanF": -0.08631948564777807,
+    "wins": 98,
+    "draws": 0,
+    "losses": 30
+   },
+   "valid": {
+    "n": 64,
+    "mean": 0.796875,
+    "meanF": -0.05918518031472633,
+    "wins": 51,
+    "draws": 0,
+    "losses": 13
+   },
+   "promoted": true,
+   "stoppedEarly": true,
+   "matchesRun": 7744,
+   "history": [
+    {
+     "gen": 0,
+     "incumbentMean": 0.5625,
+     "incumbentF": -0.06399625582476365,
+     "challengers": 4,
+     "accepted": true,
+     "acceptedMean": 0.6796875,
+     "signNonTied": 27,
+     "signWins": 21
+    },
+    {
+     "gen": 1,
+     "incumbentMean": 0.671875,
+     "incumbentF": -0.004660964064313435,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.671875,
+     "signNonTied": 4,
+     "signWins": 0
+    },
+    {
+     "gen": 2,
+     "incumbentMean": 0.6484375,
+     "incumbentF": -0.03685693268648309,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6484375,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 3,
+     "incumbentMean": 0.6328125,
+     "incumbentF": -0.045571601914929705,
+     "challengers": 4,
+     "accepted": true,
+     "acceptedMean": 0.7421875,
+     "signNonTied": 48,
+     "signWins": 31
+    },
+    {
+     "gen": 4,
+     "incumbentMean": 0.7578125,
+     "incumbentF": -0.07341130317755885,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.7578125,
+     "signNonTied": 11,
+     "signWins": 9
+    },
+    {
+     "gen": 5,
+     "incumbentMean": 0.78125,
+     "incumbentF": -0.052615553873406426,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.78125,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 6,
+     "incumbentMean": 0.7734375,
+     "incumbentF": -0.06822900666000646,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.7734375,
+     "signNonTied": 3,
+     "signWins": 1
+    },
+    {
+     "gen": 7,
+     "incumbentMean": 0.765625,
+     "incumbentF": -0.047888717465498096,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.765625,
+     "signNonTied": 18,
+     "signWins": 17
+    },
+    {
+     "gen": 8,
+     "incumbentMean": 0.7578125,
+     "incumbentF": -0.05197622474442974,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.7578125,
+     "signNonTied": 9,
+     "signWins": 2
+    },
+    {
+     "gen": 9,
+     "incumbentMean": 0.765625,
+     "incumbentF": -0.059952473296677286,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.765625,
+     "signNonTied": 18,
+     "signWins": 12
+    },
+    {
+     "gen": 10,
+     "incumbentMean": 0.78125,
+     "incumbentF": -0.055533996978659184,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.78125,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 11,
+     "incumbentMean": 0.765625,
+     "incumbentF": -0.08631948564777807,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.765625,
+     "signNonTied": 5,
+     "signWins": 0
+    }
+   ]
+  },
+  {
+   "restart": 2,
+   "train": {
+    "n": 128,
+    "mean": 0.7578125,
+    "meanF": -0.02305420615165795,
+    "wins": 97,
+    "draws": 0,
+    "losses": 31
+   },
+   "valid": {
+    "n": 64,
+    "mean": 0.734375,
+    "meanF": -0.049693025959719965,
+    "wins": 47,
+    "draws": 0,
+    "losses": 17
+   },
+   "promoted": true,
+   "stoppedEarly": true,
+   "matchesRun": 13504,
+   "history": [
+    {
+     "gen": 0,
+     "incumbentMean": 0.5859375,
+     "incumbentF": 0.008640451334954058,
+     "challengers": 4,
+     "accepted": true,
+     "acceptedMean": 0.6640625,
+     "signNonTied": 28,
+     "signWins": 22
+    },
+    {
+     "gen": 1,
+     "incumbentMean": 0.65625,
+     "incumbentF": 0.060330171925191814,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.65625,
+     "signNonTied": 13,
+     "signWins": 7
+    },
+    {
+     "gen": 2,
+     "incumbentMean": 0.65625,
+     "incumbentF": 0.047630127852287096,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.65625,
+     "signNonTied": 15,
+     "signWins": 13
+    },
+    {
+     "gen": 3,
+     "incumbentMean": 0.671875,
+     "incumbentF": 0.05852198388039116,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.671875,
+     "signNonTied": 16,
+     "signWins": 14
+    },
+    {
+     "gen": 4,
+     "incumbentMean": 0.6328125,
+     "incumbentF": 0.01856212017595812,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6328125,
+     "signNonTied": 20,
+     "signWins": 16
+    },
+    {
+     "gen": 5,
+     "incumbentMean": 0.6640625,
+     "incumbentF": 0.05917207348371349,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6640625,
+     "signNonTied": 8,
+     "signWins": 0
+    },
+    {
+     "gen": 6,
+     "incumbentMean": 0.65625,
+     "incumbentF": 0.05448479268747965,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.65625,
+     "signNonTied": 20,
+     "signWins": 14
+    },
+    {
+     "gen": 7,
+     "incumbentMean": 0.6640625,
+     "incumbentF": 0.07318694061343874,
+     "challengers": 4,
+     "accepted": true,
+     "acceptedMean": 0.78125,
+     "signNonTied": 29,
+     "signWins": 22
+    },
+    {
+     "gen": 8,
+     "incumbentMean": 0.734375,
+     "incumbentF": 0.0809578860445706,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.734375,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 9,
+     "incumbentMean": 0.734375,
+     "incumbentF": 0.07945128797933575,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.734375,
+     "signNonTied": 7,
+     "signWins": 7
+    },
+    {
+     "gen": 10,
+     "incumbentMean": 0.765625,
+     "incumbentF": 0.10755651600338258,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.765625,
+     "signNonTied": 7,
+     "signWins": 6
+    },
+    {
+     "gen": 11,
+     "incumbentMean": 0.7109375,
+     "incumbentF": 0.07173475638447517,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.7109375,
+     "signNonTied": 18,
+     "signWins": 16
+    },
+    {
+     "gen": 12,
+     "incumbentMean": 0.7265625,
+     "incumbentF": 0.08550879023550866,
+     "challengers": 4,
+     "accepted": true,
+     "acceptedMean": 0.7734375,
+     "signNonTied": 28,
+     "signWins": 17
+    },
+    {
+     "gen": 13,
+     "incumbentMean": 0.78125,
+     "incumbentF": 0.008715875221114742,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.78125,
+     "signNonTied": 13,
+     "signWins": 9
+    },
+    {
+     "gen": 14,
+     "incumbentMean": 0.796875,
+     "incumbentF": 0.0246458092597241,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.796875,
+     "signNonTied": 19,
+     "signWins": 10
+    },
+    {
+     "gen": 15,
+     "incumbentMean": 0.78125,
+     "incumbentF": 0.013072434530460425,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.78125,
+     "signNonTied": 13,
+     "signWins": 10
+    },
+    {
+     "gen": 16,
+     "incumbentMean": 0.8046875,
+     "incumbentF": 0.06528994796524856,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.8046875,
+     "signNonTied": 25,
+     "signWins": 14
+    },
+    {
+     "gen": 17,
+     "incumbentMean": 0.765625,
+     "incumbentF": 0.015163527577481968,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.765625,
+     "signNonTied": 3,
+     "signWins": 0
+    },
+    {
+     "gen": 18,
+     "incumbentMean": 0.78125,
+     "incumbentF": 0.016346911889859077,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.78125,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 19,
+     "incumbentMean": 0.765625,
+     "incumbentF": 0.015917110888598967,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.765625,
+     "signNonTied": 13,
+     "signWins": 9
+    },
+    {
+     "gen": 20,
+     "incumbentMean": 0.7578125,
+     "incumbentF": -0.02305420615165795,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.7578125,
+     "signNonTied": 15,
+     "signWins": 10
+    }
+   ]
+  },
+  {
+   "restart": 3,
+   "train": {
+    "n": 128,
+    "mean": 0.6953125,
+    "meanF": 0.17086952112022546,
+    "wins": 89,
+    "draws": 0,
+    "losses": 39
+   },
+   "valid": {
+    "n": 64,
+    "mean": 0.703125,
+    "meanF": 0.16154568939841815,
+    "wins": 45,
+    "draws": 0,
+    "losses": 19
+   },
+   "promoted": true,
+   "stoppedEarly": true,
+   "matchesRun": 12224,
+   "history": [
+    {
+     "gen": 0,
+     "incumbentMean": 0.54296875,
+     "incumbentF": 0.04521699556149292,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.54296875,
+     "signNonTied": 21,
+     "signWins": 6
+    },
+    {
+     "gen": 1,
+     "incumbentMean": 0.5390625,
+     "incumbentF": 0.04762509115572047,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.5390625,
+     "signNonTied": 1,
+     "signWins": 0
+    },
+    {
+     "gen": 2,
+     "incumbentMean": 0.5078125,
+     "incumbentF": 0.0264258801344379,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.5078125,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 3,
+     "incumbentMean": 0.5,
+     "incumbentF": 0.025905807258164323,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.5,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 4,
+     "incumbentMean": 0.515625,
+     "incumbentF": 0.03265778325996669,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.515625,
+     "signNonTied": 8,
+     "signWins": 8
+    },
+    {
+     "gen": 5,
+     "incumbentMean": 0.5234375,
+     "incumbentF": 0.050331021312806395,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.5234375,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 6,
+     "incumbentMean": 0.5,
+     "incumbentF": 0.03581196203626799,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.5,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 7,
+     "incumbentMean": 0.5,
+     "incumbentF": 0.04189162797492953,
+     "challengers": 4,
+     "accepted": true,
+     "acceptedMean": 0.6015625,
+     "signNonTied": 29,
+     "signWins": 21
+    },
+    {
+     "gen": 8,
+     "incumbentMean": 0.6171875,
+     "incumbentF": 0.07371190295249347,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6171875,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 9,
+     "incumbentMean": 0.625,
+     "incumbentF": 0.07109019038981143,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.625,
+     "signNonTied": 13,
+     "signWins": 1
+    },
+    {
+     "gen": 10,
+     "incumbentMean": 0.6328125,
+     "incumbentF": 0.07727429648462597,
+     "challengers": 4,
+     "accepted": true,
+     "acceptedMean": 0.6796875,
+     "signNonTied": 30,
+     "signWins": 18
+    },
+    {
+     "gen": 11,
+     "incumbentMean": 0.6953125,
+     "incumbentF": 0.17585565351404106,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6953125,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 12,
+     "incumbentMean": 0.6796875,
+     "incumbentF": 0.16863418878052527,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6796875,
+     "signNonTied": 1,
+     "signWins": 1
+    },
+    {
+     "gen": 13,
+     "incumbentMean": 0.6640625,
+     "incumbentF": 0.15310013717618848,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6640625,
+     "signNonTied": 22,
+     "signWins": 7
+    },
+    {
+     "gen": 14,
+     "incumbentMean": 0.703125,
+     "incumbentF": 0.18860097371996234,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.703125,
+     "signNonTied": 19,
+     "signWins": 11
+    },
+    {
+     "gen": 15,
+     "incumbentMean": 0.6875,
+     "incumbentF": 0.16002754037220598,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6875,
+     "signNonTied": 11,
+     "signWins": 3
+    },
+    {
+     "gen": 16,
+     "incumbentMean": 0.6953125,
+     "incumbentF": 0.1836654244846732,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6953125,
+     "signNonTied": 3,
+     "signWins": 3
+    },
+    {
+     "gen": 17,
+     "incumbentMean": 0.671875,
+     "incumbentF": 0.16535263975996503,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.671875,
+     "signNonTied": 8,
+     "signWins": 8
+    },
+    {
+     "gen": 18,
+     "incumbentMean": 0.6953125,
+     "incumbentF": 0.17086952112022546,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.6953125,
+     "signNonTied": 41,
+     "signWins": 17
+    }
+   ]
+  },
+  {
+   "restart": 4,
+   "train": {
+    "n": 128,
+    "mean": 0.3828125,
+    "meanF": -0.2504818951490351,
+    "wins": 49,
+    "draws": 0,
+    "losses": 79
+   },
+   "valid": {
+    "n": 64,
+    "mean": 0.46875,
+    "meanF": -0.23398296070827013,
+    "wins": 30,
+    "draws": 0,
+    "losses": 34
+   },
+   "promoted": true,
+   "stoppedEarly": true,
+   "matchesRun": 5184,
+   "history": [
+    {
+     "gen": 0,
+     "incumbentMean": 0.4296875,
+     "incumbentF": -0.2376586353427988,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.4296875,
+     "signNonTied": 15,
+     "signWins": 3
+    },
+    {
+     "gen": 1,
+     "incumbentMean": 0.421875,
+     "incumbentF": -0.22814759188367464,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.421875,
+     "signNonTied": 37,
+     "signWins": 20
+    },
+    {
+     "gen": 2,
+     "incumbentMean": 0.40625,
+     "incumbentF": -0.2657030103089532,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.40625,
+     "signNonTied": 8,
+     "signWins": 0
+    },
+    {
+     "gen": 3,
+     "incumbentMean": 0.3984375,
+     "incumbentF": -0.26238192590582343,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.3984375,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 4,
+     "incumbentMean": 0.3984375,
+     "incumbentF": -0.25718899275083484,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.3984375,
+     "signNonTied": 23,
+     "signWins": 3
+    },
+    {
+     "gen": 5,
+     "incumbentMean": 0.40625,
+     "incumbentF": -0.24111982909181223,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.40625,
+     "signNonTied": 20,
+     "signWins": 3
+    },
+    {
+     "gen": 6,
+     "incumbentMean": 0.3984375,
+     "incumbentF": -0.2589691691758994,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.3984375,
+     "signNonTied": 27,
+     "signWins": 3
+    },
+    {
+     "gen": 7,
+     "incumbentMean": 0.3828125,
+     "incumbentF": -0.2504818951490351,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.3828125,
+     "signNonTied": 6,
+     "signWins": 0
+    }
+   ]
+  },
+  {
+   "restart": 5,
+   "train": {
+    "n": 128,
+    "mean": 0.484375,
+    "meanF": -0.20390243490165263,
+    "wins": 62,
+    "draws": 0,
+    "losses": 66
+   },
+   "valid": {
+    "n": 64,
+    "mean": 0.453125,
+    "meanF": -0.2633104891925665,
+    "wins": 29,
+    "draws": 0,
+    "losses": 35
+   },
+   "promoted": true,
+   "stoppedEarly": true,
+   "matchesRun": 5184,
+   "history": [
+    {
+     "gen": 0,
+     "incumbentMean": 0.484375,
+     "incumbentF": -0.22181930520502013,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.484375,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 1,
+     "incumbentMean": 0.4609375,
+     "incumbentF": -0.23594812721443817,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.4609375,
+     "signNonTied": 10,
+     "signWins": 10
+    },
+    {
+     "gen": 2,
+     "incumbentMean": 0.4375,
+     "incumbentF": -0.26764177942721995,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.4375,
+     "signNonTied": 2,
+     "signWins": 2
+    },
+    {
+     "gen": 3,
+     "incumbentMean": 0.4296875,
+     "incumbentF": -0.25516413886215533,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.4296875,
+     "signNonTied": 19,
+     "signWins": 12
+    },
+    {
+     "gen": 4,
+     "incumbentMean": 0.46875,
+     "incumbentF": -0.24338845147783902,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.46875,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 5,
+     "incumbentMean": 0.484375,
+     "incumbentF": -0.2237073731657834,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.484375,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 6,
+     "incumbentMean": 0.453125,
+     "incumbentF": -0.24311779575169465,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.453125,
+     "signNonTied": 1,
+     "signWins": 1
+    },
+    {
+     "gen": 7,
+     "incumbentMean": 0.484375,
+     "incumbentF": -0.20390243490165263,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.484375,
+     "signNonTied": 36,
+     "signWins": 14
+    }
+   ]
+  },
+  {
+   "restart": 6,
+   "train": {
+    "n": 128,
+    "mean": 0.4609375,
+    "meanF": -0.06232332812778738,
+    "wins": 59,
+    "draws": 0,
+    "losses": 69
+   },
+   "valid": {
+    "n": 64,
+    "mean": 0.515625,
+    "meanF": -0.04239463273254529,
+    "wins": 33,
+    "draws": 0,
+    "losses": 31
+   },
+   "promoted": true,
+   "stoppedEarly": true,
+   "matchesRun": 5824,
+   "history": [
+    {
+     "gen": 0,
+     "incumbentMean": 0.453125,
+     "incumbentF": -0.0678931713462217,
+     "challengers": 4,
+     "accepted": true,
+     "acceptedMean": 0.5,
+     "signNonTied": 24,
+     "signWins": 15
+    },
+    {
+     "gen": 1,
+     "incumbentMean": 0.5,
+     "incumbentF": -0.027949956574307558,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.5,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 2,
+     "incumbentMean": 0.4609375,
+     "incumbentF": -0.07091144190807186,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.4609375,
+     "signNonTied": 4,
+     "signWins": 3
+    },
+    {
+     "gen": 3,
+     "incumbentMean": 0.484375,
+     "incumbentF": -0.05037944596107949,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.484375,
+     "signNonTied": 23,
+     "signWins": 12
+    },
+    {
+     "gen": 4,
+     "incumbentMean": 0.5,
+     "incumbentF": -0.03591891306846289,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.5,
+     "signNonTied": 2,
+     "signWins": 1
+    },
+    {
+     "gen": 5,
+     "incumbentMean": 0.4765625,
+     "incumbentF": -0.04466839213380544,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.4765625,
+     "signNonTied": 1,
+     "signWins": 1
+    },
+    {
+     "gen": 6,
+     "incumbentMean": 0.4765625,
+     "incumbentF": -0.050243405934290754,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.4765625,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 7,
+     "incumbentMean": 0.4921875,
+     "incumbentF": -0.04393418749848806,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.4921875,
+     "signNonTied": 16,
+     "signWins": 10
+    },
+    {
+     "gen": 8,
+     "incumbentMean": 0.4609375,
+     "incumbentF": -0.06232332812778738,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.4609375,
+     "signNonTied": 1,
+     "signWins": 0
+    }
+   ]
+  },
+  {
+   "restart": 7,
+   "train": {
+    "n": 128,
+    "mean": 0.4140625,
+    "meanF": 0.11030452553893993,
+    "wins": 53,
+    "draws": 0,
+    "losses": 75
+   },
+   "valid": {
+    "n": 64,
+    "mean": 0.421875,
+    "meanF": 0.09730918973053528,
+    "wins": 27,
+    "draws": 0,
+    "losses": 37
+   },
+   "promoted": true,
+   "stoppedEarly": true,
+   "matchesRun": 5184,
+   "history": [
+    {
+     "gen": 0,
+     "incumbentMean": 0.40625,
+     "incumbentF": 0.10044417612695103,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.40625,
+     "signNonTied": 46,
+     "signWins": 22
+    },
+    {
+     "gen": 1,
+     "incumbentMean": 0.421875,
+     "incumbentF": 0.10180728051639804,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.421875,
+     "signNonTied": 7,
+     "signWins": 7
+    },
+    {
+     "gen": 2,
+     "incumbentMean": 0.3984375,
+     "incumbentF": 0.08912068111118293,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.3984375,
+     "signNonTied": 6,
+     "signWins": 6
+    },
+    {
+     "gen": 3,
+     "incumbentMean": 0.390625,
+     "incumbentF": 0.0840133905238226,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.390625,
+     "signNonTied": 22,
+     "signWins": 14
+    },
+    {
+     "gen": 4,
+     "incumbentMean": 0.4296875,
+     "incumbentF": 0.1097920865615336,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.4296875,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 5,
+     "incumbentMean": 0.40625,
+     "incumbentF": 0.11215195548675434,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.40625,
+     "signNonTied": 19,
+     "signWins": 11
+    },
+    {
+     "gen": 6,
+     "incumbentMean": 0.3828125,
+     "incumbentF": 0.09741201538291466,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.3828125,
+     "signNonTied": 0,
+     "signWins": 0
+    },
+    {
+     "gen": 7,
+     "incumbentMean": 0.4140625,
+     "incumbentF": 0.11030452553893993,
+     "challengers": 4,
+     "accepted": false,
+     "acceptedMean": 0.4140625,
+     "signNonTied": 13,
+     "signWins": 6
+    }
+   ]
+  }
+ ],
+ "champion": {
+  "genome": {
+   "genome_version": 1,
+   "bot": "orbiter",
+   "params": {
+    "orbit.range": 220.584486887502,
+    "orbit.dir": 1,
+    "orbit.band": 60,
+    "drive.alignTol": 1.2,
+    "drive.orbitThrottle": 0.9,
+    "drive.turnThrottle": 0.3,
+    "steer.gain": 2.5,
+    "turret.gain": 3,
+    "fire.aimTol": 0.07,
+    "target.policy": "first",
+    "search.scanTurn": 0.8,
+    "loadout": {
+     "trigger": 2,
+     "charger": 1,
+     "plating": 2,
+     "nanorepair": 1
+    }
+   }
+  },
+  "hash": "8f9eada1a49d2c29222f45f876db170a7f18c15b6b18be096b2a040eaf121b32",
+  "train": {
+   "n": 128,
+   "mean": 0.765625,
+   "meanF": -0.08631948564777807,
+   "wins": 98,
+   "draws": 0,
+   "losses": 30
+  },
+  "valid": {
+   "n": 64,
+   "mean": 0.796875,
+   "meanF": -0.05918518031472633,
+   "wins": 51,
+   "draws": 0,
+   "losses": 13
+  },
+  "fromRestart": 1
+ },
+ "veto": {
+  "veto": false,
+  "champMean": 0.796875,
+  "defaultMean": 0.1875,
+  "nonTied": 39,
+  "defaultWins": 0,
+  "p": 1,
+  "matches": 64
+ },
+ "vetoSeeds": [
+  3438866421,
+  1798334894,
+  157803367,
+  2812239136,
+  1171707609,
+  3826143378,
+  2185611851,
+  545080324,
+  3199516093,
+  1558984566,
+  4213420335,
+  2572888808,
+  932357281,
+  3586793050,
+  1946261523,
+  305729996
+ ],
+ "validation": [
+  {
+   "seed": 1725761109,
+   "arena": "open",
+   "opponent": "rusher",
+   "side": 0,
+   "score": 1,
+   "f": 0.12845771144278612,
+   "fingerprint": "open|{}|0@402|TRG2 CHG1 PLT2 NRP1,130,1,26.400000000000553,432.0427538631489,626,6.512905223911418e-8,-3.141592653589062,1,132,13,18,0,0,0,0|OVR3 TRG1 PLT2,130,0,0,404.04274403202743,626,6.518477572240788e-8,7.307545104582435e-13,0,108,11,21,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwicnVzaGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMDozLDU6MSw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+  },
+  {
+   "seed": 1725761109,
+   "arena": "open",
+   "opponent": "rusher",
+   "side": 1,
+   "score": 1,
+   "f": 0.12845771144278612,
+   "fingerprint": "open|{}|1@402|OVR3 TRG1 PLT2,130,0,0,555.9572559679724,14,-3.1415925884050173,-3.141592653589062,0,108,11,21,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,26.400000000000553,527.9572461368505,14,-3.1415925884607407,7.307545104704224e-13,1,132,13,18,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMDozLDU6MSw4OjIiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+  },
+  {
+   "seed": 1725761109,
+   "arena": "blocks",
+   "opponent": "rusher",
+   "side": 0,
+   "score": 1,
+   "f": 0.3933898305084746,
+   "fingerprint": "blocks|{}|0@472|TRG2 CHG1 PLT2 NRP1,130,1,49.35000000000053,556,454.7516608541013,-0.5893679491475521,-2.8516296273896633,1,132,18,5,0,0,0,0|OVR3 TRG1 PLT2,130,0,0,432.70451431966654,418.60721101666934,0.2929458616802892,0.28996302620013004,0,84,15,11,0,0,0,0|503.4118199431057,440.4674834931267,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwicnVzaGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMDozLDU6MSw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+  },
+  {
+   "seed": 1725761109,
+   "arena": "blocks",
+   "opponent": "rusher",
+   "side": 1,
+   "score": 1,
+   "f": 0.3933898305084746,
+   "fingerprint": "blocks|{}|1@472|OVR3 TRG1 PLT2,130,0,0,527.2954856803334,221.3927889833311,-2.8486467919095104,-2.85162962738967,0,84,15,11,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,49.35000000000053,404,185.24833914589993,2.5522247044422333,0.28996302620012365,1,132,18,5,0,0,0,0|456.58818005689426,199.53251650687398,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNzI1NzYxMTA5LCJ0IjoxLCJsIjpbInJ1c2hlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMDozLDU6MSw4OjIiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+  },
+  {
+   "seed": 85229582,
+   "arena": "open",
+   "opponent": "turret",
+   "side": 0,
+   "score": 1,
+   "f": 0.3075078864353313,
+   "fingerprint": "open|{}|0@317|TRG2 CHG1 PLT2 NRP1,130,1,73.0500000000007,503.3805074024643,626,0.6802261137536595,-0.8921686158891,1,108,11,8,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,0,0,652.571345185127,440.1481164803816,-2.5334069374711077,2.240391130966051,0,60,13,16,0,0,0,0|547.0399189401219,571.5078061674965,1,0;563.2437329853936,550.8646430770143,0,0;628.0304303211401,471.0995865204062,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTIyOTU4MiwidCI6MSwibCI6WyJvcmJpdGVyLWhjMSIsInR1cnJldCJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjI6MSwzOjIsNToyLDY6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 85229582,
+   "arena": "open",
+   "opponent": "turret",
+   "side": 1,
+   "score": 1,
+   "f": -0.12812362030905083,
+   "fingerprint": "open|{}|1@453|SRV1 SCN2 TRG2 MRK1,100,0,0,307.4286548148734,440.14811648038165,-0.6081864740039555,-1.915820911072281,0,84,11,13,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,49.72500000000063,284.21819672727787,193.77318269163084,3.12853795828465,1.5274085106710735,1,108,10,7,0,0,0,0|281.93544198065837,251.86615744184414,0,0;303.00889016930273,298.4074282798013,1,0;289.433094712681,381.8629569918087,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTIyOTU4MiwidCI6MSwibCI6WyJ0dXJyZXQiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjI6MSwzOjIsNToyLDY6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 85229582,
+   "arena": "blocks",
+   "opponent": "turret",
+   "side": 0,
+   "score": 1,
+   "f": 0.26,
+   "fingerprint": "blocks|{}|0@1606|TRG2 CHG1 PLT2 NRP1,130,1,37.225000000000456,671.3798445242082,626,0.021238377997874845,-1.5523279016401133,1,108,83,15,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,0,0,674,436.8180890031279,-2.5995900289949154,1.5799854713068895,0,96,84,12,0,0,0,0|673.0336121688857,504.9779051634165,1,0;671.8859217024647,579.3435863651717,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTIyOTU4MiwidCI6MSwibCI6WyJvcmJpdGVyLWhjMSIsInR1cnJldCJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjI6MSwzOjIsNToyLDY6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 85229582,
+   "arena": "blocks",
+   "opponent": "turret",
+   "side": 1,
+   "score": 1,
+   "f": -0.2766176470588236,
+   "fingerprint": "blocks|{}|1@544|SRV1 SCN2 TRG2 MRK1,100,0,0,286,436.81808900312797,-0.5420026245938693,-1.0761116202212924,0,132,14,3,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,3.1250000000005347,403.6489943578093,223.1152773585173,-2.637974734612373,2.0742901823515965,1,108,14,7,0,0,0,0|349.0506159249913,320.0916383763581,0,0;353.3231486145399,314.6269156246617,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTIyOTU4MiwidCI6MSwibCI6WyJ0dXJyZXQiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjI6MSwzOjIsNToyLDY6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 2739665351,
+   "arena": "open",
+   "opponent": "wanderer",
+   "side": 0,
+   "score": 1,
+   "f": 0.41109304426377596,
+   "fingerprint": "open|{}|0@1107|TRG2 CHG1 PLT2 NRP1,130,1,92.12500000000503,597.077921961467,319.28587854622884,-0.2235528935467863,-0.8220105589747165,1,108,43,11,0,0,0,0|OVR2 SCN2 WND2,100,0,0,785.5008271448419,108.17164998667116,-0.5129986794423096,2.3195820946150767,0,60,33,11,0,0,0,0|312.68089013498656,389.3795816496312,1,0;507.98550862776705,309.25134530190377,1,0;701.9016295942395,174.76652145171414,0,0;682.8205722452531,197.8104433484955,1,0;634.3642411376793,267.0492367799235,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNzM5NjY1MzUxLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwid2FuZGVyZXIiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCIwOjIsMzoyLDQ6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 2739665351,
+   "arena": "open",
+   "opponent": "wanderer",
+   "side": 1,
+   "score": 1,
+   "f": 0.32,
+   "fingerprint": "open|{}|1@1642|OVR2 SCN2 WND2,100,0,0,305.833579168385,282.8064870514913,2.796041973029003,-0.7832816030457252,0,84,53,23,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,82.35000000000827,500.0363270913993,77.87009506630336,-2.617991303275496,2.358311050544068,1,108,68,11,0,0,0,0|682.6274038255659,45.28893682062902,0,0;496.58049382145487,139.3178626826243,0,0;395.62751341368937,221.0683859563711,1,0;457.8773645581102,137.29921954198696,1,0;330.23019698098375,259.6227023368662,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNzM5NjY1MzUxLCJ0IjoxLCJsIjpbIndhbmRlcmVyIiwib3JiaXRlci1oYzEiXSwibyI6WyIwOjIsMzoyLDQ6MiIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 2739665351,
+   "arena": "blocks",
+   "opponent": "wanderer",
+   "side": 0,
+   "score": 0,
+   "f": -0.27971929824561403,
+   "fingerprint": "blocks|{}|1@1156|TRG2 CHG1 PLT2 NRP1,130,0,0,556,463.56992075676675,-0.03334815181919725,-1.6284825170783683,0,96,55,10,0,0,0,0|OVR2 SCN2 WND2,100,1,4,538.8649116528886,294.06424400078294,2.691600504321931,1.513110136511425,1,156,41,4,0,0,0,0|582.576744264683,253.5187232729681,0,0;556.2075434271858,381.0794207933628,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNzM5NjY1MzUxLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwid2FuZGVyZXIiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCIwOjIsMzoyLDQ6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 2739665351,
+   "arena": "blocks",
+   "opponent": "wanderer",
+   "side": 1,
+   "score": 1,
+   "f": 0.56,
+   "fingerprint": "blocks|{}|1@3738|OVR2 SCN2 WND2,100,0,0,556,139.74339596855805,1.2872950992060088,-3.0515994121806114,0,36,149,18,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,95.20000000000027,302.112476877921,116,1.6588340716820607,0.08999324140918191,1,108,198,6,0,0,0,0|413.0569199329374,125.2106634446873,1,0;488.08804344097734,132.94925002982018,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNzM5NjY1MzUxLCJ0IjoxLCJsIjpbIndhbmRlcmVyIiwib3JiaXRlci1oYzEiXSwibyI6WyIwOjIsMzoyLDQ6MiIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 1099133824,
+   "arena": "open",
+   "opponent": "hunter",
+   "side": 0,
+   "score": 0,
+   "f": -1.0568176718620585,
+   "fingerprint": "open|{}|1@699|TRG2 CHG1 PLT2 NRP1,130,0,0,554.0215053870551,535.3575567892524,-0.5658207553373674,-1.9874899624193987,0,48,11,9,0,0,0,0|TRG2 MRK1 CHG2 PLT1,115,1,67,422.5198184135122,287.5121363134151,2.767338010942091,0.917421626435405,1,140.5,9,0,0.7000000000000001,0,0,0|513.8338246068428,457.8685944418612,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxMDk5MTMzODI0LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwiaHVudGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiNToyLDY6MSw3OjIsODoxIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 1099133824,
+   "arena": "open",
+   "opponent": "hunter",
+   "side": 1,
+   "score": 0,
+   "f": -1.0568176718620585,
+   "fingerprint": "open|{}|0@699|TRG2 MRK1 CHG2 PLT1,115,1,67,537.4801815864874,352.4878636865847,-0.3742546426477051,-2.224171027154391,1,140.5,9,0,0.7000000000000001,0,0,0|TRG2 CHG1 PLT2 NRP1,130,0,0,405.97849461294345,104.64244321074693,2.5757718982524223,1.1541026911703918,0,48,11,9,0,0,0,0|446.1661753931565,182.13140555813789,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxMDk5MTMzODI0LCJ0IjoxLCJsIjpbImh1bnRlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiNToyLDY6MSw3OjIsODoxIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 1099133824,
+   "arena": "blocks",
+   "opponent": "hunter",
+   "side": 0,
+   "score": 1,
+   "f": 0.6799999999999999,
+   "fingerprint": "blocks|{}|0@712|TRG2 CHG1 PLT2 NRP1,130,1,106.8750000000002,628.7970447690172,524,-1.413658847666473,-2.984373295117974,1,120,32,10,0,0,0,0|TRG2 MRK1 CHG2 PLT1,115,0,0,404,488.26732281149737,-2.994028429297309,0.14843403897281857,0,24,24,11,0,0,0,0|606.0890242661155,518.8631955918147,1,0;547.1110817190859,511.12452127330243,0,0;478.51007339363457,499.53101252227947,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxMDk5MTMzODI0LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwiaHVudGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiNToyLDY6MSw3OjIsODoxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  },
+  {
+   "seed": 1099133824,
+   "arena": "blocks",
+   "opponent": "hunter",
+   "side": 1,
+   "score": 1,
+   "f": 0.6799999999999999,
+   "fingerprint": "blocks|{}|1@712|TRG2 MRK1 CHG2 PLT1,115,0,0,556,151.73267718850346,0.14756422429248944,-2.99315861461697,0,24,24,11,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,106.8750000000002,331.20295523098486,116,1.7279338059233251,0.15721935847182447,1,120,32,10,0,0,0,0|353.910975733885,121.13680440818524,0,0;412.8889182809158,128.87547872669788,1,0;481.48992660636543,140.46898747772076,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxMDk5MTMzODI0LCJ0IjoxLCJsIjpbImh1bnRlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiNToyLDY6MSw3OjIsODoxIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  },
+  {
+   "seed": 3753569593,
+   "arena": "open",
+   "opponent": "sniper",
+   "side": 0,
+   "score": 1,
+   "f": 0.4348294392523364,
+   "fingerprint": "open|{}|0@428|TRG2 CHG1 PLT2 NRP1,130,1,87.7750000000013,823.6540467316995,523.3505210371287,0.48608515543033975,-1.0527054946239567,1,108,16,16,0,0,0,0|SCN2 MRK2 CHG1 DDY1,100,0,0,946,283.0009924578412,-1.0270045430291563,1.809013857465479,0,47.95,8,16,0,0,0,0|887.1833246933104,374.36114324954406,0,0;919.4386600201084,368.9513733310911,1,1;839.8165135345365,487.26693111972196,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNzUzNTY5NTkzLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwic25pcGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMzoyLDY6Miw3OjEsMTE6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 3753569593,
+   "arena": "open",
+   "opponent": "sniper",
+   "side": 1,
+   "score": 0,
+   "f": -1.7068508771929825,
+   "fingerprint": "open|{}|0@664|SCN2 MRK2 CHG1 DDY1,100,1,100,233.58938905918185,453.70587457229044,-0.4971549833814081,-0.9382322417976211,1,143.7,7,15,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,0,0,560.1334321872247,14,-2.8813477522601634,-2.6855191894877004,0,0,0,0,0,0,0,0|290.99408406293713,375.7225722828241,0,1",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNzUzNTY5NTkzLCJ0IjoxLCJsIjpbInNuaXBlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMzoyLDY6Miw3OjEsMTE6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 3753569593,
+   "arena": "blocks",
+   "opponent": "sniper",
+   "side": 0,
+   "score": 1,
+   "f": 0.593012645914397,
+   "fingerprint": "blocks|{}|0@514|TRG2 CHG1 PLT2 NRP1,130,1,107.67500000000037,946,560.6519142747734,0.002325802874928555,-1.5706462633028218,1,108,20,2,0,0,0,0|SCN2 MRK2 CHG1 DDY1,100,0,0,946,280.8638510987683,0.0019341067097571646,1.561766492158316,0,23.95,9,0,0.4666666666666666,0,0,0|946.5021843650314,420.8028758762044,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNzUzNTY5NTkzLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwic25pcGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMzoyLDY6Miw3OjEsMTE6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 3753569593,
+   "arena": "blocks",
+   "opponent": "sniper",
+   "side": 1,
+   "score": 0,
+   "f": -1.7068508771929825,
+   "fingerprint": "blocks|{}|0@664|SCN2 MRK2 CHG1 DDY1,100,1,100,233.58938905918185,453.70587457229044,-0.4971549833814081,-0.9382322417976211,1,143.7,7,15,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,0,0,560.1334321872247,14,-2.8813477522601634,-2.6855191894877004,0,0,0,0,0,0,0,0|290.99408406293713,375.7225722828241,0,1",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNzUzNTY5NTkzLCJ0IjoxLCJsIjpbInNuaXBlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMzoyLDY6Miw3OjEsMTE6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 2113038066,
+   "arena": "open",
+   "opponent": "brawler",
+   "side": 0,
+   "score": 1,
+   "f": 0.253015873015873,
+   "fingerprint": "open|{}|0@315|TRG2 CHG1 PLT2 NRP1,130,1,37.000000000000426,246.32049256502677,626,3.1395874209699914,-0.00003871929289529929,1,132,11,18,0,0,0,1|OVR2 TRG2 PLT2,130,0,0,274.32049256502677,626,3.139587945205007,3.1415539342968977,0,96,12,18,0,264,556,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMTEzMDM4MDY2LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwiYnJhd2xlciJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjA6Miw1OjIsODoyIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 2113038066,
+   "arena": "open",
+   "opponent": "brawler",
+   "side": 1,
+   "score": 1,
+   "f": 0.253015873015873,
+   "fingerprint": "open|{}|1@315|OVR2 TRG2 PLT2,130,0,0,685.6795074349727,14,-0.002004708384786083,-0.00003871929289529524,0,96,12,18,0,264,556,0|TRG2 CHG1 PLT2 NRP1,130,1,37.000000000000426,713.6795074349727,14,-0.0020052326198013014,3.1415539342968977,1,132,11,18,0,0,0,1|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMTEzMDM4MDY2LCJ0IjoxLCJsIjpbImJyYXdsZXIiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjA6Miw1OjIsODoyIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 2113038066,
+   "arena": "blocks",
+   "opponent": "brawler",
+   "side": 0,
+   "score": 1,
+   "f": 0.2,
+   "fingerprint": "blocks|{}|0@546|TRG2 CHG1 PLT2 NRP1,130,1,2.675000000000405,346.61716971999033,626,2.0244957206098806,-1.1139706752456917,1,132,24,5,0,0,0,0|OVR2 TRG2 PLT2,130,0,0,403.9756313737831,510.825668035066,2.0244957207533645,2.0276219783441016,0,132,25,13,0,33,325,0|377.3521503282827,564.9772742131566,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMTEzMDM4MDY2LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwiYnJhd2xlciJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjA6Miw1OjIsODoyIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  },
+  {
+   "seed": 2113038066,
+   "arena": "blocks",
+   "opponent": "brawler",
+   "side": 1,
+   "score": 1,
+   "f": 0.2,
+   "fingerprint": "blocks|{}|1@546|OVR2 TRG2 PLT2,130,0,0,556.024368626217,129.17433196493369,-1.1170969328364413,-1.1139706752457035,0,132,25,13,0,33,325,0|TRG2 CHG1 PLT2 NRP1,130,1,2.675000000000405,613.3828302800079,14,-1.1170969329799243,2.0276219783440896,1,132,24,5,0,0,0,0|582.6478496717165,75.02272578684294,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMTEzMDM4MDY2LCJ0IjoxLCJsIjpbImJyYXdsZXIiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjA6Miw1OjIsODoyIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  },
+  {
+   "seed": 472506539,
+   "arena": "open",
+   "opponent": "ghost",
+   "side": 0,
+   "score": 1,
+   "f": -1.0850209706411025,
+   "fingerprint": "open|{}|0@10014|TRG2 CHG1 PLT2 NRP1,130,1,130,441.9832270691433,252.81932442994486,-1.8166010189115211,2.836571585585814,0,0,6,0,0,0,0,0|OVR2 GYR2 WND1 SCT1,100,0,0,184.69738959330206,362.3720472823779,0.9753003523830238,-0.5923077067836287,0,60,13,0,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0NzI1MDY1MzksInQiOjEsImwiOlsib3JiaXRlci1oYzEiLCJnaG9zdCJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjA6MiwxOjIsNDoxLDEyOjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+  },
+  {
+   "seed": 472506539,
+   "arena": "open",
+   "opponent": "ghost",
+   "side": 1,
+   "score": 1,
+   "f": -1.0850224663005492,
+   "fingerprint": "open|{}|1@10015|OVR2 GYR2 WND1 SCT1,100,0,0,773.8937030129126,275.42297552947593,-2.139376256746883,2.5317039391426306,0,60,13,0,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,130,518.6026772785893,389.35305125012366,1.307357852887692,-0.3225761712091366,0,0,6,0,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0NzI1MDY1MzksInQiOjEsImwiOlsiZ2hvc3QiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjA6MiwxOjIsNDoxLDEyOjEiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+  },
+  {
+   "seed": 472506539,
+   "arena": "blocks",
+   "opponent": "ghost",
+   "side": 0,
+   "score": 1,
+   "f": 0.26,
+   "fingerprint": "blocks|{}|0@1031|TRG2 CHG1 PLT2 NRP1,130,1,48.40000000000283,557.307599261387,225.90787300899896,-0.5740666215810188,-2.145881677961225,1,108,51,6,0,0,0,0|OVR2 GYR2 WND1 SCT1,100,0,0,419.4699418051015,14,-2.137363399071881,0.9869225372111563,0,96,39,3,0,293,0,0|517.2204019457611,161.11944343098804,1,0;497.26937804458066,132.63369665454988,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0NzI1MDY1MzksInQiOjEsImwiOlsib3JiaXRlci1oYzEiLCJnaG9zdCJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjA6MiwxOjIsNDoxLDEyOjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+  },
+  {
+   "seed": 472506539,
+   "arena": "blocks",
+   "opponent": "ghost",
+   "side": 1,
+   "score": 1,
+   "f": 0.26,
+   "fingerprint": "blocks|{}|1@1031|OVR2 GYR2 WND1 SCT1,100,0,0,540.5300581948994,626,1.0042292545179097,-2.154670116378641,0,96,39,3,0,293,0,0|TRG2 CHG1 PLT2 NRP1,130,1,48.40000000000283,402.6924007386135,414.09212699100226,2.567526032008771,0.9957109756285645,1,108,51,6,0,0,0,0|442.77959805423984,478.8805565690121,0,0;462.73062195542065,507.36630334545106,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0NzI1MDY1MzksInQiOjEsImwiOlsiZ2hvc3QiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjA6MiwxOjIsNDoxLDEyOjEiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+  },
+  {
+   "seed": 3126942308,
+   "arena": "open",
+   "opponent": "hunter-hc1",
+   "side": 0,
+   "score": 0,
+   "f": -0.8135770063912837,
+   "fingerprint": "open|{}|1@409|TRG2 CHG1 PLT2 NRP1,130,0,0,687.4044884738742,401.3874783170629,-1.912283323145677,2.5583401175600713,0,84,8,0,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,51.95000000000051,560.0520768457878,499.80726757501344,-0.5392632107993744,-0.8319988381647023,1,145.95,16,16,0,0,0,0|586.0619035558047,472.35786154540034,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozMTI2OTQyMzA4LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwiaHVudGVyLWhjMSJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 3126942308,
+   "arena": "open",
+   "opponent": "hunter-hc1",
+   "side": 1,
+   "score": 0,
+   "f": -0.8135770063912837,
+   "fingerprint": "open|{}|0@409|TRG2 CHG1 PLT2 NRP1,130,1,51.95000000000051,399.94792315421154,140.19273242498807,2.602329442790402,2.3095938154250732,1,145.95,16,16,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,0,0,272.5955115261275,238.61252168294044,1.2293093304440998,-0.5832525360297397,0,84,8,0,0,0,0,0|373.9380964441952,167.64213845460154,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozMTI2OTQyMzA4LCJ0IjoxLCJsIjpbImh1bnRlci1oYzEiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 3126942308,
+   "arena": "blocks",
+   "opponent": "hunter-hc1",
+   "side": 0,
+   "score": 0,
+   "f": -0.2745574822818636,
+   "fingerprint": "blocks|{}|1@604|TRG2 CHG1 PLT2 NRP1,130,0,0,484.00974407993414,324.12428593841054,2.831138383233987,1.2260064710958396,0,108,22,9,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,31.32500000000075,568.7749449658181,523.9462984394866,-1.8812506001757432,-2.2106300906850085,1,147.15,26,11,0,0,0,0|525.9401144599218,405.55562718652834,0,0;528.6186575641718,460.4783080277185,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozMTI2OTQyMzA4LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwiaHVudGVyLWhjMSJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 3126942308,
+   "arena": "blocks",
+   "opponent": "hunter-hc1",
+   "side": 1,
+   "score": 0,
+   "f": -0.2745574822818636,
+   "fingerprint": "blocks|{}|0@604|TRG2 CHG1 PLT2 NRP1,130,1,31.32500000000075,391.22505503417864,116.05370156051315,1.260342053414036,0.9309625629047699,1,147.15,26,11,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,0,0,475.9902559200657,315.87571406158764,-0.31045427035582024,-1.9155861824939688,0,108,22,9,0,0,0,0|434.0598855400768,234.4443728134707,1,0;431.3813424358257,179.5216919722809,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozMTI2OTQyMzA4LCJ0IjoxLCJsIjpbImh1bnRlci1oYzEiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 1486410781,
+   "arena": "open",
+   "opponent": "rusher-hc1",
+   "side": 0,
+   "score": 1,
+   "f": 0.27762886597938147,
+   "fingerprint": "open|{}|0@388|TRG2 CHG1 PLT2 NRP1,130,1,37.80000000000052,323.23189583813496,626,3.141589034006726,-8.879916268971778e-10,1,144,13,18,0,0,0,0|SCN2 TRG1 PLT2 NRP1,130,0,0,351.23189583813496,626,3.1415890346351314,3.141592652701801,0,96,13,15,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNDg2NDEwNzgxLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwicnVzaGVyLWhjMSJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjM6Miw1OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 1486410781,
+   "arena": "open",
+   "opponent": "rusher-hc1",
+   "side": 1,
+   "score": 1,
+   "f": 0.27762886597938147,
+   "fingerprint": "open|{}|1@388|SCN2 TRG1 PLT2 NRP1,130,0,0,608.7681041618639,14,-0.00000361895466166359,-8.879916268972403e-10,0,96,13,15,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,37.80000000000052,636.7681041618639,14,-0.000003619583066913539,3.141592652701801,1,144,13,18,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNDg2NDEwNzgxLCJ0IjoxLCJsIjpbInJ1c2hlci1oYzEiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjM6Miw1OjEsODoyLDk6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 1486410781,
+   "arena": "blocks",
+   "opponent": "rusher-hc1",
+   "side": 0,
+   "score": 1,
+   "f": 0.3436144578313252,
+   "fingerprint": "blocks|{}|0@415|TRG2 CHG1 PLT2 NRP1,130,1,38.45000000000047,328.981038171479,626,3.1236077275246585,-0.001455009926338405,1,144,15,18,0,0,0,0|SCN2 TRG1 PLT2 NRP1,130,0,0,356.981038171479,626,3.123607727538451,3.1401376436634547,0,96,13,3,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNDg2NDEwNzgxLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwicnVzaGVyLWhjMSJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjM6Miw1OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 1486410781,
+   "arena": "blocks",
+   "opponent": "rusher-hc1",
+   "side": 1,
+   "score": 1,
+   "f": 0.3436144578313252,
+   "fingerprint": "blocks|{}|1@415|SCN2 TRG1 PLT2 NRP1,130,0,0,603.0189618285195,14,-0.01798492605134335,-0.0014550099263385655,0,96,13,3,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,38.45000000000047,631.0189618285195,14,-0.017984926065135364,3.1401376436634547,1,144,15,18,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxNDg2NDEwNzgxLCJ0IjoxLCJsIjpbInJ1c2hlci1oYzEiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjM6Miw1OjEsODoyLDk6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 4140846550,
+   "arena": "open",
+   "opponent": "rusher",
+   "side": 0,
+   "score": 1,
+   "f": 0.12845771144278612,
+   "fingerprint": "open|{}|0@402|TRG2 CHG1 PLT2 NRP1,130,1,26.400000000000553,432.0427538631489,626,6.512905223911418e-8,-3.141592653589062,1,132,13,18,0,0,0,0|OVR3 TRG1 PLT2,130,0,0,404.04274403202743,626,6.518477572240788e-8,7.307545104582435e-13,0,108,11,21,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MTQwODQ2NTUwLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwicnVzaGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMDozLDU6MSw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+  },
+  {
+   "seed": 4140846550,
+   "arena": "open",
+   "opponent": "rusher",
+   "side": 1,
+   "score": 1,
+   "f": 0.12845771144278612,
+   "fingerprint": "open|{}|1@402|OVR3 TRG1 PLT2,130,0,0,555.9572559679724,14,-3.1415925884050173,-3.141592653589062,0,108,11,21,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,26.400000000000553,527.9572461368505,14,-3.1415925884607407,7.307545104704224e-13,1,132,13,18,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MTQwODQ2NTUwLCJ0IjoxLCJsIjpbInJ1c2hlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMDozLDU6MSw4OjIiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+  },
+  {
+   "seed": 4140846550,
+   "arena": "blocks",
+   "opponent": "rusher",
+   "side": 0,
+   "score": 1,
+   "f": 0.3933898305084746,
+   "fingerprint": "blocks|{}|0@472|TRG2 CHG1 PLT2 NRP1,130,1,49.35000000000053,556,454.7516608541013,-0.5893679491475521,-2.8516296273896633,1,132,18,5,0,0,0,0|OVR3 TRG1 PLT2,130,0,0,432.70451431966654,418.60721101666934,0.2929458616802892,0.28996302620013004,0,84,15,11,0,0,0,0|503.4118199431057,440.4674834931267,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MTQwODQ2NTUwLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwicnVzaGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMDozLDU6MSw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+  },
+  {
+   "seed": 4140846550,
+   "arena": "blocks",
+   "opponent": "rusher",
+   "side": 1,
+   "score": 1,
+   "f": 0.3933898305084746,
+   "fingerprint": "blocks|{}|1@472|OVR3 TRG1 PLT2,130,0,0,527.2954856803334,221.3927889833311,-2.8486467919095104,-2.85162962738967,0,84,15,11,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,49.35000000000053,404,185.24833914589993,2.5522247044422333,0.28996302620012365,1,132,18,5,0,0,0,0|456.58818005689426,199.53251650687398,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MTQwODQ2NTUwLCJ0IjoxLCJsIjpbInJ1c2hlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMDozLDU6MSw4OjIiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+  },
+  {
+   "seed": 2500315023,
+   "arena": "open",
+   "opponent": "turret",
+   "side": 0,
+   "score": 1,
+   "f": 0.3075078864353313,
+   "fingerprint": "open|{}|0@317|TRG2 CHG1 PLT2 NRP1,130,1,73.0500000000007,503.3805074024643,626,0.6802261137536595,-0.8921686158891,1,108,11,8,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,0,0,652.571345185127,440.1481164803816,-2.5334069374711077,2.240391130966051,0,60,13,16,0,0,0,0|547.0399189401219,571.5078061674965,1,0;563.2437329853936,550.8646430770143,0,0;628.0304303211401,471.0995865204062,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNTAwMzE1MDIzLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwidHVycmV0Il0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMjoxLDM6Miw1OjIsNjoxIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 2500315023,
+   "arena": "open",
+   "opponent": "turret",
+   "side": 1,
+   "score": 1,
+   "f": -0.12812362030905083,
+   "fingerprint": "open|{}|1@453|SRV1 SCN2 TRG2 MRK1,100,0,0,307.4286548148734,440.14811648038165,-0.6081864740039555,-1.915820911072281,0,84,11,13,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,49.72500000000063,284.21819672727787,193.77318269163084,3.12853795828465,1.5274085106710735,1,108,10,7,0,0,0,0|281.93544198065837,251.86615744184414,0,0;303.00889016930273,298.4074282798013,1,0;289.433094712681,381.8629569918087,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNTAwMzE1MDIzLCJ0IjoxLCJsIjpbInR1cnJldCIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMjoxLDM6Miw1OjIsNjoxIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 2500315023,
+   "arena": "blocks",
+   "opponent": "turret",
+   "side": 0,
+   "score": 1,
+   "f": 0.26,
+   "fingerprint": "blocks|{}|0@1606|TRG2 CHG1 PLT2 NRP1,130,1,37.225000000000456,671.3798445242082,626,0.021238377997874845,-1.5523279016401133,1,108,83,15,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,0,0,674,436.8180890031279,-2.5995900289949154,1.5799854713068895,0,96,84,12,0,0,0,0|673.0336121688857,504.9779051634165,1,0;671.8859217024647,579.3435863651717,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNTAwMzE1MDIzLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwidHVycmV0Il0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMjoxLDM6Miw1OjIsNjoxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  },
+  {
+   "seed": 2500315023,
+   "arena": "blocks",
+   "opponent": "turret",
+   "side": 1,
+   "score": 1,
+   "f": -0.2766176470588236,
+   "fingerprint": "blocks|{}|1@544|SRV1 SCN2 TRG2 MRK1,100,0,0,286,436.81808900312797,-0.5420026245938693,-1.0761116202212924,0,132,14,3,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,3.1250000000005347,403.6489943578093,223.1152773585173,-2.637974734612373,2.0742901823515965,1,108,14,7,0,0,0,0|349.0506159249913,320.0916383763581,0,0;353.3231486145399,314.6269156246617,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyNTAwMzE1MDIzLCJ0IjoxLCJsIjpbInR1cnJldCIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMjoxLDM6Miw1OjIsNjoxIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  },
+  {
+   "seed": 859783496,
+   "arena": "open",
+   "opponent": "wanderer",
+   "side": 0,
+   "score": 1,
+   "f": 0.3419144602851323,
+   "fingerprint": "open|{}|0@491|TRG2 CHG1 PLT2 NRP1,130,1,125.65000000000174,655.824304880848,247.48763338755714,-2.461319216428037,2.230156136435655,1,108,13,5,0,0,0,0|OVR2 SCN2 WND2,100,0,0,500.92035897483044,458.72658813303394,3.034873149926142,-0.9114365171541385,0,12,11,17,0,0,0,0|735.1406026513896,290.59378370247043,1,0;599.0315196798875,354.91599846203235,0,0;559.239668410081,399.69391984706624,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTk3ODM0OTYsInQiOjEsImwiOlsib3JiaXRlci1oYzEiLCJ3YW5kZXJlciJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjA6MiwzOjIsNDoyIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 859783496,
+   "arena": "open",
+   "opponent": "wanderer",
+   "side": 1,
+   "score": 1,
+   "f": 0.2514157806379406,
+   "fingerprint": "open|{}|1@1787|OVR2 SCN2 WND2,100,0,0,652.3773376050864,123.44021317399236,-2.580996553849917,1.1690736496116927,0,60,46,12,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,98.400000000001,771.6269672712947,372.5181098947762,-0.9397226470231017,-1.9725190039781006,1,108,58,12,0,0,0,0|731.6127262551472,446.0679088536437,0,0;700.4240154647016,234.58449348924324,1,0;701.0393435185347,240.77280829302538,0,0;740.7878100880462,320.46998208722204,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTk3ODM0OTYsInQiOjEsImwiOlsid2FuZGVyZXIiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjA6MiwzOjIsNDoyIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 859783496,
+   "arena": "blocks",
+   "opponent": "wanderer",
+   "side": 0,
+   "score": 1,
+   "f": 0.26,
+   "fingerprint": "blocks|{}|0@1843|TRG2 CHG1 PLT2 NRP1,130,1,70.80000000000065,514.2053415601152,264.0233420360109,-1.7258021579630554,2.601541613619005,1,108,75,2,0,0,0,0|OVR2 SCN2 WND2,100,0,0,387.12331915964364,352.4790366385386,-0.53192343932705,-0.5400510399707884,0,96,58,24,0,0,0,0|719.8057561804421,379.133627400405,1,0;572.4026985597238,323.25225995188885,1,0;408.7083272017864,339.538845800234,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTk3ODM0OTYsInQiOjEsImwiOlsib3JiaXRlci1oYzEiLCJ3YW5kZXJlciJdLCJvIjpbIjU6Miw3OjEsODoyLDk6MSIsIjA6MiwzOjIsNDoyIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  },
+  {
+   "seed": 859783496,
+   "arena": "blocks",
+   "opponent": "wanderer",
+   "side": 1,
+   "score": 1,
+   "f": 0.6353168044077135,
+   "fingerprint": "blocks|{}|1@726|OVR2 SCN2 WND2,100,0,0,674,174.60377959354864,-2.973024513380251,0.3013237897133833,0,0,21,13,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,130,913.9434460414484,236.22870198712687,-1.2393128958380553,-2.84026886387641,1,108,26,7,0,0,0,0|898.5877428959293,335.97436474633884,0,0;769.7651410645268,215.45523929182903,0,0;809.0783876989664,218.67513144282873,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo4NTk3ODM0OTYsInQiOjEsImwiOlsid2FuZGVyZXIiLCJvcmJpdGVyLWhjMSJdLCJvIjpbIjA6MiwzOjIsNDoyIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  },
+  {
+   "seed": 3514219265,
+   "arena": "open",
+   "opponent": "hunter",
+   "side": 0,
+   "score": 0,
+   "f": -1.0568176718620585,
+   "fingerprint": "open|{}|1@699|TRG2 CHG1 PLT2 NRP1,130,0,0,554.0215053870551,535.3575567892524,-0.5658207553373674,-1.9874899624193987,0,48,11,9,0,0,0,0|TRG2 MRK1 CHG2 PLT1,115,1,67,422.5198184135122,287.5121363134151,2.767338010942091,0.917421626435405,1,140.5,9,0,0.7000000000000001,0,0,0|513.8338246068428,457.8685944418612,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNTE0MjE5MjY1LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwiaHVudGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiNToyLDY6MSw3OjIsODoxIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 3514219265,
+   "arena": "open",
+   "opponent": "hunter",
+   "side": 1,
+   "score": 0,
+   "f": -1.0568176718620585,
+   "fingerprint": "open|{}|0@699|TRG2 MRK1 CHG2 PLT1,115,1,67,537.4801815864874,352.4878636865847,-0.3742546426477051,-2.224171027154391,1,140.5,9,0,0.7000000000000001,0,0,0|TRG2 CHG1 PLT2 NRP1,130,0,0,405.97849461294345,104.64244321074693,2.5757718982524223,1.1541026911703918,0,48,11,9,0,0,0,0|446.1661753931565,182.13140555813789,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNTE0MjE5MjY1LCJ0IjoxLCJsIjpbImh1bnRlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiNToyLDY6MSw3OjIsODoxIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 3514219265,
+   "arena": "blocks",
+   "opponent": "hunter",
+   "side": 0,
+   "score": 1,
+   "f": 0.6799999999999999,
+   "fingerprint": "blocks|{}|0@712|TRG2 CHG1 PLT2 NRP1,130,1,106.8750000000002,628.7970447690172,524,-1.413658847666473,-2.984373295117974,1,120,32,10,0,0,0,0|TRG2 MRK1 CHG2 PLT1,115,0,0,404,488.26732281149737,-2.994028429297309,0.14843403897281857,0,24,24,11,0,0,0,0|606.0890242661155,518.8631955918147,1,0;547.1110817190859,511.12452127330243,0,0;478.51007339363457,499.53101252227947,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNTE0MjE5MjY1LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwiaHVudGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiNToyLDY6MSw3OjIsODoxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  },
+  {
+   "seed": 3514219265,
+   "arena": "blocks",
+   "opponent": "hunter",
+   "side": 1,
+   "score": 1,
+   "f": 0.6799999999999999,
+   "fingerprint": "blocks|{}|1@712|TRG2 MRK1 CHG2 PLT1,115,0,0,556,151.73267718850346,0.14756422429248944,-2.99315861461697,0,24,24,11,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,106.8750000000002,331.20295523098486,116,1.7279338059233251,0.15721935847182447,1,120,32,10,0,0,0,0|353.910975733885,121.13680440818524,0,0;412.8889182809158,128.87547872669788,1,0;481.48992660636543,140.46898747772076,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjozNTE0MjE5MjY1LCJ0IjoxLCJsIjpbImh1bnRlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiNToyLDY6MSw3OjIsODoxIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  },
+  {
+   "seed": 1873687738,
+   "arena": "open",
+   "opponent": "sniper",
+   "side": 0,
+   "score": 1,
+   "f": 0.4348294392523364,
+   "fingerprint": "open|{}|0@428|TRG2 CHG1 PLT2 NRP1,130,1,87.7750000000013,823.6540467316995,523.3505210371287,0.48608515543033975,-1.0527054946239567,1,108,16,16,0,0,0,0|SCN2 MRK2 CHG1 DDY1,100,0,0,946,283.0009924578412,-1.0270045430291563,1.809013857465479,0,47.95,8,16,0,0,0,0|887.1833246933104,374.36114324954406,0,0;919.4386600201084,368.9513733310911,1,1;839.8165135345365,487.26693111972196,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxODczNjg3NzM4LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwic25pcGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMzoyLDY6Miw3OjEsMTE6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 1873687738,
+   "arena": "open",
+   "opponent": "sniper",
+   "side": 1,
+   "score": 0,
+   "f": -1.7068508771929825,
+   "fingerprint": "open|{}|0@664|SCN2 MRK2 CHG1 DDY1,100,1,100,233.58938905918185,453.70587457229044,-0.4971549833814081,-0.9382322417976211,1,143.7,7,15,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,0,0,560.1334321872247,14,-2.8813477522601634,-2.6855191894877004,0,0,0,0,0,0,0,0|290.99408406293713,375.7225722828241,0,1",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxODczNjg3NzM4LCJ0IjoxLCJsIjpbInNuaXBlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMzoyLDY6Miw3OjEsMTE6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+  },
+  {
+   "seed": 1873687738,
+   "arena": "blocks",
+   "opponent": "sniper",
+   "side": 0,
+   "score": 1,
+   "f": 0.593012645914397,
+   "fingerprint": "blocks|{}|0@514|TRG2 CHG1 PLT2 NRP1,130,1,107.67500000000037,946,560.6519142747734,0.002325802874928555,-1.5706462633028218,1,108,20,2,0,0,0,0|SCN2 MRK2 CHG1 DDY1,100,0,0,946,280.8638510987683,0.0019341067097571646,1.561766492158316,0,23.95,9,0,0.4666666666666666,0,0,0|946.5021843650314,420.8028758762044,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxODczNjg3NzM4LCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwic25pcGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMzoyLDY6Miw3OjEsMTE6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 1873687738,
+   "arena": "blocks",
+   "opponent": "sniper",
+   "side": 1,
+   "score": 0,
+   "f": -1.7068508771929825,
+   "fingerprint": "blocks|{}|0@664|SCN2 MRK2 CHG1 DDY1,100,1,100,233.58938905918185,453.70587457229044,-0.4971549833814081,-0.9382322417976211,1,143.7,7,15,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,0,0,560.1334321872247,14,-2.8813477522601634,-2.6855191894877004,0,0,0,0,0,0,0,0|290.99408406293713,375.7225722828241,0,1",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoxODczNjg3NzM4LCJ0IjoxLCJsIjpbInNuaXBlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMzoyLDY6Miw3OjEsMTE6MSIsIjU6Miw3OjEsODoyLDk6MSJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+  },
+  {
+   "seed": 233156211,
+   "arena": "open",
+   "opponent": "brawler",
+   "side": 0,
+   "score": 1,
+   "f": 0.253015873015873,
+   "fingerprint": "open|{}|0@315|TRG2 CHG1 PLT2 NRP1,130,1,37.000000000000426,246.32049256502677,626,3.1395874209699914,-0.00003871929289529929,1,132,11,18,0,0,0,1|OVR2 TRG2 PLT2,130,0,0,274.32049256502677,626,3.139587945205007,3.1415539342968977,0,96,12,18,0,264,556,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMzMxNTYyMTEsInQiOjEsImwiOlsib3JiaXRlci1oYzEiLCJicmF3bGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMDoyLDU6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+  },
+  {
+   "seed": 233156211,
+   "arena": "open",
+   "opponent": "brawler",
+   "side": 1,
+   "score": 1,
+   "f": 0.253015873015873,
+   "fingerprint": "open|{}|1@315|OVR2 TRG2 PLT2,130,0,0,685.6795074349727,14,-0.002004708384786083,-0.00003871929289529524,0,96,12,18,0,264,556,0|TRG2 CHG1 PLT2 NRP1,130,1,37.000000000000426,713.6795074349727,14,-0.0020052326198013014,3.1415539342968977,1,132,11,18,0,0,0,1|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMzMxNTYyMTEsInQiOjEsImwiOlsiYnJhd2xlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMDoyLDU6Miw4OjIiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+  },
+  {
+   "seed": 233156211,
+   "arena": "blocks",
+   "opponent": "brawler",
+   "side": 0,
+   "score": 1,
+   "f": 0.2,
+   "fingerprint": "blocks|{}|0@546|TRG2 CHG1 PLT2 NRP1,130,1,2.675000000000405,346.61716971999033,626,2.0244957206098806,-1.1139706752456917,1,132,24,5,0,0,0,0|OVR2 TRG2 PLT2,130,0,0,403.9756313737831,510.825668035066,2.0244957207533645,2.0276219783441016,0,132,25,13,0,33,325,0|377.3521503282827,564.9772742131566,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMzMxNTYyMTEsInQiOjEsImwiOlsib3JiaXRlci1oYzEiLCJicmF3bGVyIl0sIm8iOlsiNToyLDc6MSw4OjIsOToxIiwiMDoyLDU6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+  },
+  {
+   "seed": 233156211,
+   "arena": "blocks",
+   "opponent": "brawler",
+   "side": 1,
+   "score": 1,
+   "f": 0.2,
+   "fingerprint": "blocks|{}|1@546|OVR2 TRG2 PLT2,130,0,0,556.024368626217,129.17433196493369,-1.1170969328364413,-1.1139706752457035,0,132,25,13,0,33,325,0|TRG2 CHG1 PLT2 NRP1,130,1,2.675000000000405,613.3828302800079,14,-1.1170969329799243,2.0276219783440896,1,132,24,5,0,0,0,0|582.6478496717165,75.02272578684294,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyMzMxNTYyMTEsInQiOjEsImwiOlsiYnJhd2xlciIsIm9yYml0ZXItaGMxIl0sIm8iOlsiMDoyLDU6Miw4OjIiLCI1OjIsNzoxLDg6Miw5OjEiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+  },
+  {
+   "seed": 2887591980,
+   "arena": "open",
+   "opponent": "ghost",
+   "side": 0,
+   "score": 1,
+   "f": -1.0850209706411025,
+   "fingerprint": "open|{}|0@10014|TRG2 CHG1 PLT2 NRP1,130,1,130,441.9832270691433,252.81932442994486,-1.8166010189115211,2.836571585585814,0,0,6,0,0,0,0,0|OVR2 GYR2 WND1 SCT1,100,0,0,184.69738959330206,362.3720472823779,0.9753003523830238,-0.5923077067836287,0,60,13,0,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyODg3NTkxOTgwLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwiZ2hvc3QiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCIwOjIsMToyLDQ6MSwxMjoxIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 2887591980,
+   "arena": "open",
+   "opponent": "ghost",
+   "side": 1,
+   "score": 1,
+   "f": -1.0850224663005492,
+   "fingerprint": "open|{}|1@10015|OVR2 GYR2 WND1 SCT1,100,0,0,773.8937030129126,275.42297552947593,-2.139376256746883,2.5317039391426306,0,60,13,0,0,0,0,0|TRG2 CHG1 PLT2 NRP1,130,1,130,518.6026772785893,389.35305125012366,1.307357852887692,-0.3225761712091366,0,0,6,0,0,0,0,0|",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyODg3NTkxOTgwLCJ0IjoxLCJsIjpbImdob3N0Iiwib3JiaXRlci1oYzEiXSwibyI6WyIwOjIsMToyLDQ6MSwxMjoxIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJvcGVuIiwibSI6IiJ9"
+  },
+  {
+   "seed": 2887591980,
+   "arena": "blocks",
+   "opponent": "ghost",
+   "side": 0,
+   "score": 1,
+   "f": 0.26,
+   "fingerprint": "blocks|{}|0@1031|TRG2 CHG1 PLT2 NRP1,130,1,48.40000000000283,557.307599261387,225.90787300899896,-0.5740666215810188,-2.145881677961225,1,108,51,6,0,0,0,0|OVR2 GYR2 WND1 SCT1,100,0,0,419.4699418051015,14,-2.137363399071881,0.9869225372111563,0,96,39,3,0,293,0,0|517.2204019457611,161.11944343098804,1,0;497.26937804458066,132.63369665454988,0,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyODg3NTkxOTgwLCJ0IjoxLCJsIjpbIm9yYml0ZXItaGMxIiwiZ2hvc3QiXSwibyI6WyI1OjIsNzoxLDg6Miw5OjEiLCIwOjIsMToyLDQ6MSwxMjoxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  },
+  {
+   "seed": 2887591980,
+   "arena": "blocks",
+   "opponent": "ghost",
+   "side": 1,
+   "score": 1,
+   "f": 0.26,
+   "fingerprint": "blocks|{}|1@1031|OVR2 GYR2 WND1 SCT1,100,0,0,540.5300581948994,626,1.0042292545179097,-2.154670116378641,0,96,39,3,0,293,0,0|TRG2 CHG1 PLT2 NRP1,130,1,48.40000000000283,402.6924007386135,414.09212699100226,2.567526032008771,0.9957109756285645,1,108,51,6,0,0,0,0|442.77959805423984,478.8805565690121,0,0;462.73062195542065,507.36630334545106,1,0",
+   "code": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjoyODg3NTkxOTgwLCJ0IjoxLCJsIjpbImdob3N0Iiwib3JiaXRlci1oYzEiXSwibyI6WyIwOjIsMToyLDQ6MSwxMjoxIiwiNToyLDc6MSw4OjIsOToxIl0sImEiOiJibG9ja3MiLCJtIjoiIn0"
+  }
+ ],
+ "frozen": "orbiter-hc1",
+ "matchesRun": 74496,
+ "elapsedMs": 213390
+}

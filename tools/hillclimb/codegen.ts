@@ -11,8 +11,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { loadoutCode, type SkillLoadout } from '../../src/sim/skills';
 import { genomeHash, genomeLoadout, type Genome } from '../../src/robots/genome';
+import { brawlerParamsFromGenome } from '../../src/robots/brawler';
+import { ghostParamsFromGenome } from '../../src/robots/ghost';
 import { hunterParamsFromGenome } from '../../src/robots/hunter';
 import { orbiterParamsFromGenome } from '../../src/robots/orbiter';
+import { rusherParamsFromGenome } from '../../src/robots/rusher';
+import { sniperParamsFromGenome } from '../../src/robots/sniper';
+import { turretParamsFromGenome } from '../../src/robots/turret';
+import { wandererParamsFromGenome } from '../../src/robots/wanderer';
 import { getRobot } from '../../src/robots/registry';
 import type { ValidationMatch } from './manifest';
 
@@ -61,24 +67,35 @@ function renderLoadout(loadout: SkillLoadout): string {
     return `{ ${parts.join(', ')} }`;
 }
 
+const PARAMS_FROM_GENOME: Record<string, (genome: Genome) => unknown> = {
+    brawler: brawlerParamsFromGenome,
+    ghost: ghostParamsFromGenome,
+    hunter: hunterParamsFromGenome,
+    orbiter: orbiterParamsFromGenome,
+    rusher: rusherParamsFromGenome,
+    sniper: sniperParamsFromGenome,
+    turret: turretParamsFromGenome,
+    wanderer: wandererParamsFromGenome,
+};
+
 function renderParams(archetype: string, genome: Genome): string {
-    const params: Record<string, unknown> =
-        archetype === 'hunter' ? { ...(hunterParamsFromGenome(genome) as unknown as Record<string, unknown>) } : { ...(orbiterParamsFromGenome(genome) as unknown as Record<string, unknown>) };
+    const fromGenome = PARAMS_FROM_GENOME[archetype];
+    if (!fromGenome) throw new Error(`no codegen template for archetype ${archetype}`);
+    const params = { ...(fromGenome(genome) as Record<string, unknown>) };
     return Object.entries(params)
         .sort(([a], [b]) => (a < b ? -1 : 1))
         .map(([key, value]) => `    ${key}: ${typeof value === 'string' ? `'${value}'` : JSON.stringify(value)},`)
         .join('\n');
 }
 
-function baseImport(archetype: string): { factory: string; paramsType: string } {
-    if (archetype === 'hunter') return { factory: 'createWithParams as createHunterParams', paramsType: 'HunterParams' };
-    if (archetype === 'orbiter') return { factory: 'createWithParams as createOrbiterParams', paramsType: 'OrbiterParams' };
-    throw new Error(`no codegen template for archetype ${archetype}`);
+function baseImport(archetype: string): { factory: string; paramsType: string; createCall: string } {
+    const cap = capitalize(archetype);
+    if (!PARAMS_FROM_GENOME[archetype] || !/^[A-Za-z]+$/.test(archetype)) throw new Error(`no codegen template for archetype ${archetype}`);
+    return { factory: `createWithParams as create${cap}Params`, paramsType: `${cap}Params`, createCall: `create${cap}Params` };
 }
 
 function renderSource(opts: { id: string; name: string; base: string; version: string; runId: string; hash: string; loadout: SkillLoadout; genome: Genome }): string {
-    const { factory, paramsType } = baseImport(opts.base);
-    const createCall = opts.base === 'hunter' ? 'createHunterParams(PARAMS)' : 'createOrbiterParams(PARAMS)';
+    const { factory, paramsType, createCall } = baseImport(opts.base);
     return `// ${opts.name}: hillclimb champion bred from ${opts.base}. Do not hand-edit:
 // re-run the tuner (\`npm run tune -- --archetype ${opts.base}\`) instead.
 // tuned: run ${opts.runId} genome ${opts.hash}
@@ -103,8 +120,12 @@ ${renderParams(opts.base, opts.genome)}
 };
 
 export function create(): RobotController {
-    const inner = ${createCall};
-    return { meta, loadout, update: inner.update };
+    const inner = ${createCall}(PARAMS);
+    // Forward onSpawn when the base archetype has one (anchor bots): the
+    // frozen champion must behave exactly like the tuned genome.
+    return inner.onSpawn === undefined
+        ? { meta, loadout, update: inner.update }
+        : { meta, loadout, update: inner.update, onSpawn: inner.onSpawn };
 }
 `;
 }
