@@ -20,14 +20,14 @@ import { Scene } from 'phaser';
 import { isColorblind, teamColorFor } from './accessibility';
 import { BIG_MUZZLE, RECOIL_A, RECOIL_B, SPAWN_A, SPAWN_B, TREADS_A, TREADS_B } from './art/anim';
 import { CHASSIS_V2 } from './art/chassis';
-import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_VENT } from './art/decor';
+import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_LAMP_B, DECOR_VENT } from './art/decor';
 import { FLOOR_A, FLOOR_B, FLOOR_C, FLOOR_D } from './art/floor';
 import { BOOM_1, BOOM_2, BOOM_3, BOOM_4, CHARGE_AURA, RING_FX } from './art/fx';
 import { LOGO_BAR, SKILL_ICONS } from './art/menu';
 import { validateArt } from './art/validate';
 import { BULLET_CHARGED, BULLET_V2, SPARK_V2, TRACER } from './art/projectiles';
 import { HUB_V2, MUZZLE_V2, TOWER_HEAVY, TOWER_LIGHT, TOWER_TWIN } from './art/towers';
-import { WALL_CORNER, WALL_GATE, WALL_V2 } from './art/walls';
+import { OBSTACLE_TOP, WALL_CORNER, WALL_GATE, WALL_GATE_B, WALL_V2 } from './art/walls';
 import { WRECKS } from './art/wrecks';
 
 type PixelMap = string[];
@@ -83,8 +83,11 @@ export function artRegistry(): ArtEntry[] {
         ['spark', SPARK_V2, 2, 2],
         ['tracer', TRACER, 8, 2],
         ['tile_wall', WALL_V2, 16, 16],
+        ['tile_wall_v', transposeMap(WALL_V2), 16, 16],
         ['wall_corner', WALL_CORNER, 16, 16],
         ['wall_gate', WALL_GATE, 16, 16],
+        ['wall_gate_b', WALL_GATE_B, 16, 16],
+        ['obstacle_top', OBSTACLE_TOP, 16, 16],
         ['boom_1', BOOM_1, 16, 16],
         ['boom_2', BOOM_2, 16, 16],
         ['boom_3', BOOM_3, 16, 16],
@@ -95,6 +98,7 @@ export function artRegistry(): ArtEntry[] {
         ['decor_crate', DECOR_CRATE, 16, 16],
         ['decor_barrel', DECOR_BARREL, 16, 16],
         ['decor_lamp', DECOR_LAMP, 16, 16],
+        ['decor_lamp_b', DECOR_LAMP_B, 16, 16],
         ['decor_vent', DECOR_VENT, 16, 16],
         ['spawn_a', SPAWN_A, 16, 16],
         ['spawn_b', SPAWN_B, 16, 16],
@@ -106,6 +110,14 @@ export function artRegistry(): ArtEntry[] {
     for (const [key, map, w, h] of fixed) entries.push({ key, map, w, h });
     return entries;
 }
+
+/** Transpose a square map: vertical walls get stripes running down, not across. */
+function transposeMap(map: PixelMap): PixelMap {
+    return map[0]!.split('').map((_, x) => map.map((row) => row[x] as string).join(''));
+}
+
+/** Base radius (px) of the sd_ring bake; runtime scale = circle.r / SD_RING_R. */
+export const SD_RING_R = 128;
 
 const TOWER_FOR_ROBOT: Record<string, string> = {
     rusher: 'tower_twin',
@@ -262,6 +274,210 @@ function bakeArenaFloor(scene: Scene): void {
         }
     }
     context.putImageData(image, 0, 0);
+    floorOverlay(context, lut);
+    texture.refresh();
+}
+
+/**
+ * Vector overlay pass on the baked floor (zero runtime cost): center-ring
+ * emblem (the SD target mark), spawn pads at the verified spawn columns
+ * (x = 130 / 830, engine spawnFor; y union for team sizes 1–3), a stronger
+ * rim-hazard band, a dot-vs-dash per-half cue (NO color tint), the baked
+ * corner decals, a radial vignette, and a 2 px inner border.
+ */
+function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [number, number, number]>): void {
+    // Spawn pads: shape-coded (triangle = team 0, square = team 1), no tint.
+    context.lineWidth = 2;
+    context.strokeStyle = 'rgba(232,237,242,0.35)';
+    for (const x of [130, 830]) {
+        for (const y of [170, 245, 320, 395, 470]) {
+            context.strokeRect(x - 22, y - 22, 44, 44);
+            context.beginPath();
+            if (x < 480) {
+                context.moveTo(x, y - 30);
+                context.lineTo(x - 6, y - 20);
+                context.lineTo(x + 6, y - 20);
+                context.closePath();
+            } else {
+                context.rect(x - 5, y - 30, 10, 10);
+            }
+            context.stroke();
+        }
+    }
+    // Center-ring emblem = the SD collapse target.
+    context.strokeStyle = 'rgba(232,237,242,0.28)';
+    context.lineWidth = 3;
+    context.beginPath();
+    context.arc(480, 320, 60, 0, Math.PI * 2);
+    context.stroke();
+    context.strokeStyle = 'rgba(232,237,242,0.2)';
+    context.lineWidth = 2;
+    context.beginPath();
+    context.arc(480, 320, 44, 0, Math.PI * 2);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(480 - 72, 320);
+    context.lineTo(480 + 72, 320);
+    context.moveTo(480, 320 - 72);
+    context.lineTo(480, 320 + 72);
+    context.stroke();
+    context.fillStyle = 'rgba(232,237,242,0.35)';
+    context.beginPath();
+    context.arc(480, 320, 4, 0, Math.PI * 2);
+    context.fill();
+    // Dot-vs-dash per-half cue along the center line (shape, not color).
+    context.fillStyle = 'rgba(232,237,242,0.25)';
+    for (let y = 20; y < 640; y += 40) {
+        context.beginPath();
+        context.arc(470, y, 2.5, 0, Math.PI * 2);
+        context.fill();
+        context.fillRect(486, y - 1.5, 9, 3);
+    }
+    // Stronger rim-hazard band: diagonal ticks just inside every edge.
+    context.strokeStyle = 'rgba(255,179,64,0.28)';
+    context.lineWidth = 3;
+    for (let x = 12; x < 960; x += 24) {
+        for (const y of [10, 630]) {
+            context.beginPath();
+            context.moveTo(x, y - 5);
+            context.lineTo(x + 9, y + 5);
+            context.stroke();
+        }
+    }
+    for (let y = 12; y < 640; y += 24) {
+        for (const x of [10, 950]) {
+            context.beginPath();
+            context.moveTo(x - 5, y);
+            context.lineTo(x + 5, y + 9);
+            context.stroke();
+        }
+    }
+    // Baked radial vignette (static corners; Phase 6 owns the red pulse).
+    const grad = context.createRadialGradient(480, 320, 280, 480, 320, 620);
+    grad.addColorStop(0, 'rgba(6,8,11,0)');
+    grad.addColorStop(1, 'rgba(6,8,11,0.45)');
+    context.fillStyle = grad;
+    context.fillRect(0, 0, 960, 640);
+    // Corner decals baked in (16×16 at the legacy sprite footprints).
+    stampMap(context, lut, DECOR_CRATE, 36, 36);
+    stampMap(context, lut, DECOR_BARREL, 908, 36);
+    stampMap(context, lut, DECOR_VENT, 36, 588);
+    stampMap(context, lut, DECOR_LAMP, 908, 588);
+    // 2 px inner border.
+    context.strokeStyle = '#3a4656';
+    context.lineWidth = 2;
+    context.strokeRect(1, 1, 958, 638);
+}
+
+/** Stamp a pixel map into a floor-bake context at 1:1 (alpha 0.55). */
+function stampMap(
+    context: CanvasRenderingContext2D,
+    lut: Map<string, [number, number, number]>,
+    map: PixelMap,
+    ox: number,
+    oy: number,
+): void {
+    context.save();
+    context.globalAlpha = 0.55;
+    map.forEach((row, y) => {
+        for (let x = 0; x < row.length; x += 1) {
+            const rgb = lut.get(row[x] as string);
+            if (rgb === undefined) continue;
+            context.fillStyle = `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`;
+            context.fillRect(ox + x, oy + y, 1, 1);
+        }
+    });
+    context.restore();
+}
+
+/** Soft black scorch blob for the impact-decal pool (32×32, white-tintable). */
+function bakeScorch(scene: Scene): void {
+    if (scene.textures.exists('scorch')) {
+        bakedKeys.add('scorch');
+        return;
+    }
+    const texture = scene.textures.createCanvas('scorch', 32, 32);
+    if (!texture) return;
+    bakedKeys.add('scorch');
+    const context = texture.getContext();
+    const grad = context.createRadialGradient(16, 16, 2, 16, 16, 15);
+    grad.addColorStop(0, 'rgba(10,8,6,0.9)');
+    grad.addColorStop(0.55, 'rgba(20,14,10,0.65)');
+    grad.addColorStop(1, 'rgba(20,14,10,0)');
+    context.fillStyle = grad;
+    context.fillRect(0, 0, 32, 32);
+    // Fixed cinder speckles (deterministic bake, no RNG).
+    context.fillStyle = 'rgba(5,4,3,0.8)';
+    for (const [x, y] of [[9, 12], [22, 10], [12, 22], [21, 21], [16, 8]] as const) {
+        context.fillRect(x, y, 2, 2);
+    }
+    texture.refresh();
+}
+
+/**
+ * SD danger-fill ring (256×256, white so the scene tints the amber→red→
+ * white ramp). Soft band peaking near the rim, transparent center.
+ */
+function bakeSdRing(scene: Scene): void {
+    if (scene.textures.exists('sd_ring')) {
+        bakedKeys.add('sd_ring');
+        return;
+    }
+    const texture = scene.textures.createCanvas('sd_ring', 256, 256);
+    if (!texture) return;
+    bakedKeys.add('sd_ring');
+    const context = texture.getContext();
+    const grad = context.createRadialGradient(128, 128, 96, 128, 128, 128);
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    grad.addColorStop(0.55, 'rgba(255,255,255,0.28)');
+    grad.addColorStop(0.85, 'rgba(255,255,255,0.55)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    context.fillStyle = grad;
+    context.fillRect(0, 0, 256, 256);
+    texture.refresh();
+}
+
+/** Per-block one-time bake key (all blocks layout rects are 90×90). */
+export function blockKey(w: number, h: number): string {
+    return `block_${w}x${h}`;
+}
+
+/**
+ * Bake one obstacle-block canvas at exact pixel dims: OBSTACLE_TOP tiles
+ * wrapped wall-to-wall (fixes the 16 px crop), a dark edge frame, and a top
+ * light-catch. Baked once per dims, reused by every block that size.
+ */
+export function ensureBlockTexture(scene: Scene, w: number, h: number): void {
+    const key = blockKey(w, h);
+    if (scene.textures.exists(key)) {
+        bakedKeys.add(key);
+        return;
+    }
+    const texture = scene.textures.createCanvas(key, w, h);
+    if (!texture) return;
+    bakedKeys.add(key);
+    const context = texture.getContext();
+    OBSTACLE_TOP.forEach((row, ty) => {
+        for (let x = 0; x < row.length; x += 1) {
+            const color = PALETTE[row[x] as string];
+            if (color === undefined) continue;
+            context.fillStyle = color;
+            for (let oy = ty; oy < h; oy += 16) {
+                for (let ox = x; ox < w; ox += 16) {
+                    context.fillRect(ox, oy, 1, 1);
+                }
+            }
+        }
+    });
+    context.strokeStyle = '#0b0e12';
+    context.lineWidth = 3;
+    context.strokeRect(1, 1, w - 2, h - 2);
+    context.strokeStyle = 'rgba(232,237,242,0.5)';
+    context.lineWidth = 1;
+    context.beginPath();
+    context.moveTo(3, 3);
+    context.lineTo(w - 3, 3);
+    context.stroke();
     texture.refresh();
 }
 
@@ -289,6 +505,8 @@ export function ensureArtTextures(scene: Scene): void {
     for (const { key, map } of artRegistry()) bake(scene, key, map);
     bakeTeamChassis(scene);
     bakeArenaFloor(scene);
+    bakeScorch(scene);
+    bakeSdRing(scene);
     if (debugArtRequested()) {
         const ms = (nowMs() - t0).toFixed(1);
         const issues = validateArt();

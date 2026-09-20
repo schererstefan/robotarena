@@ -405,6 +405,10 @@ export const BATTLE = {
     bannerExhibitionCustom: 'EXHIBITION MATCH - CUSTOM ROBOT',
     bannerSuddenDeath: 'SUDDEN DEATH',
     bannerFirstBlood: 'FIRST BLOOD',
+    /** Status glyphs (always paired with shape/position, never color-only). */
+    markLowHp: '!',
+    markSlowed: '❄',
+    markSkull: '☠',
     bannerSoundOn: 'SOUND ON',
     bannerSoundOff: 'SOUND OFF',
     pause: 'PAUSE',
@@ -459,6 +463,11 @@ export function exhibitionTag(parts: string[]): string {
 
 export function speedLabel(speed: number): string {
     return `${speed}X`;
+}
+
+/** SD pre-warning banner ("SUDDEN DEATH IN 10"), fired 10 s before collapse. */
+export function sdPreWarning(secondsLeft: number): string {
+    return `SUDDEN DEATH IN ${secondsLeft}`;
 }
 
 export function destroyedBanner(callsign: string): string {

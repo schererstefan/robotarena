@@ -45,6 +45,27 @@ export const WALL_CORNER: PixelMap = [
     'kkkkkkkkkkkkkkkk',
 ];
 
+// Obstacle cap: reads as solid machinery, NOT a wall (no hazard stripes).
+// Riveted plate with a top light-catch and a low-right shade step.
+export const OBSTACLE_TOP: PixelMap = [
+    'kkkkkkkkkkkkkkkk',
+    'kllllllllllllllk',
+    'klddddddddddddlk',
+    'kldwddddddddwdlk',
+    'klddddddddddddlk',
+    'klddddddddddddlk',
+    'klddddddddddddlk',
+    'klddddddddddddlk',
+    'klddddddddddddlk',
+    'klddddddddddddlk',
+    'klddddddddddddlk',
+    'kldwddddddddwdlk',
+    'klddddddddddddlk',
+    'kddddddddddddddk',
+    'kssssssssssssssk',
+    'kkkkkkkkkkkkkkkk',
+];
+
 // Door-like accent segment: same hazard top and edges as WALL_V2 so it
 // drops into a wall run; ribbed door with an amber chevron band.
 export const WALL_GATE: PixelMap = [
@@ -59,6 +80,26 @@ export const WALL_GATE: PixelMap = [
     'kmdkdmmddmmdkdmk',
     'kmdkkkkkkkkkkdmk',
     'kmwkykkyykkykwmk',
+    'kmdkkkkkkkkkkdmk',
+    'kmdkdmmddmmdkdmk',
+    'kmmmmmmmmmmmmmmk',
+    'kddddddddddddddk',
+    'kkkkkkkkkkkkkkkk',
+];
+
+// Gate lit frame: the chevron band and door core glow (1 s flicker swap).
+export const WALL_GATE_B: PixelMap = [
+    'kkkkkkkkkkkkkkkk',
+    'yykkyykkyykkyykk',
+    'ykkyykkyykkyykky',
+    'kkyykkyykkyykkyy',
+    'kkkkkkkkkkkkkkkk',
+    'kmmmmmmmmmmmmmmk',
+    'kmdkmmmmmmmmkdmk',
+    'kmwkdmmddmmdkwmk',
+    'kmdkdmmwwmmdkdmk',
+    'kmdkkkkkkkkkkdmk',
+    'kmwkwkwwwwkwkwmk',
     'kmdkkkkkkkkkkdmk',
     'kmdkdmmddmmdkdmk',
     'kmmmmmmmmmmmmmmk',

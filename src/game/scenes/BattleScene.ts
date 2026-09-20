@@ -3,13 +3,13 @@
 // is sprite transforms plus one small dynamic Graphics (cones + trails).
 
 import { Scene } from 'phaser';
-import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DT, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DT, EMP_RADIUS, MAX_TICKS, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
-import { clamp, wrapAngle } from '../../sim/math';
+import { angleDiff, clamp, wrapAngle } from '../../sim/math';
 import { decodeReplay, encodeReplay } from '../../sim/replay';
 import { getRobot } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
-import { bakedTextureCount, chassisTeamKey, ensureArtTextures, towerKey, wreckKey } from '../art';
+import { SD_RING_R, bakedTextureCount, blockKey, chassisTeamKey, ensureArtTextures, ensureBlockTexture, towerKey, wreckKey } from '../art';
 import {
     playBattleStart,
     playClick,
@@ -51,6 +51,7 @@ import {
     resultRow,
     resultsSub,
     resultsTitle,
+    sdPreWarning,
     seedLabel,
     showcaseResultsLine,
     showcaseTag,
@@ -79,12 +80,19 @@ const TREAD_SWAP_PX = 6;
 const QUALITY_FACTORS = [1, 0.5, 0.25];
 const QUALITY_NAMES = ['HIGH', 'MED', 'LOW'];
 const IND_TTL = 0.8;
-const MAP_W = 72;
-const MAP_H = 48;
+const MAP_W = 96;
+const MAP_H = 64;
 const MAP_CX = 440;
 const MAP_CY = 738;
 const MAP_X0 = MAP_CX - MAP_W / 2;
 const MAP_Y0 = MAP_CY - MAP_H / 2;
+/** Scorch-decal pool: oldest recycled, never grown mid-fight. */
+const SCORCH_POOL = 24;
+const SKULL_POOL = 6;
+/** SD pre-warning fires 10 s before the collapse starts. */
+const SD_WARN_TICK = MAX_TICKS - 600;
+/** Full-collapse radius (matches the engine's safeCircle at rest). */
+const SD_FULL_R = Math.hypot(ARENA_WIDTH / 2, ARENA_HEIGHT / 2);
 
 interface Particle {
     img: Phaser.GameObjects.Image;
@@ -148,7 +156,24 @@ export class BattleScene extends Scene {
     /** Deciding-kill slow-mo window (acc-rate + results hold). */
     private slowmoT = 0;
     private zoomBusy = false;
-    private lampImg: Phaser.GameObjects.Image | null = null;
+    /** HP staging: white ghost lag bar + low-HP/slowed glyphs + EMP rings. */
+    private barGhost: Phaser.GameObjects.Rectangle[] = [];
+    private ghostFrac: number[] = [];
+    private lowMark: Phaser.GameObjects.Text[] = [];
+    private slowMark: Phaser.GameObjects.Text[] = [];
+    private empRingT: number[] = [];
+    /** SD escalation: danger-fill sprite + pre-warning latch. */
+    private sdRing!: Phaser.GameObjects.Image;
+    private sdWarned = false;
+    /** Impact scorch decals (pool) + death skull markers (pool). */
+    private scorches: Phaser.GameObjects.Image[] = [];
+    private scorchCursor = 0;
+    private skulls: Array<{ text: Phaser.GameObjects.Text; ttl: number }> = [];
+    /** Flicker variants: gate A/B swap + lamp B overlay on 1 s timers. */
+    private gateImgs: Phaser.GameObjects.Image[] = [];
+    private lampB: Phaser.GameObjects.Image | null = null;
+    private flickT = 0;
+    private flickOn = false;
     private rings: Phaser.GameObjects.Image[] = [];
     private treads: Phaser.GameObjects.Image[] = [];
     private treadAcc: number[] = [];
@@ -200,6 +225,8 @@ export class BattleScene extends Scene {
     private qualityTimer = 0;
     private goodStreak = 0;
     private indicators: EdgeIndicator[] = [];
+    /** Scratch edge indicator for pilot rim chevrons (reused, never alloc'd). */
+    private chevScratch: EdgeIndicator = { vx: 0, vy: 0, ax: 0, ay: 0, team: 1, ttl: 0 };
     private mapG!: Phaser.GameObjects.Graphics;
     private pilot: PilotInput | null = null;
     private obstacles: ArenaObstacle[] = [];
@@ -273,7 +300,19 @@ export class BattleScene extends Scene {
         this.throesStage = [];
         this.slowmoT = 0;
         this.zoomBusy = false;
-        this.lampImg = null;
+        this.barGhost = [];
+        this.ghostFrac = [];
+        this.lowMark = [];
+        this.slowMark = [];
+        this.empRingT = [];
+        this.sdWarned = false;
+        this.scorches = [];
+        this.scorchCursor = 0;
+        this.skulls = [];
+        this.gateImgs = [];
+        this.lampB = null;
+        this.flickT = 0;
+        this.flickOn = false;
         this.firstBlood = false;
         this.trails = [];
         this.lastTrailTick = -1;
@@ -328,15 +367,17 @@ export class BattleScene extends Scene {
         this.exhibition = isExhibition(this.request.modifiers) || this.customMatch;
         this.prev = this.match.robotSnapshots;
 
-        // Static layers: composed floor, wall strips + corners + gates, decals.
+        // Static layers: composed floor (overlay, decals, vignette baked in),
+        // wall strips + corners + gates. Verticals use the transposed tile
+        // so stripes run down the wall instead of across it.
         this.add.image(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT / 2, 'floor_big').setDepth(0);
-        const wall = (x: number, y: number, w: number, h: number) => {
-            this.add.tileSprite(x, y, w, h, 'tile_wall').setDepth(1);
+        const wall = (x: number, y: number, w: number, h: number, key: string) => {
+            this.add.tileSprite(x, y, w, h, key).setDepth(1);
         };
-        wall(AX + ARENA_WIDTH / 2, AY - 8, ARENA_WIDTH + 32, 16);
-        wall(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT + 8, ARENA_WIDTH + 32, 16);
-        wall(AX - 8, AY + ARENA_HEIGHT / 2, 16, ARENA_HEIGHT + 32);
-        wall(AX + ARENA_WIDTH + 8, AY + ARENA_HEIGHT / 2, 16, ARENA_HEIGHT + 32);
+        wall(AX + ARENA_WIDTH / 2, AY - 8, ARENA_WIDTH + 32, 16, 'tile_wall');
+        wall(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT + 8, ARENA_WIDTH + 32, 16, 'tile_wall');
+        wall(AX - 8, AY + ARENA_HEIGHT / 2, 16, ARENA_HEIGHT + 32, 'tile_wall_v');
+        wall(AX + ARENA_WIDTH + 8, AY + ARENA_HEIGHT / 2, 16, ARENA_HEIGHT + 32, 'tile_wall_v');
         const corner = (x: number, y: number, flipX: boolean, flipY: boolean) => {
             this.add.image(x, y, 'wall_corner').setDepth(1).setFlipX(flipX).setFlipY(flipY);
         };
@@ -344,22 +385,32 @@ export class BattleScene extends Scene {
         corner(AX + ARENA_WIDTH + 8, AY - 8, true, false);
         corner(AX - 8, AY + ARENA_HEIGHT + 8, false, true);
         corner(AX + ARENA_WIDTH + 8, AY + ARENA_HEIGHT + 8, true, true);
-        this.add.image(AX + ARENA_WIDTH / 2, AY - 8, 'wall_gate').setDepth(1);
-        this.add.image(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT + 8, 'wall_gate').setDepth(1).setFlipY(true);
-        const decal = (key: string, x: number, y: number): Phaser.GameObjects.Image => {
-            return this.add.image(AX + x, AY + y, key).setDepth(0).setAlpha(0.55);
-        };
-        decal('decor_crate', 44, 44);
-        decal('decor_barrel', ARENA_WIDTH - 44, 44);
-        decal('decor_vent', 44, ARENA_HEIGHT - 44);
-        this.lampImg = decal('decor_lamp', ARENA_WIDTH - 44, ARENA_HEIGHT - 44);
-        // Arena obstacles: wall-textured blocks with an edge frame.
+        this.gateImgs = [
+            this.add.image(AX + ARENA_WIDTH / 2, AY - 8, 'wall_gate').setDepth(1),
+            this.add.image(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT + 8, 'wall_gate').setDepth(1).setFlipY(true),
+        ];
+        // Lamp lit-frame overlay over the baked lamp: toggled on the 1 s
+        // flicker timer (hidden under reduced motion — the baked lamp stays).
+        this.lampB = this.add
+            .image(AX + ARENA_WIDTH - 44, AY + ARENA_HEIGHT - 44, 'decor_lamp_b')
+            .setDepth(0.5)
+            .setAlpha(0.9)
+            .setVisible(false);
+        // Arena obstacles: per-block one-time bakes (exact dims, no 16 px
+        // crop) with drop shadows; material reads as machinery, not wall.
         for (const o of this.obstacles) {
             const cx = AX + o.x + o.w / 2;
             const cy = AY + o.y + o.h / 2;
-            this.add.rectangle(cx, cy, o.w + 4, o.h + 4, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(1);
-            this.add.tileSprite(cx, cy, o.w, o.h, 'tile_wall').setDepth(1);
+            this.add.rectangle(cx + 4, cy + 5, o.w, o.h, 0x000000, 0.45).setDepth(0.9);
+            ensureBlockTexture(this, o.w, o.h);
+            this.add.image(cx, cy, blockKey(o.w, o.h)).setDepth(1);
         }
+        // SD danger-fill sprite: pre-baked ring, scaled per frame to the
+        // safe circle (hidden until the 10 s pre-warning).
+        this.sdRing = this.add
+            .image(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT / 2, 'sd_ring')
+            .setDepth(1.5)
+            .setVisible(false);
 
         this.dyn = this.add.graphics().setDepth(2);
 
@@ -402,7 +453,19 @@ export class BattleScene extends Scene {
             this.towers.push(tower);
             this.hubs.push(hub);
             this.barBg.push(this.add.rectangle(0, 0, 46, 6, 0x000000, 0.7).setDepth(9));
+            this.barGhost.push(this.add.rectangle(0, 0, 44, 4, COLORS.white, 0.45).setDepth(9));
+            this.ghostFrac.push(1);
             this.barFg.push(this.add.rectangle(0, 0, 44, 4, COLORS.accent).setDepth(9));
+            this.empRingT.push(0);
+            // Low-HP (!) and slowed (❄) glyphs: text + position redundant.
+            const low = this.add.text(0, 0, BATTLE.markLowHp, FONTS.monoSmall).setOrigin(0.5).setDepth(9).setVisible(false);
+            low.setColor(COLORS.goldCss);
+            low.setStroke('#0b0e12', 3);
+            this.lowMark.push(low);
+            const slow = this.add.text(0, 0, BATTLE.markSlowed, FONTS.monoSmall).setOrigin(0.5).setDepth(9).setVisible(false);
+            slow.setColor('#9be7ff');
+            slow.setStroke('#0b0e12', 3);
+            this.slowMark.push(slow);
             const name = this.add.text(0, 0, skin.callsign, FONTS.monoSmall).setOrigin(0.5).setDepth(9);
             name.setColor(teamCss(snap.team));
             this.nameTexts.push(name);
@@ -462,6 +525,16 @@ export class BattleScene extends Scene {
         }
         for (let i = 0; i < BOOM_POOL; i += 1) {
             this.booms.push(this.add.image(-50, -50, 'boom_1').setScale(3).setDepth(8).setVisible(false));
+        }
+        // Scorch decals (impact record, oldest recycled) + skull markers.
+        for (let i = 0; i < SCORCH_POOL; i += 1) {
+            this.scorches.push(this.add.image(-50, -50, 'scorch').setDepth(1).setVisible(false).setAlpha(0.75));
+        }
+        for (let i = 0; i < SKULL_POOL; i += 1) {
+            const text = this.add.text(-50, -50, BATTLE.markSkull, FONTS.mono).setOrigin(0.5).setDepth(9).setVisible(false);
+            text.setColor(COLORS.ink);
+            text.setStroke('#0b0e12', 3);
+            this.skulls.push({ text, ttl: 0 });
         }
 
         // HUD.
@@ -666,13 +739,12 @@ export class BattleScene extends Scene {
         this.decayEffects(dt);
         this.updateTrauma(dt);
         if (!this.paused) this.tickThroes(dt);
-        // Lamp idle flicker (idle life; static under reduced motion).
-        if (this.lampImg && !this.reducedMotion) {
-            this.lampImg.setAlpha(0.5 + 0.08 * Math.sin(_time / 130) + Math.random() * 0.04);
-        }
+        this.tickFlicker(dt);
+        this.tickSkulls(dt);
+        this.syncSdRing();
         this.syncSprites(snaps, bullets, dt);
         this.drawDynamic(snaps);
-        this.syncHud(snaps);
+        this.syncHud(snaps, bullets);
         if (this.match.result.over && !this.resultsShown) {
             // Deciding-kill slow-mo holds the results panel ~0.8 s so the
             // pre-fired banner + zoom read before the panel lands.
@@ -896,6 +968,7 @@ export class BattleScene extends Scene {
             }
             if (s.alive && p.empCd <= 0 && s.empCd > 0) {
                 playEmp(s.x);
+                this.empRingT[i] = 0.5;
             }
             if (p.alive && !s.alive) {
                 // Death-throes staging (reduced motion: detonate at once).
@@ -947,6 +1020,88 @@ export class BattleScene extends Scene {
         }
     }
 
+    /** 1 s flicker timers for gate/lamp lit variants (static when reduced). */
+    private tickFlicker(dt: number): void {
+        if (this.reducedMotion || this.paused) return;
+        this.flickT += dt;
+        if (this.flickT < 1) return;
+        this.flickT = 0;
+        this.flickOn = !this.flickOn;
+        for (const gate of this.gateImgs) gate.setTexture(this.flickOn ? 'wall_gate_b' : 'wall_gate');
+        this.lampB?.setVisible(this.flickOn);
+    }
+
+    /** Death skull-markers hold 5 s over the wreck, then fade. */
+    private tickSkulls(dt: number): void {
+        for (const skull of this.skulls) {
+            if (skull.ttl <= 0) continue;
+            skull.ttl -= dt;
+            if (skull.ttl <= 0) {
+                skull.text.setVisible(false);
+            } else {
+                skull.text.setAlpha(Math.min(skull.ttl / 2, 1));
+            }
+        }
+    }
+
+    private placeSkull(x: number, y: number): void {
+        const skull = this.skulls.find((k) => k.ttl <= 0) ?? this.skulls[0]!;
+        skull.text.setPosition(x, y - 44).setAlpha(1).setVisible(true);
+        skull.ttl = 5;
+    }
+
+    /** SD danger-fill: pre-baked sprite scaled per frame + amber→red→white. */
+    private syncSdRing(): void {
+        const tick = this.match.result.tick;
+        const show = tick >= SD_WARN_TICK && !this.match.result.over;
+        this.sdRing.setVisible(show);
+        if (!show) return;
+        const circle = this.match.safeCircle;
+        const frac = clamp(circle.r / SD_FULL_R, 0, 1);
+        this.sdRing.setPosition(AX + circle.x, AY + circle.y);
+        this.sdRing.setScale(Math.max(circle.r, 1) / SD_RING_R);
+        this.sdRing.setTint(frac > 0.66 ? COLORS.team[0] : frac > 0.33 ? COLORS.danger : COLORS.white);
+        this.sdRing.setAlpha(this.match.result.suddenDeath ? 0.85 : 0.45);
+    }
+
+    /**
+     * Render-side bullet-impact inference (C5: no engine list): a bullet slot
+     * going live→gone near an obstacle splashes gray/amber + a quiet hit +
+     * a recycled scorch decal; range-expiry elsewhere fizzles with no decal.
+     */
+    private bulletGone(x: number, y: number): void {
+        let nearBlock = false;
+        for (const o of this.obstacles) {
+            if (x > o.x - 14 && x < o.x + o.w + 14 && y > o.y - 14 && y < o.y + o.h + 14) {
+                nearBlock = true;
+                break;
+            }
+        }
+        if (nearBlock) {
+            this.burst(AX + x, AY + y, COLORS.faintNum, 4, 120, 160);
+            this.burst(AX + x, AY + y, COLORS.team[0], 3, 90, 120);
+            playHit(8, x);
+            const decal = this.scorches[this.scorchCursor] as Phaser.GameObjects.Image;
+            this.scorchCursor = (this.scorchCursor + 1) % this.scorches.length;
+            decal
+                .setPosition(AX + x, AY + y)
+                .setRotation(Math.random() * Math.PI * 2)
+                .setScale(0.8 + Math.random() * 0.5)
+                .setVisible(true);
+        } else {
+            // Range-expiry fizzle: a 2-spark shrink-out, no decal.
+            this.burst(AX + x, AY + y, COLORS.faintNum, 2, 40, 0);
+        }
+    }
+
+    /** True when (tx,ty) sits inside s's sensor cone (victim-centered arcs). */
+    private coneCovers(s: RobotSnapshot, tx: number, ty: number): boolean {
+        const dx = tx - s.x;
+        const dy = ty - s.y;
+        if (Math.hypot(dx, dy) > s.scan) return false;
+        return Math.abs(angleDiff(s.tower, Math.atan2(dy, dx))) < s.fov / 2;
+    }
+
     private explode(i: number, cx: number, cy: number, dealer: number): void {
         const snap = this.match.robotSnapshots[i] as RobotSnapshot;
         const robotId = this.robotIds[i] as string;
@@ -962,6 +1117,7 @@ export class BattleScene extends Scene {
         }
         this.fireRing(cx, cy, true);
         this.killZoom();
+        this.placeSkull(cx, cy);
         playExplosion(snap.x);
         // Framed explosion from the pool (6 slots for 6 robots max), then a
         // persistent per-archetype wreck. The fallback allocates only if a
@@ -1244,6 +1400,7 @@ export class BattleScene extends Scene {
                 const next = dip * Math.exp(-dt * 12);
                 this.hubDip[i] = next < 0.05 ? 0 : next;
             }
+            if ((this.empRingT[i] as number) > 0) this.empRingT[i] = (this.empRingT[i] as number) - dt;
             if ((this.punchT[i] as number) > 0) this.punchT[i] = (this.punchT[i] as number) - dt;
         }
         for (let i = this.indicators.length - 1; i >= 0; i -= 1) {
@@ -1350,9 +1507,12 @@ export class BattleScene extends Scene {
                 body.setTexture(chassisTeamKey(this.robotIds[i] as string, s.team, wantDmg));
             }
             // Hurt-flash: 2-frame white blink on the damaged chassis.
+            // Slowed robots desaturate (tint) + carry the ❄ glyph instead.
             if ((this.hurtT[i] as number) > 0) {
                 body.setTint(COLORS.white);
                 this.hurtT[i] = (this.hurtT[i] as number) - 1;
+            } else if (visible && s.slowed) {
+                body.setTint(0x8fa3b8);
             } else {
                 body.clearTint();
             }
@@ -1414,19 +1574,34 @@ export class BattleScene extends Scene {
             // Health bar + name.
             const frac = Math.max(s.health, 0) / s.maxHealth;
             const bg = this.barBg[i] as Phaser.GameObjects.Rectangle;
+            const ghost = this.barGhost[i] as Phaser.GameObjects.Rectangle;
             const fg = this.barFg[i] as Phaser.GameObjects.Rectangle;
             const plateOn = visible && introAlpha > 0.5;
             bg.setVisible(plateOn).setPosition(cx, cy - 28);
+            // White ghost lag bar: drains toward the live value, snaps up.
+            let gfrac = this.ghostFrac[i] as number;
+            if (frac < gfrac) gfrac = Math.max(frac, gfrac - dt * 0.5);
+            else gfrac = frac;
+            this.ghostFrac[i] = gfrac;
+            ghost.setVisible(plateOn).setPosition(cx - 22 + (44 * gfrac) / 2, cy - 28);
+            ghost.setSize(44 * gfrac, 4);
             fg.setVisible(plateOn).setPosition(cx - 22 + (44 * frac) / 2, cy - 28);
             fg.setSize(44 * frac, 4);
+            // Low-HP pulse + '!' glyph (static glyph when reduced).
+            const lowHp = s.alive && frac <= 0.25;
+            fg.setAlpha(lowHp && !this.reducedMotion ? 0.65 + 0.35 * Math.sin(tick / 4) : 1);
+            const low = this.lowMark[i] as Phaser.GameObjects.Text;
+            low.setVisible(lowHp && plateOn).setPosition(cx + 27, cy - 28);
+            const slow = this.slowMark[i] as Phaser.GameObjects.Text;
+            slow.setVisible(visible && s.slowed && plateOn).setPosition(cx - 29, cy - 28);
             const band = frac > 0.5 ? 2 : frac > 0.25 ? 1 : 0;
             if (band !== this.barBand[i]) {
                 this.barBand[i] = band;
                 fg.setFillStyle(band === 2 ? COLORS.accent : band === 1 ? COLORS.team[0] : COLORS.danger);
             }
+            // Dead names stop persisting: the skull marker takes over.
             const label = this.nameTexts[i] as Phaser.GameObjects.Text;
-            label.setVisible(introAlpha > 0.5).setPosition(cx, cy - 40);
-            if (!s.alive) label.setColor(COLORS.faint);
+            label.setVisible((s.alive || throes) && introAlpha > 0.5).setPosition(cx, cy - 40);
             // Cooldown pips under the chassis; text only re-renders on change.
             const pips = this.pipTexts[i] as Phaser.GameObjects.Text;
             pips.setVisible(plateOn).setPosition(cx, cy + 30);
@@ -1447,6 +1622,11 @@ export class BattleScene extends Scene {
             this.prevBY[i] = this.curBY[i] as number;
             const b = bullets[i];
             if (b === undefined) {
+                // Live→gone edge: the slot's last known pos feeds impact
+                // inference (prevBX still holds it — curBX is today's write).
+                const lx = this.prevBX[i] as number;
+                const ly = this.prevBY[i] as number;
+                if (lx > -9998 && this.match.result.tick > 0) this.bulletGone(lx, ly);
                 img.setVisible(false);
                 this.bulletTeam[i] = null;
                 this.hotSlot[i] = false;
@@ -1538,15 +1718,75 @@ export class BattleScene extends Scene {
             g.lineBetween(AX + cx - (dx / len) * 26, AY + cy - (dy / len) * 26, AX + cx, AY + cy);
         }
         for (const ind of this.indicators) this.drawEdgeIndicator(g, ind);
-        // Sudden-death safe circle: red ring shrinking onto the arena center.
-        if (this.match.result.suddenDeath) {
-            const circle = this.match.safeCircle;
-            const r = Math.max(circle.r, 1);
-            g.lineStyle(3, COLORS.danger, 0.9);
-            g.strokeCircle(AX + circle.x, AY + circle.y, r);
-            g.lineStyle(1, COLORS.white, 0.5);
-            g.strokeCircle(AX + circle.x, AY + circle.y, Math.max(r - 4, 1));
-        }
+        // Readability set (single dyn redraw, O(N²), N ≤ 6): HP divider
+        // ticks, charge cast-bars, EMP rings, victim-centered threat arcs
+        // (white = contested), focus-fire ▼, SD outside pips. The SD circle
+        // itself is the pre-baked sprite now (syncSdRing), not dyn strokes.
+        const tickNow = this.match.result.tick;
+        const sdOn = this.match.result.suddenDeath;
+        const circle = sdOn ? this.match.safeCircle : null;
+        snaps.forEach((s, i) => {
+            if (!s.alive) return;
+            const cx = AX + s.x;
+            const cy = AY + s.y;
+            // HP staging: divider ticks every 25 HP across the bar.
+            g.lineStyle(1, 0x000000, 0.8);
+            for (let v = 25; v < s.maxHealth; v += 25) {
+                const tx = cx - 22 + (44 * v) / s.maxHealth;
+                g.lineBetween(tx, cy - 30, tx, cy - 26);
+            }
+            // Charge cast-bar (bar + white MAX frame, not color-only).
+            if (s.charge > 0.05) {
+                g.fillStyle(0x000000, 0.7);
+                g.fillRect(cx - 15, cy - 52, 30, 4);
+                g.fillStyle(COLORS.gold, 0.95);
+                g.fillRect(cx - 15, cy - 52, 30 * Math.min(s.charge, 1), 4);
+                if (s.charge >= 1) {
+                    g.lineStyle(1, COLORS.white, 0.9);
+                    g.strokeRect(cx - 15, cy - 52, 30, 4);
+                }
+            }
+            // EMP ring on the empCd edge: expands to EMP_RADIUS (static at
+            // full radius under reduced motion).
+            const et = this.empRingT[i] as number;
+            if (et > 0) {
+                const er = this.reducedMotion ? EMP_RADIUS : (0.5 - et) * (EMP_RADIUS / 0.5);
+                g.lineStyle(2, 0x9be7ff, Math.min(et * 2, 1) * 0.7);
+                g.strokeCircle(cx, cy, Math.max(er, 4));
+            }
+            // Victim-centered threat arcs: one attacker = their team color
+            // facing them; ≥2 = white contested ring + gold focus ▼.
+            let foes = 0;
+            let foeX = 0;
+            let foeY = 0;
+            let foeTeam: 0 | 1 = 0;
+            for (const f of snaps) {
+                if (!f.alive || f.team === s.team) continue;
+                if (!this.coneCovers(f, s.x, s.y)) continue;
+                foes += 1;
+                foeX = f.x;
+                foeY = f.y;
+                foeTeam = f.team;
+                if (foes >= 2) break;
+            }
+            if (foes === 1) {
+                const a = Math.atan2(foeY - s.y, foeX - s.x);
+                g.lineStyle(2, teamColor(foeTeam), 0.85);
+                g.beginPath();
+                g.arc(cx, cy, 22, a - 0.5, a + 0.5);
+                g.strokePath();
+            } else if (foes >= 2) {
+                g.lineStyle(2, COLORS.white, 0.9);
+                g.strokeCircle(cx, cy, 22);
+                g.fillStyle(COLORS.gold, 0.95);
+                g.fillTriangle(cx - 6, cy - 58, cx + 6, cy - 58, cx, cy - 50);
+            }
+            // SD outside blink pip (2 Hz triangle below the robot).
+            if (circle && Math.hypot(s.x - circle.x, s.y - circle.y) > circle.r && tickNow % 30 < 15) {
+                g.fillStyle(COLORS.danger, 0.95);
+                g.fillTriangle(cx - 6, cy + 50, cx + 6, cy + 50, cx, cy + 42);
+            }
+        });
         // Pilot aim reticle: faint sight line plus a crosshair at the cursor.
         if (this.pilot) {
             const s0 = snaps[0] as RobotSnapshot | undefined;
@@ -1558,6 +1798,19 @@ export class BattleScene extends Scene {
                 g.lineStyle(2, COLORS.white, 0.8);
                 g.lineBetween(ax - 6, ay, ax + 6, ay);
                 g.lineBetween(ax, ay - 6, ax, ay + 6);
+                // Rim chevrons (pilot-only): one per live foe, pointing from
+                // the pilot's hull toward them. Drawn through the shared
+                // scratch indicator: zero per-frame allocation.
+                for (const f of snaps) {
+                    if (!f.alive || f.team === s0.team) continue;
+                    this.chevScratch.vx = s0.x;
+                    this.chevScratch.vy = s0.y;
+                    this.chevScratch.ax = f.x;
+                    this.chevScratch.ay = f.y;
+                    this.chevScratch.team = f.team;
+                    this.chevScratch.ttl = IND_TTL * 0.8;
+                    this.drawEdgeIndicator(g, this.chevScratch);
+                }
             }
         }
     }
@@ -1594,7 +1847,15 @@ export class BattleScene extends Scene {
         );
     }
 
-    private syncHud(snaps: RobotSnapshot[]): void {
+    private syncHud(snaps: RobotSnapshot[], bullets: BulletSnapshot[]): void {
+        // SD escalation: 10 s pre-warning banner + red timer, then the
+        // collapse banner. The danger-fill sprite + minimap echo ride along.
+        const nowTick = this.match.result.tick;
+        if (!this.sdWarned && !this.match.result.over && nowTick >= SD_WARN_TICK) {
+            this.sdWarned = true;
+            this.queueBanner(sdPreWarning(10), COLORS.dangerCss);
+            this.hudTimer.setColor(COLORS.dangerCss);
+        }
         if (this.match.result.suddenDeath && !this.sdAnnounced) {
             this.sdAnnounced = true;
             this.queueBanner(BATTLE.bannerSuddenDeath, COLORS.dangerCss);
@@ -1626,11 +1887,16 @@ export class BattleScene extends Scene {
         // Minimap redraws at most every 3rd tick (perf budget).
         if (this.match.result.tick - this.lastMapTick >= 3 || this.match.result.over) {
             this.lastMapTick = this.match.result.tick;
-            this.drawMinimap(snaps);
+            this.drawMinimap(snaps, bullets);
         }
     }
 
-    private drawMinimap(snaps: RobotSnapshot[]): void {
+    /**
+     * 96×64 minimap: obstacles, team dots + facing ticks, charged ■, dead
+     * ✕, bullet dots, EMP rings, and the SD circle echo. Shape-redundant:
+     * every state has a glyph, not just a color.
+     */
+    private drawMinimap(snaps: RobotSnapshot[], bullets: BulletSnapshot[]): void {
         const g = this.mapG;
         g.clear();
         for (const o of this.obstacles) {
@@ -1642,17 +1908,41 @@ export class BattleScene extends Scene {
                 (o.h / ARENA_HEIGHT) * MAP_H,
             );
         }
-        for (const s of snaps) {
+        if (this.match.result.suddenDeath) {
+            const circle = this.match.safeCircle;
+            g.lineStyle(1, COLORS.danger, 0.9);
+            g.strokeCircle(
+                MAP_X0 + (circle.x / ARENA_WIDTH) * MAP_W,
+                MAP_Y0 + (circle.y / ARENA_HEIGHT) * MAP_H,
+                Math.max((circle.r / ARENA_WIDTH) * MAP_W, 1),
+            );
+        }
+        g.fillStyle(COLORS.white, 0.8);
+        for (const b of bullets) {
+            g.fillRect(MAP_X0 + (b.x / ARENA_WIDTH) * MAP_W, MAP_Y0 + (b.y / ARENA_HEIGHT) * MAP_H, 1.5, 1.5);
+        }
+        snaps.forEach((s, i) => {
             const mx = MAP_X0 + (s.x / ARENA_WIDTH) * MAP_W;
             const my = MAP_Y0 + (s.y / ARENA_HEIGHT) * MAP_H;
             if (s.alive) {
+                if (s.charge >= 1) {
+                    g.fillStyle(COLORS.gold, 1);
+                    g.fillRect(mx - 2.5, my - 2.5, 5, 5);
+                }
                 g.fillStyle(teamColor(s.team), 1);
                 g.fillCircle(mx, my, 2.5);
+                g.lineStyle(1, COLORS.white, 0.9);
+                g.lineBetween(mx, my, mx + Math.cos(s.heading) * 5, my + Math.sin(s.heading) * 5);
+                if ((this.empRingT[i] as number) > 0) {
+                    g.lineStyle(1, 0x9be7ff, 0.9);
+                    g.strokeCircle(mx, my, 6);
+                }
             } else {
-                g.lineStyle(1, teamColor(s.team), 0.75);
-                g.strokeCircle(mx, my, 2.5);
+                g.lineStyle(1, teamColor(s.team), 0.9);
+                g.lineBetween(mx - 3, my - 3, mx + 3, my + 3);
+                g.lineBetween(mx - 3, my + 3, mx + 3, my - 3);
             }
-        }
+        });
     }
 
     private showResults(): void {

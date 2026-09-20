@@ -64,6 +64,26 @@ export const DECOR_LAMP: PixelMap = [
     '................',
 ];
 
+// LAMP_B: lamp lit frame — hot lens plus a wider spill row (1 s flicker).
+export const DECOR_LAMP_B: PixelMap = [
+    '................',
+    '................',
+    '......kkkk......',
+    '......kwwk......',
+    '.....kwwwwk.....',
+    '......kwwk......',
+    '.......kk.......',
+    '.......mm.......',
+    '.......mm.......',
+    '.......mm.......',
+    '.......mm.......',
+    '.......mm.......',
+    '......kmmk......',
+    '.....kkmmkk.....',
+    '....kkkkkkkk....',
+    '................',
+];
+
 // VENT: wall grate with fan hint (arc blades + hub behind slats).
 export const DECOR_VENT: PixelMap = [
     '................',
