@@ -22,7 +22,7 @@ import { isColorblind, teamColorFor } from './accessibility';
 import { BIG_MUZZLE, RECOIL_A, RECOIL_B, SPAWN_A, SPAWN_B, TREADS_A, TREADS_B } from './art/anim';
 import { CHASSIS_V2 } from './art/chassis';
 import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_LAMP_B, DECOR_VENT } from './art/decor';
-import { FLOOR_A, FLOOR_B, FLOOR_C, FLOOR_D } from './art/floor';
+import { FLOOR_A, FLOOR_B, FLOOR_C, FLOOR_D, FLOOR_E, FLOOR_F, FLOOR_G } from './art/floor';
 import { BOOM_1, BOOM_2, BOOM_3, BOOM_4, CHARGE_AURA, RING_FX } from './art/fx';
 import { LOGO_BAR, PANEL_TILE, SKILL_ICONS, UI_ICONS } from './art/menu';
 import { validateArt } from './art/validate';
@@ -369,13 +369,29 @@ function bakeDir8Variants(scene: Scene): void {
     bakeDir8(scene, 'charge_aura', CHARGE_AURA, EMPTY_RECOLOR);
 }
 
-/** Deterministic floor pattern: mostly plate, with vents, hazards, accents. */
+/** Deterministic 32-bit hash of tile coords -> [0, 1). Seeded per-coordinate;
+ * layout is pixel-identical every boot (seeded only, no nondeterminism). */
+function tileRand(tx: number, ty: number): number {
+    let h = (Math.imul(tx, 374761393) + Math.imul(ty, 668265263)) | 0;
+    h = (h ^ (h >>> 13)) | 0;
+    h = Math.imul(h, 1274126177);
+    h = (h ^ (h >>> 16)) >>> 0;
+    return h / 4294967296;
+}
+
+/** Deterministic floor pattern: mostly plate, with vents, hazards, accents.
+ * A/E/F/G are grain/wear variants mixed at bake time: A keeps ~93% share,
+ * E/F/G take ~7% as low-frequency wear so the floor does not read as flat. */
 function floorTileAt(tx: number, ty: number): PixelMap {
     if (tx % 9 === 4 && ty % 7 === 3) return FLOOR_B;
     const edge = tx < 2 || tx > 57 || ty < 2 || ty > 37;
     if (edge && (tx + ty) % 5 === 0) return FLOOR_C;
     if ((tx * 7 + ty * 13) % 29 === 0) return FLOOR_D;
-    return FLOOR_A;
+    const r = tileRand(tx, ty);
+    if (r < 0.93) return FLOOR_A;
+    if (r < 0.955) return FLOOR_E;
+    if (r < 0.98) return FLOOR_F;
+    return FLOOR_G;
 }
 
 function hexToRgb(hex: string): [number, number, number] {
