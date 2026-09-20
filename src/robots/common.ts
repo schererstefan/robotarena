@@ -2,6 +2,7 @@
 // inline their own math; everything here is plain deterministic code.
 
 import { angleDiff, clamp } from '../sim/math';
+import type { SensedRobot } from '../sim/types';
 
 /** Proportional tower control: returns a -1..1 towerTurn toward a target angle. */
 export function aimTurret(current: number, target: number, gain = 3): number {
@@ -24,6 +25,17 @@ export function throttleFor(heading: number, target: number): number {
 /** True when the tower is close enough to the target angle to fire. */
 export function aimed(current: number, target: number, tolerance = 0.07): boolean {
     return Math.abs(angleDiff(current, target)) < tolerance;
+}
+
+/**
+ * Intercept bearing: aim here so the bullet meets a constant-velocity foe.
+ * Shared helper (was hunter-local); every bot's lead math must agree.
+ */
+export function leadAngle(selfX: number, selfY: number, bulletSpeed: number, foe: SensedRobot): number {
+    const flightTime = foe.distance / bulletSpeed;
+    const px = foe.x + Math.cos(foe.heading) * foe.speed * flightTime;
+    const py = foe.y + Math.sin(foe.heading) * foe.speed * flightTime;
+    return Math.atan2(py - selfY, px - selfX);
 }
 
 /**

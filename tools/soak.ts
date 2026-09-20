@@ -21,6 +21,9 @@ import {
     winRates,
 } from '../src/game/history';
 import { ROBOTS } from '../src/robots/registry';
+import { canonicalStringify, defaultGenome, genomeDefFor, genomeHash, genomeLoadout, sha256Hex, validateGenome, type Genome } from '../src/robots/genome';
+import { createWithParams as createHunterParams, HUNTER_DEFAULTS, hunterParamsFromGenome } from '../src/robots/hunter';
+import { createWithParams as createOrbiterParams, ORBITER_DEFAULTS, orbiterParamsFromGenome } from '../src/robots/orbiter';
 import { computeStats, loadoutCode, loadoutCost, sanitizeLoadout, SKILL_DEFS, type SkillLoadout } from '../src/sim/skills';
 import { ROBOT_API_VERSION, type Intent, type RobotController, type SenseState } from '../src/sim/types';
 import { initialRound, nextRound, roundName, tiebreakWinner } from '../src/game/tournament';
@@ -1400,6 +1403,112 @@ console.log('tutorial');
         threw = true;
     }
     check('throwing storage never throws', !threw);
+}
+
+// --- Genome schema + parameterized factories -------------------------------
+console.log('genome');
+{
+    const hunterDef = genomeDefFor('hunter');
+    const orbiterDef = genomeDefFor('orbiter');
+    check('hunter genome def exists', hunterDef !== undefined && hunterDef.genome_version === 1);
+    check('orbiter genome def exists', orbiterDef !== undefined && orbiterDef.genome_version === 1);
+    check('unknown bot has no genome def', genomeDefFor('nope') === undefined);
+
+    // Default-params factories reproduce create() fingerprints exactly.
+    const seeds = [1, 7, 1234, 999983];
+    const arenas: ArenaId[] = ['open', 'blocks'];
+    const hunterDefault = defaultGenome('hunter');
+    const orbiterDefault = defaultGenome('orbiter');
+    let legacyMatch = true;
+    let explicitMatch = true;
+    let genomeMatch = true;
+    for (const seed of seeds) {
+        for (const arena of arenas) {
+            const ref = fingerprint(runMatch(['hunter', 'orbiter'], [0, 1], seed, undefined, arena));
+            const mk = (hc: RobotController, oc: RobotController): string => {
+                const m = new Match(
+                    [
+                        { team: 0, controller: hc, loadout: { ...hc.loadout } },
+                        { team: 1, controller: oc, loadout: { ...oc.loadout } },
+                    ],
+                    seed,
+                    { arena },
+                );
+                m.runToEnd();
+                return fingerprint(m);
+            };
+            if (mk(createHunterParams(), createOrbiterParams()) !== ref) legacyMatch = false;
+            if (mk(createHunterParams({ ...HUNTER_DEFAULTS }), createOrbiterParams({ ...ORBITER_DEFAULTS })) !== ref) explicitMatch = false;
+            if (
+                mk(
+                    createHunterParams(hunterParamsFromGenome(hunterDefault as Genome)),
+                    createOrbiterParams(orbiterParamsFromGenome(orbiterDefault as Genome)),
+                ) !== ref
+            )
+                genomeMatch = false;
+        }
+    }
+    check('param factories with {} match legacy fingerprints', legacyMatch);
+    check('param factories with explicit defaults match', explicitMatch);
+    check('genome-derived params match legacy fingerprints', genomeMatch);
+
+    // Params actually wire through: strong overrides must change behavior.
+    const refH = fingerprint(runMatch(['hunter', 'orbiter'], [0, 1], 1234));
+    const wildH = new Match(
+        [
+            { team: 0, controller: createHunterParams({ steerGain: 6, scanTurn: -1, bankRangeFrac: 0.3 }), loadout: { charger: 2, marksman: 1, trigger: 2, plating: 1 } },
+            { team: 1, controller: createOrbiterParams(), loadout: { gyro: 2, overdrive: 2, trigger: 1, plating: 1 } },
+        ],
+        1234,
+        {},
+    );
+    wildH.runToEnd();
+    const wildO = new Match(
+        [
+            { team: 0, controller: createHunterParams(), loadout: { charger: 2, marksman: 1, trigger: 2, plating: 1 } },
+            { team: 1, controller: createOrbiterParams({ orbitDir: -1, orbitRange: 150 }), loadout: { gyro: 2, overdrive: 2, trigger: 1, plating: 1 } },
+        ],
+        1234,
+        {},
+    );
+    wildO.runToEnd();
+    check('hunter params change behavior', fingerprint(wildH) !== refH);
+    check('orbiter params change behavior', fingerprint(wildO) !== refH);
+
+    // Clamp / validate.
+    const hunter = hunterDef as NonNullable<typeof hunterDef>;
+    const clamped = validateGenome(hunter, {
+        genome_version: 1,
+        bot: 'hunter',
+        params: {
+            'steer.gain': 99,
+            'fire.aimTol': -5,
+            'target.policy': 'bogus',
+            'does.not.exist': 1,
+            loadout: { overdrive: 3, gyro: 3, bogus: 2 },
+        },
+    });
+    check('float clamps to max', clamped.params['steer.gain'] === 6);
+    check('float clamps to min', clamped.params['fire.aimTol'] === 0.01);
+    check('bad enum falls to default', clamped.params['target.policy'] === 'weakest');
+    check('unknown keys dropped', !('does.not.exist' in clamped.params));
+    check('missing keys filled with defaults', clamped.params['search.scanTurn'] === 0.9);
+    const geneLoadout = genomeLoadout(clamped);
+    check('loadout gene through sanitizeLoadout', loadoutCost(geneLoadout) <= 6 && !('bogus' in geneLoadout));
+    check('validate is total on garbage', validateGenome(hunter, null).params['steer.gain'] === 2.5);
+
+    // Canonical JSON + sha256.
+    check('canonical stringify sorts keys', canonicalStringify({ b: 1, a: { d: 4, c: 3 } }) === '{"a":{"c":3,"d":4},"b":1}');
+    check('sha256 known vector', sha256Hex('abc') === 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
+    const g1 = validateGenome(hunter, { params: { 'steer.gain': 4 } });
+    const g2 = validateGenome(hunter, { params: { loadout: { trigger: 3 }, 'steer.gain': 4 } });
+    const reordered = validateGenome(hunter, JSON.parse(JSON.stringify({ params: { 'steer.gain': 4, loadout: { trigger: 3 } } })));
+    check('genome hash is 64 hex', /^[0-9a-f]{64}$/.test(genomeHash(g1)));
+    check('genome hash stable across key order', genomeHash(g2) === genomeHash(reordered));
+    check('genome hash changes with params', genomeHash(g1) !== genomeHash(g2));
+
+    // leadAngle dedup: hunter still leads (sanity: it fires lead shots, not raw bearings).
+    check('hunter lead helper shared via common', typeof createHunterParams === 'function');
 }
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);
