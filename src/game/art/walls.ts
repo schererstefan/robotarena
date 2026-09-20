@@ -1,7 +1,11 @@
 // Arena wall tile drafts, 16x16 each. Same string-pixel-map format as
-// src/game/art.ts. Palette chars used: k, d, m, w, y (all in base PALETTE).
+// src/game/art.ts. Palette chars used: k, d, m, l, w, y (all in base PALETTE).
 // No PALETTE_ADDITIONS needed.
 // WALL_V2 tiles horizontally seamlessly (period-4 hazard stripes, k edges).
+// Phase 5 wall language: bright `l` light-catch under the cap (wall-top
+// highlight), recessed panel seams (m lip + k slot), twin vent slits with
+// lit lips, shaded rivets, and AO darkening at the base (k/d ordered
+// dither melting into a solid k foot). Corner + gate share the language.
 
 type PixelMap = string[];
 
@@ -11,37 +15,38 @@ export const WALL_V2: PixelMap = [
     'ykkyykkyykkyykky',
     'kkyykkyykkyykkyy',
     'kkkkkkkkkkkkkkkk',
-    'kmmmmmmmmmmmmmmk',
-    'kmddddddddddddmk',
-    'kmwddddddddddwmk',
-    'kmdkkdkkkkdkkdmk',
-    'kmddddddddddddmk',
-    'kmwddddddddddwmk',
-    'kmddddddddddddmk',
-    'kmdmmmmmmmmmmdmk',
-    'kmmmmmmmmmmmmmmk',
-    'kddddddddddddddk',
+    'kllllllllllllllk',
+    'kmddmkdddmkddddk',
+    'kmwdmkdddmkddwdk',
+    'kmddmkmmmmkmmmdk',
+    'kmddmkkkkmkkkkdk',
+    'kmddmkdddmkddddk',
+    'kmwdmkdddmkddwdk',
+    'kmdddddddddddddk',
+    'kdkdkdkdkdkdkdkk',
+    'kkkkkkkkkkkkkkkk',
     'kkkkkkkkkkkkkkkk',
 ];
 
 // Top-left outer corner: hazard cap on top, riveted corner post with an
-// amber band on the left; right side continues the WALL_V2 body pattern.
+// amber band on the left; right side continues the WALL_V2 body pattern
+// (same seams/vents/AO columns) so runs stay continuous.
 export const WALL_CORNER: PixelMap = [
     'kkkkkkkkkkkkkkkk',
     'yykkyykkyykkyykk',
     'ykkyykkyykkyykky',
     'kkyykkyykkyykkyy',
     'kkkkkkkkkkkkkkkk',
-    'kmmmkmmmmmmmmmmk',
-    'kmdmkdddddddddmk',
-    'kmwmkddddddddwmk',
-    'kmdmkdkkkkdkkdmk',
-    'kyyykdddddddddmk',
-    'kmdmkddddddddwmk',
-    'kmwmkdddddddddmk',
-    'kmdmkmmmmmmmmdmk',
-    'kmmmkmmmmmmmmmmk',
-    'kdddkddddddddddk',
+    'klllkllllllllllk',
+    'kmmdkkdddmkddddk',
+    'kmwdkkdddmkddwdk',
+    'kmmdkkmmmmkmmmdk',
+    'kyyykkkkkmkkkkdk',
+    'kmmdkkdddmkddddk',
+    'kmwdkkdddmkddwdk',
+    'kmmdkddddddddddk',
+    'kdkdkdkdkdkdkdkk',
+    'kkkkkkkkkkkkkkkk',
     'kkkkkkkkkkkkkkkk',
 ];
 
@@ -74,7 +79,7 @@ export const WALL_GATE: PixelMap = [
     'ykkyykkyykkyykky',
     'kkyykkyykkyykkyy',
     'kkkkkkkkkkkkkkkk',
-    'kmmmmmmmmmmmmmmk',
+    'kllllllllllllllk',
     'kmdkmmmmmmmmkdmk',
     'kmwkdmmddmmdkwmk',
     'kmdkdmmddmmdkdmk',
@@ -82,8 +87,8 @@ export const WALL_GATE: PixelMap = [
     'kmwkykkyykkykwmk',
     'kmdkkkkkkkkkkdmk',
     'kmdkdmmddmmdkdmk',
-    'kmmmmmmmmmmmmmmk',
-    'kddddddddddddddk',
+    'kdkdkdkdkdkdkdkk',
+    'kkkkkkkkkkkkkkkk',
     'kkkkkkkkkkkkkkkk',
 ];
 
@@ -94,7 +99,7 @@ export const WALL_GATE_B: PixelMap = [
     'ykkyykkyykkyykky',
     'kkyykkyykkyykkyy',
     'kkkkkkkkkkkkkkkk',
-    'kmmmmmmmmmmmmmmk',
+    'kllllllllllllllk',
     'kmdkmmmmmmmmkdmk',
     'kmwkdmmddmmdkwmk',
     'kmdkdmmwwmmdkdmk',
@@ -102,7 +107,7 @@ export const WALL_GATE_B: PixelMap = [
     'kmwkwkwwwwkwkwmk',
     'kmdkkkkkkkkkkdmk',
     'kmdkdmmddmmdkdmk',
-    'kmmmmmmmmmmmmmmk',
-    'kddddddddddddddk',
+    'kdkdkdkdkdkdkdkk',
+    'kkkkkkkkkkkkkkkk',
     'kkkkkkkkkkkkkkkk',
 ];

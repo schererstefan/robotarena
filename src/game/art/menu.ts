@@ -4,155 +4,160 @@
 
 type PixelMap = string[];
 
-// 8x8 skill icons. White detail on transparent; read at 16px (2x) display.
+// 8x8 skill icons, read at 16px (2x) in the loadout menu. Every icon has a
+// distinct silhouette AND family accent color + k drop shadow, so no two
+// confuse at a glance. Families: offense = amber y (trigger marksman
+// deadeye charger), defense = blue b (plating nanorepair), mobility =
+// green g (overdrive gyro servos slipstream), sensors = cream c (longscan
+// wideband scout). White w = hot detail shared by all.
 export const SKILL_ICONS: Record<string, PixelMap> = {
-    // Double chevron >> (overdrive/boost).
+    // Double chevron >> in green/white with k shade (overdrive/boost).
     overdrive: [
         '........',
-        '..w..w..',
-        '.ww..ww.',
-        '..wwww..',
-        '..wwww..',
-        '.ww..ww.',
-        '..w..w..',
+        '.w..w...',
+        '.gw.gwk.',
+        '..w..wk.',
+        '.gw.gwk.',
+        '.w..w...',
+        '.k..k...',
         '........',
     ],
-    // Two wedge-head arcs chasing a circle (gyro).
+    // Gyro ring: green band, top-left arc light, center hub (gyro).
     gyro: [
-        '..wwww..',
-        '.w....w.',
-        '.....www',
-        '......w.',
-        '.w......',
-        'www.....',
-        '.w....w.',
-        '..wwww..',
+        '..gggg..',
+        '.gg..gg.',
+        '.g....g.',
+        '.w.gg.g.',
+        '.w.gg.g.',
+        '.wg...g.',
+        '..gg.gg.',
+        '...gggk.',
     ],
-    // Four-tooth gear with square hub hole (servos).
+    // Four-tooth gear, white-lit crown, square hub hole (servos).
     servos: [
-        '...ww...',
-        '..wwww..',
-        '.wwwwww.',
-        'www..www',
-        'www..www',
-        '.wwwwww.',
-        '..wwww..',
-        '...ww...',
+        '...gg...',
+        '..gwwg..',
+        '..gwwg..',
+        'gwg..gwg',
+        'gwg..gwg',
+        '..gwwg..',
+        '..gwwgk.',
+        '...ggk..',
     ],
-    // Dish pointing up: bowl, feed mast + dot, signal arcs, base (longscan).
+    // Dish pointing up: signal arcs rain onto a creamed bowl + mast (longscan).
     longscan: [
-        '.w....w.',
+        '.c....c.',
+        '..c..c..',
+        '...cc...',
         '...ww...',
-        '...ww...',
-        'w......w',
-        '.w....w.',
-        '..w..w..',
-        '...ww...',
-        '..wwww..',
+        'c..ww..c',
+        '.c.ww.c.',
+        '..cwwc..',
+        '..cccck.',
     ],
-    // Broadcast fan: emitter dot under two concentric arcs (wideband).
+    // Broadcast fan: emitter bar + two ) arcs opening right (wideband).
     wideband: [
-        '..wwww..',
-        '.w....w.',
-        'w......w',
-        'w..ww..w',
-        '..w..w..',
-        '.w....w.',
-        '...ww...',
-        '...ww...',
+        '......c.',
+        '....c.cc',
+        '..w..c.c',
+        '..ww.c.c',
+        '..ww.c.c',
+        '..w..c.c',
+        '....c.cc',
+        '......ck',
     ],
-    // Bold plus reticle with gaps (trigger crosshair).
+    // Crosshair reticle: amber ring, white ticks, OPEN center (trigger).
     trigger: [
-        '...ww...',
-        '...ww...',
-        '........',
-        'ww.ww.ww',
-        'ww.ww.ww',
-        '........',
-        '...ww...',
-        '...ww...',
+        '..yyyy..',
+        '.y....y.',
+        'y..ww..y',
+        'y.w..w.y',
+        'y.w..w.y',
+        'y..ww..y',
+        '.y....yk',
+        '..yyyyk.',
     ],
-    // Ring scope with full crosshair + filled center (marksman).
+    // Scope: amber ring, full white cross, filled amber bullseye (marksman).
     marksman: [
-        '..wwww..',
-        '.w....w.',
-        'w..ww..w',
-        'w.wwww.w',
-        'w.wwww.w',
-        'w..ww..w',
-        '.w....w.',
-        '..wwww..',
+        '..yyyy..',
+        '.y.ww.y.',
+        'y..ww..y',
+        '.wwyyww.',
+        '.wwyyww.',
+        'y..ww..y',
+        '.y.ww.yk',
+        '..yyyyk.',
     ],
-    // Zigzag lightning bolt with tapered tip (charger).
+    // Lightning bolt: white-hot core, amber body, notched shade (charger).
     charger: [
-        '.....ww.',
-        '....ww..',
-        '...ww...',
-        '..wwww..',
-        '....ww..',
-        '...ww...',
-        '..ww....',
-        '..w.....',
+        '....yy..',
+        '...ywy..',
+        '...ywy..',
+        '..ywwyk.',
+        '..ywy...',
+        '..ywy.k.',
+        '..ywyk..',
+        '..wyk...',
     ],
-    // Shield outline with center ridge tapering to a point (plating).
+    // Shield: blue plate, white center ridge, tapered point (plating).
     plating: [
-        '.wwwwww.',
-        'ww....ww',
-        'w..ww..w',
-        'w..ww..w',
-        '.w.ww.w.',
-        '.w.ww.w.',
-        '..wwww..',
-        '...ww...',
+        '.bbbbbb.',
+        'bwbbbbwb',
+        'bwbwwbwb',
+        'b.bwwb.b',
+        '.b.ww.b.',
+        '.b.ww.bk',
+        '..bwwbk.',
+        '...bbk..',
     ],
-    // Repair cross: bold plus (nanorepair).
+    // Repair cross: blue arms, glowing white core, k shade (nanorepair).
     nanorepair: [
+        '........',
+        '...bb...',
         '...ww...',
-        '...ww...',
-        '...ww...',
-        'wwwwwwww',
-        'wwwwwwww',
-        '...ww...',
-        '...ww...',
-        '...ww...',
+        '.bbwwbbk',
+        '.bbwwbbk',
+        '...wwk..',
+        '...bbk..',
+        '....kk..',
     ],
-    // Triple speed lines, staggered (slipstream).
+    // Triple speed lines, staggered, white heads, dark tail tips (slipstream).
     slipstream: [
         '........',
-        '.wwww...',
+        '.wwgggk.',
         '........',
-        '...wwwww',
+        '...wwggk',
         '........',
-        '.wwww...',
+        '.wwgggk.',
         '........',
         '........',
     ],
-    // Diamond reticle with a filled center (deadeye).
+    // Diamond reticle, white inner band, filled amber core (deadeye).
     deadeye: [
-        '...ww...',
-        '..wwww..',
-        '.ww..ww.',
-        'ww.ww.ww',
-        'ww.ww.ww',
-        '.ww..ww.',
-        '..wwww..',
-        '...ww...',
+        '...yy...',
+        '..ywwy..',
+        '.ywyywy.',
+        'ywyyyywy',
+        'ywyyyywy',
+        '.ywyywyk',
+        '..ywwyk.',
+        '...yyk..',
     ],
-    // Watchful eye: almond with a pupil (scout).
+    // watchful eye: cream almond, white ball, k pupil (scout).
     scout: [
         '........',
         '........',
-        '..wwww..',
-        '.wwwwww.',
-        'ww.ww.ww',
-        '.wwwwww.',
-        '..wwww..',
+        '..cccc..',
+        '.cwwwwc.',
+        'cwwkkwwc',
+        '.cwwwwck',
+        '..cccck.',
         '........',
     ],
 };
 
 // 8x8 UI icons (Phase 5): always rendered paired with a text label,
-// never alone. White detail on transparent, read at 1x next to 9-12px type.
+// never alone. white detail on transparent, read at 1x next to 9-12px type.
 export const UI_ICONS: Record<string, PixelMap> = {
     // Double speed chevron (dash cooldown dial).
     dash: [
