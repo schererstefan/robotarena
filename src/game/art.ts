@@ -283,10 +283,11 @@ function bakeArenaFloor(scene: Scene): void {
 
 /**
  * Vector overlay pass on the baked floor (zero runtime cost): center-ring
- * emblem (the SD target mark), spawn pads at the verified spawn columns
- * (x = 130 / 830, engine spawnFor; y union for team sizes 1–3), a stronger
- * rim-hazard band, a dot-vs-dash per-half cue (NO color tint), the baked
- * corner decals, a radial vignette, and a 2 px inner border.
+ * emblem (the SD target mark), spawn pads at the nominal spawn columns
+ * (x = 130 / 830, engine computeSpawns; y union for team sizes 1–3 —
+ * actual spawns vary ±40px around the pads), a stronger rim-hazard band,
+ * a dot-vs-dash per-half cue (NO color tint), the baked corner decals,
+ * a radial vignette, and a 2 px inner border.
  */
 function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [number, number, number]>): void {
     // Spawn pads: shape-coded (triangle = team 0, square = team 1), no tint.

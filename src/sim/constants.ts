@@ -67,7 +67,8 @@ export interface ArenaObstacle {
 /**
  * Obstacle rects per arena. The blocks layout mirrors every rect through the
  * arena center (480, 320) so neither team gains cover or a shorter path.
- * All blocks sit clear of the spawn columns (x = 130 / 830).
+ * All blocks sit clear of the spawn zones (x = 130±40 / 830±40): the nearest
+ * block face is 116px from the zone edge, minus the robot radius.
  */
 export const ARENA_OBSTACLES: Record<ArenaId, ArenaObstacle[]> = {
     open: [],
@@ -81,6 +82,19 @@ export const ARENA_OBSTACLES: Record<ArenaId, ArenaObstacle[]> = {
 
 export const ROBOT_RADIUS = 14;
 export const START_HEALTH = 100;
+
+// Seeded spawn variation (complexity/spawn): base columns plus bounded
+// offsets drawn from a dedicated RNG stream (seed ^ SPAWN_SALT). Team 1
+// mirrors team 0 through the arena center, so all clearances transfer.
+export const SPAWN_X = 130;
+export const SPAWN_X_JITTER = 40;
+export const SPAWN_Y_SHIFT = 80;
+export const SPAWN_Y_JITTER = 40;
+export const SPAWN_HEADING_JITTER = 0.3;
+/** Dedicated-stream salt: "SPAWN" leet (5=S, 1~I, A=A, 9~P, E=E, 5=S). */
+export const SPAWN_SALT = 0x51a9e5;
+/** Minimum teammate separation, enforced by construction (see engine). */
+export const SPAWN_MIN_GAP = ROBOT_RADIUS * 2 + 8;
 
 // Chassis base values (same for all robots; skills modify per loadout).
 export const MAX_SPEED = 150; // units per second at full throttle
