@@ -1,9 +1,13 @@
-// Hunter: pursues the nearest foe and leads its shots, aiming where the
-// target will be when the bullet arrives. The thinking player's bot.
+// Hunter: pursues its target and leads its shots, aiming where the target
+// will be when the bullet arrives. Runs the adaptive brain (engage /
+// retreat / kite / flank / focus / roam); the pre-brain logic stays
+// available as createLegacyWithParams for the regression gate and the
+// frozen hillclimb champion.
 
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
 import type { SkillLoadout } from '../sim/skills';
-import type { Intent, RobotController, RobotMeta, SensedRobot, SenseState } from '../sim/types';
+import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
+import { createBrain, pickTarget, type BrainParams } from './brain';
 import { aimed, aimTurret, leadAngle, manageCharge, steerTo, throttleFor } from './common';
 import { castFocusVote, focusTarget } from './comms';
 import type { Genome } from './genome';
@@ -12,8 +16,8 @@ export const meta: RobotMeta = {
     id: 'hunter',
     name: 'Hunter',
     author: 'RobotArena',
-    version: '2.0.0',
-    description: 'Pursues relentlessly and leads its shots. The thinking player bot.',
+    version: '3.0.0',
+    description: 'Adaptive hunter: pursues, kites, flanks, and focuses with its team.',
 };
 
 export const loadout: SkillLoadout = { charger: 2, marksman: 1, trigger: 2, plating: 1 };
@@ -30,6 +34,8 @@ export interface HunterParams {
     closeThrottle: number;
     scanTurn: number;
     targetPolicy: TargetPolicy;
+    /** Brain mode utilities (brain.* genome group); absent = preset defaults. */
+    brain?: Partial<BrainParams>;
 }
 
 export const HUNTER_DEFAULTS: HunterParams = {
@@ -62,35 +68,27 @@ export function hunterParamsFromGenome(genome: Genome): HunterParams {
             typeof policy === 'string' && (TARGET_POLICIES as ReadonlyArray<string>).includes(policy)
                 ? (policy as TargetPolicy)
                 : HUNTER_DEFAULTS.targetPolicy,
+        brain: {
+            retreatHp: num('brain.retreatHp', 0.3),
+            kiteRange: num('brain.kiteRange', 200),
+            flankRange: num('brain.flankRange', 350),
+            stayBonus: num('brain.stayBonus', 0.15),
+            aggression: num('brain.aggression', 1),
+            focusBonus: num('brain.focusBonus', 0.3),
+            orbitDir: p['brain.orbitDir'] === -1 ? -1 : 1,
+        },
     };
 }
 
-function pickTarget(foes: SensedRobot[], policy: TargetPolicy): SensedRobot | undefined {
-    if (policy === 'first') return foes[0];
-    let best: SensedRobot | undefined;
-    for (const candidate of foes) {
-        if (!best) {
-            best = candidate;
-            continue;
-        }
-        if (policy === 'nearest' && candidate.distance < best.distance) best = candidate;
-        else if (policy === 'weakest' && candidate.health < best.health) best = candidate;
-        else if (policy === 'strongest' && candidate.health > best.health) best = candidate;
-    }
-    return best;
-}
-
-export function createWithParams(overrides?: Partial<HunterParams>): RobotController {
+/** Pre-brain hunter, frozen: pursue + focus votes, no other modes. */
+export function createLegacyWithParams(overrides?: Partial<HunterParams>): RobotController {
     const p: HunterParams = { ...HUNTER_DEFAULTS, ...overrides };
-    // Prefer the weakest visible foe; fall back to midfield when blind.
     let lastX = ARENA_WIDTH / 2;
     let lastY = ARENA_HEIGHT / 2;
 
     function update(sense: SenseState): Intent {
         const self = sense.self;
         let foe = pickTarget(sense.foes, p.targetPolicy);
-        // Team focus: a live teammate's vote overrides the policy — but only
-        // onto a foe in our own cone. Votes steer, they never fire the gun.
         if (sense.inbox.length > 0 && sense.foes.length > 0) {
             const liveSenders = new Set(sense.allies.map((a) => a.id));
             liveSenders.add(self.id);
@@ -128,6 +126,29 @@ export function createWithParams(overrides?: Partial<HunterParams>): RobotContro
             charge,
             radio: foe ? castFocusVote(foe.id) : null,
         };
+    }
+
+    return { meta, loadout, update };
+}
+
+/** Brain hunter: the same execution, steered by the 6-mode scorer. */
+export function createWithParams(overrides?: Partial<HunterParams>): RobotController {
+    const p: HunterParams = { ...HUNTER_DEFAULTS, ...overrides };
+    const brain = createBrain({
+        steerGain: p.steerGain,
+        turretGain: p.turretGain,
+        aimTol: p.aimTol,
+        bankRangeFrac: p.bankRangeFrac,
+        closeRangeFrac: p.closeRangeFrac,
+        closeThrottle: p.closeThrottle,
+        scanTurn: p.scanTurn,
+        targetPolicy: p.targetPolicy,
+        ...(p.brain ?? {}),
+    });
+
+    function update(sense: SenseState): Intent {
+        const out = brain.update(sense);
+        return { ...out.intent, radio: out.targetId !== null ? castFocusVote(out.targetId) : null };
     }
 
     return { meta, loadout, update };

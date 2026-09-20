@@ -264,6 +264,27 @@ Modded matches replay exactly via the same replay codes.
 `onSpawn(sense)` is optional and runs once at spawn (good for picking anchors or
 initial headings).
 
+## Adaptive brain
+
+Hunter runs `src/robots/brain.ts`: a 6-mode utility scorer. Every tick each
+mode bids from the current sense — `engage` (close and finish, stronger
+against weak or distant foes), `retreat` (low health or forced out of the
+safe circle), `kite` (crowded: back off to standoff range), `flank`
+(mid-range tangent approach), `focus` (a live teammate's vote for a foe in
+your cone), `roam` (blind: sweep last-known positions). The incumbent keeps
+a `stayBonus`, so ties hold and the brain doesn't flicker between modes;
+challenger ties break toward safety (`retreat` first, `roam` last). The
+sudden-death circle overrides everything: caught outside while shrinking,
+the brain retreats to safety no matter the bids. Firing always needs your
+own cone — votes and tracks steer, they never shoot.
+
+Personalities are presets (`BRAIN_PRESETS`), not forks: rusher is
+bloodthirsty, sniper kites long, brawler barely retreats. Only hunter is
+converted so far; the other seven presets are defined and validated,
+ready to wire. Brain knobs are the `brain.*` genome group
+(`retreatHp`, `kiteRange`, `flankRange`, `stayBonus`, `aggression`,
+`focusBonus`, `orbitDir`) and tune like any other param.
+
 ## Built-in robots
 
 Eight base bots ship in `src/robots/` (registry order is append-only: replay codes
@@ -275,7 +296,7 @@ index into it). Study them before writing your own.
 | Turret | Parks on a defensive anchor, spins its tower, leads shots. | `SRV1 SCN2 TRG2 MRK1` |
 | Orbiter | Circle-strafes at mid range. | `OVR2 GYR2 TRG1 PLT1` |
 | Wanderer | Roams random waypoints, snaps shots at whatever it sees. | `OVR2 SCN2 WND2` |
-| Hunter | Pursues the weakest foe and leads its shots; banks charge at range. | `TRG2 MRK1 CHG2 PLT1` |
+| Hunter | Adaptive brain: pursues, kites, flanks, retreats, and focuses with its team. | `TRG2 MRK1 CHG2 PLT1` |
 | Sniper | Camps a deep backfield anchor; charged long-range shots, retreats when rushed. | `SCN2 MRK2 CHG1 DDY1` |
 | Brawler | Plated bruiser; walks the gun into the clinch and rams through. | `OVR2 TRG2 PLT2` |
 | Ghost | Hit-and-run scout: strikes on a ready gun, breaks away on cooldown. | `OVR2 GYR2 WND1 SCT1` |

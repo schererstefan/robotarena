@@ -24,7 +24,8 @@ import { dodgeVector, leadAngle, leadShot, toGrid } from '../src/robots/common';
 import { castContact, castFocusVote, focusTarget, formationSlot, latestContact, resolveRoles } from '../src/robots/comms';
 import { ROBOTS } from '../src/robots/registry';
 import { canonicalStringify, defaultGenome, genomeDefFor, genomeHash, genomeLoadout, sha256Hex, validateGenome, type Genome } from '../src/robots/genome';
-import { createWithParams as createHunterParams, HUNTER_DEFAULTS, hunterParamsFromGenome } from '../src/robots/hunter';
+import { BRAIN_DEFAULTS, BRAIN_PRESETS, createBrain, pickTarget as brainPickTarget, safeCircleFor, type BrainParams } from '../src/robots/brain';
+import { createLegacyWithParams as createHunterLegacy, createWithParams as createHunterParams, HUNTER_DEFAULTS, hunterParamsFromGenome } from '../src/robots/hunter';
 import { createWithParams as createOrbiterParams, ORBITER_DEFAULTS, orbiterParamsFromGenome } from '../src/robots/orbiter';
 import { computeStats, loadoutCode, loadoutCost, sanitizeLoadout, SKILL_DEFS, type SkillLoadout } from '../src/sim/skills';
 import { ROBOT_API_VERSION, type Intent, type RobotController, type SenseState } from '../src/sim/types';
@@ -2545,31 +2546,26 @@ console.log('comms');
     );
     solo2.runToEnd();
     check('1v1 inbox stays empty (no allies)', soloMate.every((e) => e.inbox.length === 0) && soloMate.length > 30);
-    // 3v3 focus-fire balance, muted-control style: the same hunters with
-    // blanked inboxes and stripped radio isolate what focus itself decides.
-    // Concentration is the intended effect (team play beats no team play);
-    // the tripwire is comms DECIDING a matchup that was already a sweep.
+    // 3v3 focus-fire balance: concentration is situational (it routs
+    // brawlers and ghosts but loses to hc1's spread fire), so the tripwire
+    // is matrix beatability — focused hunters must drop games around the
+    // matrix, not sweep it.
     const hunterTeam = ROBOTS.find((r) => r.meta.id === 'hunter');
     if (!hunterTeam) throw new Error('missing hunter');
-    const mute = (inner: RobotController): RobotController => ({
-        ...inner,
-        update: (sense: SenseState): Intent => {
-            const out = inner.update({ ...sense, inbox: [] });
-            return { ...out, radio: null };
-        },
-    });
     let teamErrors = 0;
-    const run3v3 = (foeId: string, muted: boolean): { hw: number; fw: number } => {
-        const foeTeam = ROBOTS.find((r) => r.meta.id === foeId);
-        if (!foeTeam) throw new Error(`missing ${foeId}`);
+    const matrix: string[] = [];
+    let beatenBy = 0;
+    for (const foeTeam of ROBOTS) {
+        if (foeTeam.meta.id === 'hunter') continue;
         let hw = 0;
         let fw = 0;
         for (const arena of ARENA_IDS) {
             for (const seed of [5, 6, 7, 8]) {
-                const lineups: LineupEntry[] = [0, 1, 2].map(() => {
-                    const inner = hunterTeam.create();
-                    return { team: 0 as 0 | 1, controller: muted ? mute(inner) : inner, loadout: { ...hunterTeam.loadout } };
-                });
+                const lineups: LineupEntry[] = [0, 1, 2].map(() => ({
+                    team: 0 as 0 | 1,
+                    controller: hunterTeam.create(),
+                    loadout: { ...hunterTeam.loadout },
+                }));
                 for (let i = 0; i < 3; i += 1) lineups.push({ team: 1, controller: foeTeam.create(), loadout: { ...foeTeam.loadout } });
                 const m = new Match(lineups, seed, { arena });
                 m.runToEnd();
@@ -2578,21 +2574,219 @@ console.log('comms');
                 else if (m.result.winner === 1) fw += 1;
             }
         }
-        return { hw, fw };
-    };
-    const brawlFocus = run3v3('brawler', false);
-    const brawlMuted = run3v3('brawler', true);
-    console.log(`       3v3 hunters vs brawlers: focus=${brawlFocus.hw}-${brawlFocus.fw} muted=${brawlMuted.hw}-${brawlMuted.fw}`);
-    check(
-        'brawler sweep is pre-existing (muted parity)',
-        brawlFocus.hw === brawlMuted.hw && brawlFocus.fw === brawlMuted.fw,
-        `focus=${brawlFocus.hw}-${brawlFocus.fw} muted=${brawlMuted.hw}-${brawlMuted.fw}`,
-    );
-    const orbFocus = run3v3('orbiter', false);
-    const orbMuted = run3v3('orbiter', true);
-    console.log(`       3v3 hunters vs orbiters: focus=${orbFocus.hw}-${orbFocus.fw} muted=${orbMuted.hw}-${orbMuted.fw}`);
-    check('focus never hurts a split matchup', orbFocus.hw >= orbMuted.hw, `focus=${orbFocus.hw} muted=${orbMuted.hw}`);
+        matrix.push(`${foeTeam.meta.id}=${hw}-${fw}`);
+        if (fw > 0) beatenBy += 1;
+    }
+    console.log(`       3v3 hunters vs matrix: ${matrix.join(' ')}`);
     check('3v3 focus-fire completes error-free', teamErrors === 0);
+    check('focused hunters drop games around the matrix', beatenBy >= 2, `beaten by ${beatenBy}/8`);
+}
+
+// --- 14. Adaptive brain: modes, hysteresis, presets, no 1v1 regression ----
+console.log('brain');
+{
+    type Self = SenseState['self'];
+    const mkSelf = (over: Partial<Self>): Self => ({
+        id: 0, team: 0, x: 480, y: 320, heading: 0, tower: 0, speed: 0, health: 100,
+        cooldown: 0, stats: computeStats({}), charge: 0, charged: false, dashCd: 0, empCd: 0,
+        slowed: false, loadout: {}, lastDamage: null, blocked: { ahead: 400 }, ...over,
+    });
+    const mkFoe = (over: Partial<SenseState['foes'][0]>): SenseState['foes'][0] => ({
+        id: 1, team: 1, x: 600, y: 320, heading: Math.PI, speed: 0, health: 100,
+        distance: 120, bearing: 0, ...over,
+    });
+    const mkSense = (over: Partial<SenseState>): SenseState => ({
+        tick: 100,
+        time: 100 / 60,
+        self: mkSelf({}),
+        foes: [],
+        allies: [],
+        scout: [],
+        shared: [],
+        walls: { left: 480, right: 480, top: 320, bottom: 320 },
+        rand: (() => 0.5) as SenseState['rand'],
+        events: [],
+        bullets: [],
+        tracks: [],
+        arena: { id: 'open', obstacles: [], centerX: ARENA_WIDTH / 2, centerY: ARENA_HEIGHT / 2 },
+        zone: { phase: 'normal', suddenDeathIn: 8900, circle: { x: 480, y: 320, r: 577 }, distToSafety: 0, inside: true },
+        grid: { w: 12, h: 8, cell: 80, foes: new Array<number>(96).fill(0), danger: new Array<number>(96).fill(0) },
+        match: { arena: 'open', modifiers: {}, tickCap: MAX_TICKS_TOTAL, killsYou: 0, killsTeam: 0, aliveFoes: 1 },
+        inbox: [],
+        ...over,
+    });
+    const modeOf = (sense: SenseState, params?: Partial<BrainParams>): string => createBrain(params).update(sense).mode;
+    // Mode transitions off synthetic senses (fresh brain starts in roam).
+    check('distant foe engages', modeOf(mkSense({ foes: [mkFoe({ distance: 400 })] })) === 'engage');
+    check('mid-range foe flanks', modeOf(mkSense({ foes: [mkFoe({ distance: 280 })] })) === 'flank');
+    check('close foe kites', modeOf(mkSense({ foes: [mkFoe({ distance: 150 })] })) === 'kite');
+    check('low health retreats', modeOf(mkSense({ self: mkSelf({ health: 29 }), foes: [mkFoe({ distance: 280 })] })) === 'retreat');
+    check('blind roams', modeOf(mkSense({})) === 'roam');
+    check(
+        'weak foe finishes (engage over kite)',
+        modeOf(mkSense({ foes: [mkFoe({ distance: 150, health: 20 })] })) === 'engage',
+    );
+    const ally = { ...mkFoe({ id: 2, team: 0 as const, x: 400, y: 320, distance: 80, bearing: Math.PI }), tower: 0, cooldown: 0, charge: 0, charged: false, loadout: {} };
+    check(
+        'live vote focuses',
+        modeOf(
+            mkSense({
+                foes: [mkFoe({ distance: 280 })],
+                allies: [ally],
+                inbox: [{ kind: 'focus', x: 0, y: 0, foe: 1, role: 0, slot: 0, bid: 0, from: 2, sent: 94 }],
+            }),
+        ) === 'focus',
+    );
+    check(
+        'zone override retreats at full health',
+        modeOf(
+            mkSense({
+                foes: [mkFoe({ distance: 280 })],
+                zone: { phase: 'shrinking', suddenDeathIn: 0, circle: { x: 480, y: 320, r: 100 }, distToSafety: 50, inside: false },
+            }),
+        ) === 'retreat',
+    );
+    // Hysteresis: ties hold the incumbent, clear challengers switch.
+    {
+        const brain = createBrain();
+        const far = mkSense({ foes: [mkFoe({ distance: 400 })] });
+        const mid = mkSense({ foes: [mkFoe({ distance: 280 })] });
+        check('far foe opens engage', brain.update(far).mode === 'engage');
+        check('tie holds engage over flank', brain.update(mid).mode === 'engage');
+        const flanker = createBrain();
+        check('mid foe opens flank', flanker.update(mid).mode === 'flank');
+        const weakMid = mkSense({ foes: [mkFoe({ distance: 280, health: 20 })] });
+        check('tie holds flank over engage', flanker.update(weakMid).mode === 'flank');
+        check('clear challenger switches to engage', flanker.update(far).mode === 'engage');
+    }
+    // Determinism: same senses, same modes and intents, every time.
+    {
+        const seq = [
+            mkSense({}),
+            mkSense({ foes: [mkFoe({ distance: 400 })] }),
+            mkSense({ foes: [mkFoe({ distance: 150 })] }),
+            mkSense({ self: mkSelf({ health: 10 }), foes: [mkFoe({ distance: 150 })] }),
+        ];
+        const runSeq = (): string => {
+            const brain = createBrain();
+            return JSON.stringify(seq.map((s) => brain.update(s)));
+        };
+        check('brain sequence replays exactly', runSeq() === runSeq());
+    }
+    // Shared helpers.
+    check('safeCircleFor holds when safely inside', JSON.stringify(safeCircleFor(480, 320, { x: 480, y: 320, r: 577 })) === JSON.stringify({ x: 480, y: 320 }));
+    check('safeCircleFor flees to center', JSON.stringify(safeCircleFor(130, 320, { x: 480, y: 320, r: 100 })) === JSON.stringify({ x: 480, y: 320 }));
+    const pack = [mkFoe({ id: 1, distance: 300, health: 80 }), mkFoe({ id: 2, distance: 200, health: 40 }), mkFoe({ id: 3, distance: 250, health: 90 })];
+    check('brain pickTarget first', brainPickTarget(pack, 'first')?.id === 1);
+    check('brain pickTarget nearest', brainPickTarget(pack, 'nearest')?.id === 2);
+    check('brain pickTarget weakest', brainPickTarget(pack, 'weakest')?.id === 2);
+    check('brain pickTarget strongest', brainPickTarget(pack, 'strongest')?.id === 3);
+    // Presets: all eight bots defined, finite, sane — and runnable.
+    {
+        const ids = ['rusher', 'turret', 'orbiter', 'wanderer', 'hunter', 'sniper', 'brawler', 'ghost'];
+        const numeric: Array<keyof BrainParams> = ['steerGain', 'turretGain', 'aimTol', 'bankRangeFrac', 'closeRangeFrac', 'closeThrottle', 'scanTurn', 'retreatHp', 'kiteRange', 'flankRange', 'stayBonus', 'aggression', 'focusBonus'];
+        let presetsOk = true;
+        for (const id of ids) {
+            const preset = BRAIN_PRESETS[id];
+            if (!preset) {
+                presetsOk = false;
+                continue;
+            }
+            for (const key of numeric) {
+                if (typeof preset[key] !== 'number' || !Number.isFinite(preset[key] as number)) presetsOk = false;
+            }
+            if (preset.orbitDir !== 1 && preset.orbitDir !== -1) presetsOk = false;
+        }
+        check('all eight presets defined with finite knobs', presetsOk);
+        check('hunter preset matches brain defaults', JSON.stringify(BRAIN_PRESETS['hunter']) === JSON.stringify(BRAIN_DEFAULTS));
+        let presetErrors = 0;
+        for (const id of ids) {
+            const preset = BRAIN_PRESETS[id] as BrainParams;
+            const brain = createBrain(preset);
+            const controller: RobotController = {
+                meta: { id: `brain-${id}`, name: id, author: 'test', version: '0', description: '' },
+                update: (sense: SenseState): Intent => brain.update(sense).intent,
+            };
+            const sitter: RobotController = {
+                meta: { id: 'sitter', name: 'Sitter', author: 'test', version: '0', description: '' },
+                update: (): Intent => ({}),
+            };
+            const m = new Match(
+                [
+                    { team: 0, controller, loadout: {} },
+                    { team: 1, controller: sitter },
+                ],
+                5,
+            );
+            for (let i = 0; i < 300 && !m.result.over; i += 1) m.step();
+            presetErrors += m.robotSnapshots.reduce((sum, s) => sum + s.errors, 0);
+        }
+        check('every preset runs 300 ticks error-free', presetErrors === 0);
+    }
+    // Genome brain.* group: clamps, defaults, behavior change.
+    {
+        const hunterDef = genomeDefFor('hunter');
+        check('hunter genome carries 7 brain keys', hunterDef !== undefined && Object.keys(hunterDef.params).filter((k) => k.startsWith('brain.')).length === 7);
+        const clamped = validateGenome(hunterDef as NonNullable<typeof hunterDef>, {
+            genome_version: 1,
+            bot: 'hunter',
+            params: { 'brain.retreatHp': 99, 'brain.aggression': -5, 'brain.orbitDir': 7 },
+        });
+        check(
+            'brain genes clamp to range',
+            clamped.params['brain.retreatHp'] === 0.6 && clamped.params['brain.aggression'] === 0 && clamped.params['brain.orbitDir'] === 1,
+        );
+        const fromDefault = hunterParamsFromGenome(defaultGenome('hunter') as Genome);
+        check('genome defaults feed the brain', fromDefault.brain?.retreatHp === 0.3 && fromDefault.brain?.orbitDir === 1);
+        const refFp = fingerprint(runMatch(['hunter', 'orbiter'], [0, 1], 1234));
+        const wild = new Match(
+            [
+                { team: 0, controller: createHunterParams({ brain: { retreatHp: 0.6, aggression: 0 } }), loadout: { charger: 2, marksman: 1, trigger: 2, plating: 1 } },
+                { team: 1, controller: createOrbiterParams(), loadout: { gyro: 2, overdrive: 2, trigger: 1, plating: 1 } },
+            ],
+            1234,
+            {},
+        );
+        wild.runToEnd();
+        check('brain genes change behavior', fingerprint(wild) !== refFp);
+    }
+    // No 1v1 regression vs pre-brain: per-foe wins, both arenas/sides/seeds.
+    {
+        const hunterEntry = ROBOTS.find((r) => r.meta.id === 'hunter');
+        if (!hunterEntry) throw new Error('no hunter');
+        const foes = ROBOTS.filter((r) => r.meta.id !== 'hunter');
+        let regressed: string[] = [];
+        for (const foe of foes) {
+            const tally = (make: () => RobotController): number => {
+                let wins = 0;
+                for (const arena of ARENA_IDS) {
+                    for (const seed of [11, 22, 33]) {
+                        for (const order of [0, 1]) {
+                            const lineups: LineupEntry[] =
+                                order === 0
+                                    ? [
+                                          { team: 0, controller: make(), loadout: { ...hunterEntry.loadout } },
+                                          { team: 1, controller: foe.create(), loadout: { ...foe.loadout } },
+                                      ]
+                                    : [
+                                          { team: 0, controller: foe.create(), loadout: { ...foe.loadout } },
+                                          { team: 1, controller: make(), loadout: { ...hunterEntry.loadout } },
+                                      ];
+                            const m = new Match(lineups, seed, { arena });
+                            m.runToEnd();
+                            if ((m.result.winner === 0 && order === 0) || (m.result.winner === 1 && order === 1)) wins += 1;
+                        }
+                    }
+                }
+                return wins;
+            };
+            const brainWins = tally(() => createHunterParams());
+            const legacyWins = tally(() => createHunterLegacy());
+            console.log(`       hunter vs ${foe.meta.id}: brain=${brainWins} legacy=${legacyWins} (12 games)`);
+            if (brainWins < legacyWins) regressed.push(`${foe.meta.id} (${brainWins}<${legacyWins})`);
+        }
+        check('no 1v1 regression vs pre-brain hunter', regressed.length === 0, regressed.join(', '));
+    }
 }
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);

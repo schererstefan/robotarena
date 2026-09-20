@@ -4,7 +4,7 @@
 
 import type { SkillLoadout } from '../sim/skills';
 import type { RobotController, RobotMeta } from '../sim/types';
-import { createWithParams as createHunterParams, type HunterParams } from './hunter';
+import { createLegacyWithParams as createHunterParams, type HunterParams } from './hunter';
 
 export const meta: RobotMeta = {
     id: 'hunter-hc1',

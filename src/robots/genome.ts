@@ -65,6 +65,13 @@ export const PARAM_RANGES: Record<string, Record<string, ParamDef>> = {
         'drive.closeThrottle': { type: 'float', min: 0, max: 1, default: 0.35 },
         'target.policy': { type: 'enum', values: ['first', 'nearest', 'weakest', 'strongest'], default: 'weakest' },
         'search.scanTurn': { type: 'float', min: -1, max: 1, default: 0.9 },
+        'brain.retreatHp': { type: 'float', min: 0.1, max: 0.6, default: 0.3 },
+        'brain.kiteRange': { type: 'float', min: 100, max: 350, default: 200 },
+        'brain.flankRange': { type: 'float', min: 250, max: 500, default: 350 },
+        'brain.stayBonus': { type: 'float', min: 0, max: 0.5, default: 0.15 },
+        'brain.aggression': { type: 'float', min: 0, max: 2, default: 1 },
+        'brain.focusBonus': { type: 'float', min: 0, max: 1, default: 0.3 },
+        'brain.orbitDir': { type: 'enum', values: [-1, 1], default: 1 },
         loadout: { type: 'loadout', budget: SKILL_BUDGET, default: { charger: 2, marksman: 1, trigger: 2, plating: 1 } },
     },
     orbiter: {
