@@ -27,7 +27,7 @@ No new char without a style-guide entry + `art.ts` palette entry.
 | `q` | `#1b232d` | floor inset line |
 | `a` | `#8a6d1f` | dark amber (rare) |
 | `h` | `#3d444c` | dark gray 2 / smoke alt (rare) |
-| `t` | `#ffb340` | **team accent** (trim/lens ONLY, see §4). Lands in `art.ts` Phase 1 (engine track); sprites track may use `t` in maps once engine lands. Base bake = amber (team-0 look for menu previews); team variants recolor per team. |
+| `t` | `#ffb340` | **team accent** (trim/lens ONLY, see §4). Base bake = amber (team-0 look for menu previews); team variants recolor per team (amber/cyan + CB pair). |
 
 `.` = transparent (not a color, never budgeted).
 

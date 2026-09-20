@@ -4,9 +4,10 @@
 //
 // House rules (from the art round): 1px `k` outlines on chassis/hubs, never
 // on lenses or glow; light from top-left (`l`/`c` up-left, `d`/`s` low-right);
-// only `w` tints to team/paint colors; lenses sit on `k`/`d`; ordered 2px
-// dither only between adjacent ramp steps; glow cores are `w` with `c`/`y`
-// mids and `o` outers; no purple family anywhere.
+// only `t` bakes to team colors (`w` stays neutral hull steel); lenses sit on
+// `k`/`d`; ordered 2px dither only between adjacent ramp steps; glow cores
+// are `w` with `c`/`y` mids and `o` outers; no purple family anywhere
+// (cool slate-blue shadow ramps explicitly allowed).
 //
 // Texture-atlas audit (Phase 19): each key below is one canvas texture baked
 // exactly once per game (guarded by `textures.exists`) and one GPU upload —
@@ -49,6 +50,7 @@ const PALETTE: Record<string, string> = {
     q: '#1b232d',
     a: '#8a6d1f',
     h: '#3d444c',
+    t: '#ffb340',
 };
 
 /** Legal pixel-map chars: '.' (transparent) + every palette key. */
@@ -178,15 +180,16 @@ function bakeTinted(scene: Scene, key: string, map: PixelMap, recolor: Record<st
 
 /**
  * Deterministic damage stamp over a char-map copy: a scorch blotch plus
- * sparse crack seams on hull pixels only (w/l/m). Same dims, legal chars.
+ * sparse crack seams on hull pixels only (w/l/m/t — scorch eats trim too).
+ * Same dims, legal chars.
  */
 export function damageStamp(map: PixelMap): PixelMap {
     return map.map((row, y) =>
         row
             .split('')
             .map((ch, x) => {
-                if (ch !== 'w' && ch !== 'l' && ch !== 'm') return ch;
-                if (x >= 4 && x <= 7 && y >= 9 && y <= 11) return ch === 'w' ? 'd' : 'k';
+                if (ch !== 'w' && ch !== 'l' && ch !== 'm' && ch !== 't') return ch;
+                if (x >= 4 && x <= 7 && y >= 9 && y <= 11) return ch === 'l' || ch === 'm' ? 'k' : 'd';
                 if ((x * 7 + y * 11) % 17 === 0) return 'k';
                 return ch;
             })
@@ -194,28 +197,137 @@ export function damageStamp(map: PixelMap): PixelMap {
     );
 }
 
+/** Direction-frame canvas size: fits a 16px sprite at 45° (16√2 ≈ 22.6). */
+export const DIR8_SIZE = 24;
+
+/**
+ * Quantize a heading (radians, 0 = east, positive clockwise) to the
+ * nearest of 8 baked direction frames (0..7 = 0°, 45°, …, 315°).
+ */
+export function dir8ForHeading(heading: number): number {
+    const TAU = Math.PI * 2;
+    const norm = ((heading % TAU) + TAU) % TAU;
+    return Math.round(norm / (Math.PI / 4)) % 8;
+}
+
+/**
+ * Nearest-neighbor rotation of a char map onto a DIR8_SIZE canvas.
+ * Inverse-mapped (no holes); cardinals are pixel-exact. Diagonals get a
+ * conservative orphan cleanup (fully-isolated ramp singles only; accent
+ * chars are never touched). Deterministic: no RNG anywhere.
+ */
+function rotateMapDir8(map: PixelMap, dir: number): PixelMap {
+    const sh = map.length;
+    const sw = map[0]?.length ?? 0;
+    const cx = sw / 2;
+    const cy = sh / 2;
+    const theta = (dir * Math.PI) / 4;
+    const cos = Math.cos(theta);
+    const sin = Math.sin(theta);
+    const out: string[] = [];
+    for (let y = 0; y < DIR8_SIZE; y += 1) {
+        let row = '';
+        for (let x = 0; x < DIR8_SIZE; x += 1) {
+            const vx = x + 0.5 - DIR8_SIZE / 2;
+            const vy = y + 0.5 - DIR8_SIZE / 2;
+            const sx = cx + cos * vx + sin * vy;
+            const sy = cy - sin * vx + cos * vy;
+            const ix = Math.floor(sx);
+            const iy = Math.floor(sy);
+            row += ix >= 0 && iy >= 0 && ix < sw && iy < sh ? (map[iy]?.[ix] ?? '.') : '.';
+        }
+        out.push(row);
+    }
+    if (dir % 2 === 1) killOrphans8(out);
+    return out;
+}
+
+/** Ramp chars safe to de-dust: accents (lenses/trim/embers) are exempt. */
+const DUSTABLE = new Set(['k', 'd', 'm', 'l', 'w', 's', 'h', 'p', 'q']);
+
+/**
+ * Remove fully-isolated single pixels (zero opaque 8-neighbors) left by
+ * diagonal resampling. In-place on a '.'-padded char grid.
+ */
+function killOrphans8(grid: string[]): void {
+    const h = grid.length;
+    const w = grid[0]?.length ?? 0;
+    const kill: Array<[number, number]> = [];
+    for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
+            const ch = grid[y]?.[x] ?? '.';
+            if (ch === '.' || !DUSTABLE.has(ch)) continue;
+            let neighbors = 0;
+            for (let dy = -1; dy <= 1 && neighbors === 0; dy += 1) {
+                for (let dx = -1; dx <= 1; dx += 1) {
+                    if (dx === 0 && dy === 0) continue;
+                    if ((grid[y + dy]?.[x + dx] ?? '.') !== '.') {
+                        neighbors += 1;
+                        break;
+                    }
+                }
+            }
+            if (neighbors === 0) kill.push([x, y]);
+        }
+    }
+    for (const [x, y] of kill) grid[y] = `${grid[y]?.slice(0, x)}.${grid[y]?.slice(x + 1)}`;
+}
+
+/**
+ * Bake 8 centered direction frames (`${base}_d0..d7`) from a char map with
+ * per-char recolor. Skips keys the TextureManager already has.
+ */
+function bakeDir8(scene: Scene, base: string, map: PixelMap, recolor: Record<string, string>): void {
+    for (let dir = 0; dir < 8; dir += 1) {
+        bakeTinted(scene, `${base}_d${dir}`, rotateMapDir8(map, dir), recolor);
+    }
+}
+
 function css(hex: number): string {
     return `#${hex.toString(16).padStart(6, '0')}`;
 }
 
 /** Team-tinted chassis key (palette baked in: CB toggles stay correct). */
-export function chassisTeamKey(robotId: string, team: 0 | 1, damaged: boolean): string {
-    return `chassis_${robotId}_t${team}_${isColorblind() ? 'cb' : 'std'}${damaged ? '_dmg' : ''}`;
+export function chassisTeamKey(robotId: string, team: 0 | 1, damaged: boolean, dir: number): string {
+    return `chassis_${robotId}_t${team}_${isColorblind() ? 'cb' : 'std'}${damaged ? '_dmg' : ''}_d${dir}`;
 }
 
-/** Bake per-team chassis variants (both palettes, clean + damaged). */
+/** Bake per-team chassis variants (both palettes, clean + damaged, 8 dirs). */
 function bakeTeamChassis(scene: Scene): void {
     for (const [id, map] of Object.entries(CHASSIS_V2)) {
+        // Rotate once per chassis (clean + damaged), recolor per team.
+        const cleanDirs: PixelMap[] = [];
+        const dmgDirs: PixelMap[] = [];
         const dmg = damageStamp(map);
+        for (let dir = 0; dir < 8; dir += 1) {
+            cleanDirs.push(rotateMapDir8(map, dir));
+            dmgDirs.push(rotateMapDir8(dmg, dir));
+        }
         for (const team of [0, 1] as const) {
             for (const cb of [false, true]) {
-                const recolor = { w: css(teamColorFor(team, cb)) };
+                // Trim-only team tint: `t` takes the team color, `w` stays hull steel.
+                const recolor = { t: css(teamColorFor(team, cb)) };
                 const pal = cb ? 'cb' : 'std';
-                bakeTinted(scene, `chassis_${id}_t${team}_${pal}`, map, recolor);
-                bakeTinted(scene, `chassis_${id}_t${team}_${pal}_dmg`, dmg, recolor);
+                for (let dir = 0; dir < 8; dir += 1) {
+                    bakeTinted(scene, `chassis_${id}_t${team}_${pal}_d${dir}`, cleanDirs[dir] as PixelMap, recolor);
+                    bakeTinted(scene, `chassis_${id}_t${team}_${pal}_dmg_d${dir}`, dmgDirs[dir] as PixelMap, recolor);
+                }
             }
         }
     }
+}
+
+/** Bake 8 direction frames for every other runtime-rotated sprite. */
+function bakeDir8Variants(scene: Scene): void {
+    bakeDir8(scene, 'tower_light', TOWER_LIGHT, EMPTY_RECOLOR);
+    bakeDir8(scene, 'tower_heavy', TOWER_HEAVY, EMPTY_RECOLOR);
+    bakeDir8(scene, 'tower_twin', TOWER_TWIN, EMPTY_RECOLOR);
+    bakeDir8(scene, 'treads_a', TREADS_A, EMPTY_RECOLOR);
+    bakeDir8(scene, 'treads_b', TREADS_B, EMPTY_RECOLOR);
+    for (const [id, map] of Object.entries(WRECKS)) bakeDir8(scene, `wreck_${id}`, map, EMPTY_RECOLOR);
+    bakeDir8(scene, 'muzzle', MUZZLE_V2, EMPTY_RECOLOR);
+    bakeDir8(scene, 'muzzle_big', BIG_MUZZLE, EMPTY_RECOLOR);
+    bakeDir8(scene, 'charge_aura', CHARGE_AURA, EMPTY_RECOLOR);
 }
 
 /** Deterministic floor pattern: mostly plate, with vents, hazards, accents. */
@@ -526,6 +638,7 @@ export function ensureArtTextures(scene: Scene): void {
     // tracer/ring_fx/treads_*/recoil_* stay: claimed by fidelity Phases 1-3.
     for (const { key, map } of artRegistry()) bake(scene, key, map);
     bakeTeamChassis(scene);
+    bakeDir8Variants(scene);
     bakeArenaFloor(scene);
     bakeScorch(scene);
     bakeSdRing(scene);
@@ -551,6 +664,31 @@ export function wreckKey(robotId: string): string {
 
 export function towerKey(robotId: string): string {
     return TOWER_FOR_ROBOT[robotId] ?? 'tower_light';
+}
+
+/** Nearest-direction tower key for a robot (8 baked frames, no rotation). */
+export function towerDirKey(robotId: string, dir: number): string {
+    return `${towerKey(robotId)}_d${dir}`;
+}
+
+/** Nearest-direction tread key (roll frame A/B × 8 headings). */
+export function treadsDirKey(flipped: boolean, dir: number): string {
+    return `treads_${flipped ? 'b' : 'a'}_d${dir}`;
+}
+
+/** Nearest-direction wreck key. */
+export function wreckDirKey(robotId: string, dir: number): string {
+    return `wreck_${robotId}_d${dir}`;
+}
+
+/** Nearest-direction muzzle key (standard or big charged variant). */
+export function muzzleDirKey(big: boolean, dir: number): string {
+    return `${big ? 'muzzle_big' : 'muzzle'}_d${dir}`;
+}
+
+/** Nearest-direction charge-aura key. */
+export function auraDirKey(dir: number): string {
+    return `charge_aura_d${dir}`;
 }
 
 export function skillIconKey(skillId: string): string {

@@ -10,7 +10,7 @@ import { loadoutCode, type SkillLoadout } from '../../sim/skills';
 import { decodeReplay, encodeReplay } from '../../sim/replay';
 import { getRobot } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
-import { SD_RING_R, bakedTextureCount, blockKey, chassisTeamKey, ensureArtTextures, ensureBlockTexture, towerKey, uiIconKey, wreckKey } from '../art';
+import { SD_RING_R, auraDirKey, bakedTextureCount, blockKey, chassisTeamKey, dir8ForHeading, ensureArtTextures, ensureBlockTexture, muzzleDirKey, towerDirKey, towerKey, treadsDirKey, uiIconKey, wreckDirKey } from '../art';
 import {
     playBattleStart,
     playClick,
@@ -141,6 +141,7 @@ export class BattleScene extends Scene {
     private particles: Particle[] = [];
     private recoil: number[] = [];
     private muzzleLife: number[] = [];
+    private muzzleBig: boolean[] = [];
     private hudPips!: Phaser.GameObjects.Text;
     private hudTimer!: Phaser.GameObjects.Text;
     private banner!: Phaser.GameObjects.Text;
@@ -192,7 +193,6 @@ export class BattleScene extends Scene {
     private treadLastX: number[] = [];
     private treadLastY: number[] = [];
     private treadFlip: boolean[] = [];
-    private damaged: boolean[] = [];
     private hurtT: number[] = [];
     private punchT: number[] = [];
     private punchOn: boolean[] = [];
@@ -308,12 +308,12 @@ export class BattleScene extends Scene {
         this.particles = [];
         this.recoil = [];
         this.muzzleLife = [];
+        this.muzzleBig = [];
         this.treads = [];
         this.treadAcc = [];
         this.treadLastX = [];
         this.treadLastY = [];
         this.treadFlip = [];
-        this.damaged = [];
         this.hurtT = [];
         this.punchT = [];
         this.punchOn = [];
@@ -480,20 +480,20 @@ export class BattleScene extends Scene {
             const skin = this.request.skins[i] as SlotSkin;
             const robotId = displayRobotId(this.request.lineupIds[i] as string);
             this.robotIds.push(robotId);
-            // Bake-time team tint (w pixels only): no whole-sprite setTint.
-            const body = this.add.image(0, 0, chassisTeamKey(robotId, snap.team, false)).setScale(2).setDepth(4);
-            this.damaged.push(false);
+            // Bake-time team tint (t pixels only): no whole-sprite setTint.
+            // Nearest-direction frames: pixel sprites are never rotated.
+            const body = this.add.image(0, 0, chassisTeamKey(robotId, snap.team, false, dir8ForHeading(snap.heading))).setScale(2).setDepth(4);
             this.hurtT.push(0);
             this.punchT.push(0);
             this.punchOn.push(false);
             this.healAcc.push(0);
             this.lastHealTick.push(-9999);
-            this.treads.push(this.add.image(0, 0, 'treads_a').setScale(2).setDepth(3.5));
+            this.treads.push(this.add.image(0, 0, treadsDirKey(false, dir8ForHeading(snap.heading))).setScale(2).setDepth(3.5));
             this.treadAcc.push(0);
             this.treadLastX.push(-9999);
             this.treadLastY.push(-9999);
             this.treadFlip.push(false);
-            const tower = this.add.image(0, 0, towerKey(robotId)).setScale(2).setDepth(5);
+            const tower = this.add.image(0, 0, towerDirKey(robotId, dir8ForHeading(snap.tower))).setScale(2).setDepth(5);
             tower.setTint(skin.paint);
             const hub = this.add.image(0, 0, 'hub').setScale(2).setDepth(6);
             hub.setTint(skin.paint);
@@ -545,6 +545,7 @@ export class BattleScene extends Scene {
             this.muzzles.push(muzzle);
             this.recoil.push(0);
             this.muzzleLife.push(0);
+            this.muzzleBig.push(false);
             this.trails.push([]);
             this.barBand.push(-1);
             if (snap.team === 0) this.total0 += 1;
@@ -1037,9 +1038,10 @@ export class BattleScene extends Scene {
                     }
                     this.punchT[i] = 0.06;
                 }
-                (this.muzzles[i] as Phaser.GameObjects.Image)
-                    .setTexture(p.charge > 0.4 ? 'muzzle_big' : 'muzzle')
-                    .setScale(2 + Math.random() * 0.8);
+                // Muzzle size latches here; the per-frame sync picks the
+                // matching nearest-direction frame (never rotated).
+                this.muzzleBig[i] = p.charge > 0.4;
+                (this.muzzles[i] as Phaser.GameObjects.Image).setScale(2 + Math.random() * 0.8);
                 this.burst(cx + Math.cos(s.tower) * 26, cy + Math.sin(s.tower) * 26, 0xffe28a, 4, 120, 0);
                 playShoot(p.charge > 0.4, s.x);
             }
@@ -1425,8 +1427,7 @@ export class BattleScene extends Scene {
             this.time.delayedCall(260, () => boom.setTexture('boom_4'));
             this.time.delayedCall(430, () => boom.destroy());
         }
-        const wreck = this.add.image(cx, cy, wreckKey(robotId)).setScale(2).setDepth(3);
-        wreck.setRotation(snap.heading + 0.5);
+        const wreck = this.add.image(cx, cy, wreckDirKey(robotId, dir8ForHeading(snap.heading + 0.5))).setScale(2).setDepth(3);
         wreck.setAlpha(0.95);
         // Wreck settle: Bounce ease-out + a dust kick (static when reduced).
         if (!this.reducedMotion) {
@@ -1775,25 +1776,25 @@ export class BattleScene extends Scene {
                 this.turA[i] = s.tower;
                 this.turV[i] = 0;
             }
-            // Treads: distance-keyed frame swap (static under reduced motion).
+            // Treads: distance-keyed roll swap (static under reduced motion)
+            // + nearest-direction frame (never rotated: pixels stay crisp).
             const tread = this.treads[i] as Phaser.GameObjects.Image;
-            tread.setVisible(visible && introAlpha > 0.05).setPosition(px, py).setRotation(s.heading);
+            tread.setVisible(visible && introAlpha > 0.05).setPosition(px, py);
             tread.setAlpha(introAlpha);
             if (visible && !this.reducedMotion) {
                 this.treadAcc[i] = (this.treadAcc[i] as number) + stepLen;
                 if ((this.treadAcc[i] as number) >= TREAD_SWAP_PX) {
                     this.treadAcc[i] = 0;
-                    const flip = !(this.treadFlip[i] as boolean);
-                    this.treadFlip[i] = flip;
-                    tread.setTexture(flip ? 'treads_b' : 'treads_a');
+                    this.treadFlip[i] = !(this.treadFlip[i] as boolean);
                 }
             }
-            // Bake-time damage overlay below 35% HP (texture swap, no tint).
+            const wantTread = treadsDirKey(this.treadFlip[i] as boolean, dir8ForHeading(s.heading));
+            if (tread.texture.key !== wantTread) tread.setTexture(wantTread);
+            // Bake-time damage overlay below 35% HP + nearest-direction
+            // frame (texture swap, no tint, never rotated).
             const wantDmg = visible && s.health < s.maxHealth * 0.35;
-            if (wantDmg !== this.damaged[i]) {
-                this.damaged[i] = wantDmg;
-                body.setTexture(chassisTeamKey(this.robotIds[i] as string, s.team, wantDmg));
-            }
+            const wantBody = chassisTeamKey(this.robotIds[i] as string, s.team, wantDmg, dir8ForHeading(s.heading));
+            if (body.texture.key !== wantBody) body.setTexture(wantBody);
             // Hurt-flash: 2-frame white blink on the damaged chassis.
             // Slowed robots desaturate (tint) + carry the ❄ glyph instead.
             if ((this.hurtT[i] as number) > 0) {
@@ -1814,7 +1815,13 @@ export class BattleScene extends Scene {
                 const pulse = this.reducedMotion ? 0 : 0.12 * Math.sin(tick / 3) * s.charge;
                 aura.setAlpha(Math.min(0.25 + 0.55 * Math.max(s.charge, auraFlash) + pulse, 1) * introAlpha);
             }
-            if (auraOn && !this.reducedMotion) aura.setRotation(tick / 24);
+            // Charge aura: stepped direction frames over time (static d0
+            // under reduced motion — never rotated).
+            if (auraOn) {
+                const auraDir = this.reducedMotion ? 0 : Math.floor(tick / 24 / (Math.PI / 4)) % 8;
+                const wantAura = auraDirKey(auraDir);
+                if (aura.texture.key !== wantAura) aura.setTexture(wantAura);
+            }
             // Idle breathing: 2±0.03 (intro/throes own the scale otherwise).
             let chassisScale = introScale;
             if (!this.reducedMotion && !this.introActive) {
@@ -1823,7 +1830,6 @@ export class BattleScene extends Scene {
             body
                 .setVisible(visible && introAlpha > 0.05)
                 .setPosition(px, py)
-                .setRotation(s.heading)
                 .setScale(chassisScale)
                 .setAlpha(introAlpha);
             stripe
@@ -1834,7 +1840,9 @@ export class BattleScene extends Scene {
             const rec = this.recoil[i] as number;
             const tx = px - Math.cos(aim) * rec;
             const ty = py - Math.sin(aim) * rec;
-            tower.setVisible(visible && introAlpha > 0.05).setPosition(tx, ty).setRotation(aim).setAlpha(introAlpha);
+            const wantTower = towerDirKey(this.robotIds[i] as string, dir8ForHeading(aim));
+            if (tower.texture.key !== wantTower) tower.setTexture(wantTower);
+            tower.setVisible(visible && introAlpha > 0.05).setPosition(tx, ty).setAlpha(introAlpha);
             // Scale punch: touch scale only across the punch window.
             if ((this.punchT[i] as number) > 0) {
                 tower.setScale(2.3);
@@ -1848,7 +1856,6 @@ export class BattleScene extends Scene {
             hub
                 .setVisible(visible && introAlpha > 0.05)
                 .setPosition(tx - Math.cos(aim) * dip, ty - Math.sin(aim) * dip)
-                .setRotation(0)
                 .setAlpha(introAlpha);
             if (ring) ring.setVisible(visible).setPosition(px, py).setAlpha(introAlpha);
             // Muzzle flash + pooled ADD halo (90 ms, alongside muzzleLife).
@@ -1861,7 +1868,8 @@ export class BattleScene extends Scene {
                 const hx = cx + Math.cos(aim) * 30;
                 const hy = cy + Math.sin(aim) * 30;
                 muzzle.setPosition(hx, hy);
-                muzzle.setRotation(aim);
+                const wantMuzzle = muzzleDirKey(this.muzzleBig[i] as boolean, dir8ForHeading(aim));
+                if (muzzle.texture.key !== wantMuzzle) muzzle.setTexture(wantMuzzle);
                 halo.setPosition(hx, hy);
                 halo.setAlpha(0.8);
                 if (!this.reducedMotion) halo.setScale(2.2 + 0.5 * ((this.muzzleLife[i] as number) / 0.09));
