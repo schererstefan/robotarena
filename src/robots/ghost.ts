@@ -7,7 +7,7 @@ import { angleDiff, TAU } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 import { pickTarget, type BrainTargetPolicy } from './brain';
-import { aimed, aimTurret, createStallTracker, dodgeVector, leadAngle, rayClearance, steerTo } from './common';
+import { aimed, aimTurret, createStallTracker, createUtilityMemory, dodgeVector, leadAngle, rayClearance, steerTo, utilityDrive, type UtilityMemory } from './common';
 import { castContact, latestContact } from './comms';
 import type { Genome } from './genome';
 
@@ -38,6 +38,12 @@ export interface GhostParams {
     scanTurn: number;
     breakRange: number;
     targetPolicy: BrainTargetPolicy;
+    /** Powerup/turret/hazard awareness. Absent = off (frozen checkpoints
+     * and genome builds keep exact behavior); the active `create()` opts in. */
+    utility?: boolean;
+    /** Hit-and-run sustain: also divert with a visible-but-distant foe
+     * (repair/turret between passes). Absent = divert only when blind. */
+    utilityEager?: boolean;
 }
 
 export const GHOST_DEFAULTS: GhostParams = {
@@ -56,6 +62,9 @@ export const GHOST_DEFAULTS: GhostParams = {
     scanTurn: 1,
     breakRange: 320,
     targetPolicy: 'first',
+    // Shipped behavior includes eager utility sight (see hunter.ts).
+    utility: true,
+    utilityEager: true,
 };
 
 const TARGET_POLICIES: ReadonlyArray<BrainTargetPolicy> = ['first', 'nearest', 'weakest', 'strongest'];
@@ -84,11 +93,18 @@ export function ghostParamsFromGenome(genome: Genome): GhostParams {
             typeof policy === 'string' && (TARGET_POLICIES as ReadonlyArray<string>).includes(policy)
                 ? (policy as BrainTargetPolicy)
                 : GHOST_DEFAULTS.targetPolicy,
+        utility: true,
+        utilityEager: true,
     };
 }
 
 export function createWithParams(overrides?: Partial<GhostParams>): RobotController {
     const p: GhostParams = { ...GHOST_DEFAULTS, ...overrides };
+    // Frozen PARAMS objects (pre-utility hillclimb champions) predate the
+    // flag and must behave exactly as tuned: only callers that declare
+    // `utility` opt in. DEFAULTS declare shipped behavior.
+    if (overrides !== undefined && overrides !== null && !('utility' in overrides)) p.utility = false;
+    const util: UtilityMemory | null = p.utility === true ? createUtilityMemory() : null;
     let lastX = ARENA_WIDTH / 2;
     let lastY = ARENA_HEIGHT / 2;
     const stall = createStallTracker();
@@ -164,7 +180,7 @@ export function createWithParams(overrides?: Partial<GhostParams>): RobotControl
         const breaking = self.cooldown > 0 && foe !== undefined && foe.distance < p.breakRange;
         const dash = breaking && self.dashCd <= 0;
         const emp = breaking && self.empCd <= 0 && (foe?.distance ?? Infinity) < EMP_RADIUS;
-        return {
+        const sending = {
             throttle: facing ? p.orbitThrottle : p.turnThrottle,
             turn,
             towerTurn,
@@ -174,11 +190,13 @@ export function createWithParams(overrides?: Partial<GhostParams>): RobotControl
             emp,
             radio: foe ? castContact(foe.x, foe.y, foe.id) : null,
         };
+        if (util === null) return sending;
+        return utilityDrive(sense, sending, util, { eager: p.utilityEager === true });
     }
 
     return { meta, loadout, update };
 }
 
 export function create(): RobotController {
-    return createWithParams();
+    return createWithParams({ utility: true, utilityEager: true });
 }

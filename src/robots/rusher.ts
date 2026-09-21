@@ -9,7 +9,7 @@ import { clamp } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 import { BRAIN_PRESETS, createBrain, pickTarget, type BrainParams, type BrainTargetPolicy } from './brain';
-import { aimed, aimTurret, steerTo, throttleFor } from './common';
+import { aimed, aimTurret, createUtilityMemory, steerTo, throttleFor, utilityDrive, type UtilityMemory } from './common';
 import { castFocusVote } from './comms';
 import type { Genome } from './genome';
 
@@ -35,6 +35,9 @@ export interface RusherParams {
     targetPolicy: BrainTargetPolicy;
     /** Brain mode utilities (brain.* genome group); absent = preset defaults. */
     brain?: Partial<BrainParams>;
+    /** Powerup/turret/hazard awareness. Absent = off (frozen checkpoints
+     * and genome builds keep exact behavior); the active `create()` opts in. */
+    utility?: boolean;
 }
 
 export const RUSHER_DEFAULTS: RusherParams = {
@@ -46,6 +49,8 @@ export const RUSHER_DEFAULTS: RusherParams = {
     weavePeriod: 18,
     scanRate: 2.4,
     targetPolicy: 'first',
+    // Shipped behavior includes utility sight (see hunter.ts).
+    utility: true,
 };
 
 const TARGET_POLICIES: ReadonlyArray<BrainTargetPolicy> = ['first', 'nearest', 'weakest', 'strongest'];
@@ -63,6 +68,7 @@ export function rusherParamsFromGenome(genome: Genome): RusherParams {
         weaveAmp: num('weave.amp', RUSHER_DEFAULTS.weaveAmp),
         weavePeriod: num('weave.period', RUSHER_DEFAULTS.weavePeriod),
         scanRate: num('search.scanRate', RUSHER_DEFAULTS.scanRate),
+        utility: true,
         targetPolicy:
             typeof policy === 'string' && (TARGET_POLICIES as ReadonlyArray<string>).includes(policy)
                 ? (policy as BrainTargetPolicy)
@@ -122,6 +128,10 @@ export function createLegacyWithParams(overrides?: Partial<RusherParams>): Robot
  */
 export function createWithParams(overrides?: Partial<RusherParams>): RobotController {
     const p: RusherParams = { ...RUSHER_DEFAULTS, ...overrides };
+    // Frozen PARAMS objects (pre-utility hillclimb champions) predate the
+    // flag and must behave exactly as tuned: only callers that declare
+    // `utility` opt in. DEFAULTS declare shipped behavior.
+    if (overrides !== undefined && overrides !== null && !('utility' in overrides)) p.utility = false;
     const preset = BRAIN_PRESETS['rusher'] as BrainParams;
     const brain = createBrain({
         steerGain: p.steerGain,
@@ -142,14 +152,17 @@ export function createWithParams(overrides?: Partial<RusherParams>): RobotContro
         ...(p.brain ?? {}),
     });
 
+    const util: UtilityMemory | null = p.utility === true ? createUtilityMemory() : null;
+
     function update(sense: SenseState): Intent {
         const out = brain.update(sense);
-        return { ...out.intent, radio: out.targetId !== null ? castFocusVote(out.targetId) : null };
+        const sending: Intent = { ...out.intent, radio: out.targetId !== null ? castFocusVote(out.targetId) : null };
+        return util !== null ? utilityDrive(sense, sending, util) : sending;
     }
 
     return { meta, loadout, update };
 }
 
 export function create(): RobotController {
-    return createWithParams();
+    return createWithParams({ utility: true });
 }

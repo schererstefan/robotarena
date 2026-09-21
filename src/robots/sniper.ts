@@ -6,7 +6,7 @@ import { dist } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 import { pickTarget, type BrainTargetPolicy } from './brain';
-import { aimed, aimTurret, createStallTracker, leadAngle, manageCharge, steerTo } from './common';
+import { aimed, aimTurret, createStallTracker, createUtilityMemory, hazardEscapeDrive, leadAngle, manageCharge, steerTo, utilityDivert, type UtilityMemory } from './common';
 import type { Genome } from './genome';
 
 export const meta: RobotMeta = {
@@ -36,6 +36,9 @@ export interface SniperParams {
     bankRangeFrac: number;
     turretGain: number;
     targetPolicy: BrainTargetPolicy;
+    /** Powerup/turret/hazard awareness. Absent = off (frozen checkpoints
+     * and genome builds keep exact behavior); the active `create()` opts in. */
+    utility?: boolean;
 }
 
 export const SNIPER_DEFAULTS: SniperParams = {
@@ -54,6 +57,8 @@ export const SNIPER_DEFAULTS: SniperParams = {
     bankRangeFrac: 0.75,
     turretGain: 3,
     targetPolicy: 'first',
+    // Shipped behavior includes utility sight (see hunter.ts).
+    utility: true,
 };
 
 const TARGET_POLICIES: ReadonlyArray<BrainTargetPolicy> = ['first', 'nearest', 'weakest', 'strongest'];
@@ -82,11 +87,17 @@ export function sniperParamsFromGenome(genome: Genome): SniperParams {
             typeof policy === 'string' && (TARGET_POLICIES as ReadonlyArray<string>).includes(policy)
                 ? (policy as BrainTargetPolicy)
                 : SNIPER_DEFAULTS.targetPolicy,
+        utility: true,
     };
 }
 
 export function createWithParams(overrides?: Partial<SniperParams>): RobotController {
     const p: SniperParams = { ...SNIPER_DEFAULTS, ...overrides };
+    // Frozen PARAMS objects (pre-utility hillclimb champions) predate the
+    // flag and must behave exactly as tuned: only callers that declare
+    // `utility` opt in. DEFAULTS declare shipped behavior.
+    if (overrides !== undefined && overrides !== null && !('utility' in overrides)) p.utility = false;
+    const util: UtilityMemory | null = p.utility === true ? createUtilityMemory() : null;
     let anchorX = 0;
     let anchorY = 0;
     let anchored = false;
@@ -158,12 +169,17 @@ export function createWithParams(overrides?: Partial<SniperParams>): RobotContro
             fire = inRange && onTarget && (!holdForBank || self.charged);
             charge = inRange && !fire ? manageCharge(self.charged, onTarget && !holdForBank) : false;
         }
-        return { throttle, turn, towerTurn, fire, charge };
+        const sending = { throttle, turn, towerTurn, fire, charge };
+        if (util === null) return sending;
+        // Camp identity: hazard escape always, pad/turret detours only
+        // before the anchor is reached (utilities en route, never patrols).
+        const safe = hazardEscapeDrive(sense, sending) ?? sending;
+        return anchored ? safe : utilityDivert(sense, safe, util);
     }
 
     return { meta, loadout, onSpawn, update };
 }
 
 export function create(): RobotController {
-    return createWithParams();
+    return createWithParams({ utility: true });
 }
