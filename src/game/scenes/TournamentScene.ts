@@ -92,6 +92,7 @@ export class TournamentScene extends Scene {
         this.input.keyboard?.on('keydown-L', this.onLineupKey);
         this.input.keyboard?.on('keydown-LEFT', this.onSizeLeft);
         this.input.keyboard?.on('keydown-RIGHT', this.onSizeRight);
+        this.input.keyboard?.on('keydown', this.onSeedDigitKey);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown-ESC', this.onEscapeKey);
@@ -101,6 +102,7 @@ export class TournamentScene extends Scene {
             this.input.keyboard?.off('keydown-L', this.onLineupKey);
             this.input.keyboard?.off('keydown-LEFT', this.onSizeLeft);
             this.input.keyboard?.off('keydown-RIGHT', this.onSizeRight);
+            this.input.keyboard?.off('keydown', this.onSeedDigitKey);
         });
     }
 
@@ -151,6 +153,15 @@ export class TournamentScene extends Scene {
 
     private onSizeRight = (): void => {
         this.onSizeKey(8);
+    };
+
+    /** Digits cycle the matching seed's robot on the setup screen. */
+    private onSeedDigitKey = (event: KeyboardEvent): void => {
+        if (this.mode !== 'setup') return;
+        const m = /^Digit([1-8])$/.exec(event.code);
+        if (!m) return;
+        const i = Number(m[1]) - 1;
+        if (i < this.entrants.length) this.cycleEntrant(i);
     };
 
     private onSimKey = (): void => {
