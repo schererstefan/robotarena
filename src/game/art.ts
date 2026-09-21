@@ -19,9 +19,9 @@
 
 import { Scene } from 'phaser';
 import { isColorblind, teamColorFor } from './accessibility';
+import { bgThemeForSeed, paintBackground } from './art/background';
 import { BIG_MUZZLE, RECOIL_A, RECOIL_B, SPAWN_A, SPAWN_B, TREADS_A, TREADS_B, TREADS_C } from './art/anim';
 import { CHASSIS_V2 } from './art/chassis';
-import { MENU_BACKDROP } from './art/backdrop';
 import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_LAMP_B, DECOR_VENT } from './art/decor';
 import { FLOOR_A, FLOOR_B, FLOOR_C, FLOOR_D, FLOOR_E, FLOOR_F, FLOOR_G } from './art/floor';
 import { BOOM_1, BOOM_2, BOOM_3, BOOM_4, CHARGE_AURA, RING_FX } from './art/fx';
@@ -101,7 +101,6 @@ export function artRegistry(): ArtEntry[] {
         ['ring_fx', RING_FX, 16, 16],
         ['charge_aura', CHARGE_AURA, 16, 16],
         ['logo_bar', LOGO_BAR, 32, 8],
-        ['menu_backdrop', MENU_BACKDROP, 128, 96],
         ['decor_crate', DECOR_CRATE, 16, 16],
         ['decor_barrel', DECOR_BARREL, 16, 16],
         ['decor_lamp', DECOR_LAMP, 16, 16],
@@ -385,13 +384,17 @@ function tileRand(tx: number, ty: number): number {
 
 /** Deterministic floor pattern: mostly plate, with vents, hazards, accents.
  * A/E/F/G are grain/wear variants mixed at bake time: A keeps ~93% share,
- * E/F/G take ~7% as low-frequency wear so the floor does not read as flat. */
-function floorTileAt(tx: number, ty: number): PixelMap {
+ * E/F/G take ~7% as low-frequency wear so the floor does not read as flat.
+ * Feature tiles (B/C/D) are position-patterned landmarks and never move;
+ * only the grain mix is seed-shifted, so each match seed wears the floor
+ * differently while replays of one seed stay pixel-identical. */
+function floorTileAt(tx: number, ty: number, seed = 0): PixelMap {
     if (tx % 9 === 4 && ty % 7 === 3) return FLOOR_B;
     const edge = tx < 2 || tx > 57 || ty < 2 || ty > 37;
     if (edge && (tx + ty) % 5 === 0) return FLOOR_C;
     if ((tx * 7 + ty * 13) % 29 === 0) return FLOOR_D;
-    const r = tileRand(tx, ty);
+    const s = seed | 0;
+    const r = tileRand(tx ^ s, ty ^ Math.imul(s, 0x9e3779b9));
     if (r < 0.93) return FLOOR_A;
     if (r < 0.955) return FLOOR_E;
     if (r < 0.98) return FLOOR_F;
@@ -408,7 +411,7 @@ function hexToRgb(hex: string): [number, number, number] {
  * RGB LUT, then rows memcpy into place (~10-50x faster than per-pixel
  * fillRect; 614k fillStyle swaps was the boot bottleneck).
  */
-function bakeArenaFloor(scene: Scene): void {
+function bakeArenaFloor(scene: Scene, seed = 0): void {
     if (scene.textures.exists('floor_big')) {
         bakedKeys.add('floor_big');
         return;
@@ -416,6 +419,31 @@ function bakeArenaFloor(scene: Scene): void {
     const texture = scene.textures.createCanvas('floor_big', 960, 640);
     if (!texture) return;
     bakedKeys.add('floor_big');
+    paintFloor(texture.getContext(), seed);
+    texture.refresh();
+}
+
+/**
+ * Repaint the shared 960x640 arena floor for a match seed (render-only).
+ * The texture is created once per game and repainted in place per battle,
+ * so per-seed variety never grows the texture count. Every layer is a pure
+ * function of the seed: same seed repaints pixel-identically (replay-safe).
+ */
+export function repaintArenaFloor(scene: Scene, seed: number): void {
+    if (!scene.textures.exists('floor_big')) {
+        bakeArenaFloor(scene, seed);
+        return;
+    }
+    const texture = scene.textures.get('floor_big') as unknown as {
+        getContext(): CanvasRenderingContext2D;
+        refresh(): void;
+    };
+    paintFloor(texture.getContext(), seed);
+    texture.refresh();
+}
+
+/** Compose tiles + seeded background + landmark overlay into a context. */
+function paintFloor(context: CanvasRenderingContext2D, seed: number): void {
     const lut = new Map<string, [number, number, number]>();
     for (const [ch, hex] of Object.entries(PALETTE)) lut.set(ch, hexToRgb(hex));
     const tileCache = new Map<PixelMap, Uint8ClampedArray>();
@@ -437,19 +465,21 @@ function bakeArenaFloor(scene: Scene): void {
         tileCache.set(tile, rgba);
         return rgba;
     };
-    const context = texture.getContext();
     const image = context.createImageData(960, 640);
     for (let ty = 0; ty < 40; ty += 1) {
         for (let tx = 0; tx < 60; tx += 1) {
-            const tile = expand(floorTileAt(tx, ty));
+            const tile = expand(floorTileAt(tx, ty, seed));
             for (let y = 0; y < 16; y += 1) {
                 image.data.set(tile.subarray(y * 64, y * 64 + 64), ((ty * 16 + y) * 960 + tx * 16) * 4);
             }
         }
     }
     context.putImageData(image, 0, 0);
-    floorOverlay(context, lut);
-    texture.refresh();
+    // Seeded variety pass (tonal shift + panel seams + floor lights +
+    // center-mark variant), then the static gameplay landmarks +
+    // seeded-strength vignette and edge glow on top.
+    paintBackground(context, seed);
+    floorOverlay(context, lut, seed);
 }
 
 /**
@@ -457,9 +487,14 @@ function bakeArenaFloor(scene: Scene): void {
  * emblem (the SD target mark), spawn pads at the verified spawn columns
  * (x = 130 / 830, engine spawnFor; y union for team sizes 1–3), a stronger
  * rim-hazard band, a dot-vs-dash per-half cue (NO color tint), the baked
- * corner decals, a radial vignette, and a 2 px inner border.
+ * corner decals, a seeded-strength radial vignette, and a 2 px inner
+ * border. Landmark geometry is seed-independent (readability first).
  */
-function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [number, number, number]>): void {
+function floorOverlay(
+    context: CanvasRenderingContext2D,
+    lut: Map<string, [number, number, number]>,
+    seed = 0,
+): void {
     // Spawn pads: shape-coded (triangle = team 0, square = team 1), no tint.
     context.lineWidth = 2;
     context.strokeStyle = 'rgba(236,233,226,0.25)';
@@ -527,9 +562,11 @@ function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [numbe
         }
     }
     // Baked radial vignette (static corners; Phase 6 owns the red pulse).
+    // Strength varies per match seed (0.38-0.52); geometry never moves.
+    const vigAlpha = bgThemeForSeed(seed).vignette;
     const grad = context.createRadialGradient(480, 320, 280, 480, 320, 620);
     grad.addColorStop(0, 'rgba(6,8,11,0)');
-    grad.addColorStop(1, 'rgba(6,8,11,0.45)');
+    grad.addColorStop(1, `rgba(6,8,11,${vigAlpha.toFixed(3)})`);
     context.fillStyle = grad;
     context.fillRect(0, 0, 960, 640);
     // Corner decals baked in (16×16 at the legacy sprite footprints).
@@ -537,10 +574,15 @@ function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [numbe
     stampMap(context, lut, DECOR_BARREL, 908, 36);
     stampMap(context, lut, DECOR_VENT, 36, 588);
     stampMap(context, lut, DECOR_LAMP, 908, 588);
-    // 2 px inner border.
+    // 2 px inner border (arena-bounds readability, seed-independent) plus a
+    // thin 1 px edge-glow line just inside it; glow strength varies per
+    // match seed (0.10-0.22), geometry never moves.
     context.strokeStyle = '#36435a';
     context.lineWidth = 2;
     context.strokeRect(1, 1, 958, 638);
+    context.strokeStyle = `rgba(120,180,235,${bgThemeForSeed(seed).edgeGlow.toFixed(3)})`;
+    context.lineWidth = 1;
+    context.strokeRect(3.5, 3.5, 953, 633);
 }
 
 /** Stamp a pixel map into a floor-bake context at 1:1 (alpha 0.55). */

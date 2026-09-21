@@ -10,6 +10,9 @@
 type PixelMap = string[];
 
 // A: plain plate — sparse grain, the quiet default (~majority of tiles).
+// Calm-floor discipline (art/varied-backgrounds): grain speckles stay on the
+// dark neutral ramp (q/d) — no warm dots, so the amber channel belongs only
+// to gameplay (pads, projectiles, HUD).
 export const FLOOR_A: PixelMap = [
     'pppppppppppppppp',
     'ppppppqppppppppp',
@@ -23,7 +26,7 @@ export const FLOOR_A: PixelMap = [
     'pppppqppppqppppp',
     'pppppppppqpppdpp',
     'pppdpppppppppppp',
-    'ppppppppapppqppp',
+    'ppppppppqpppqppp',
     'pppppppqpppppppp',
     'ppqppppppppppppp',
     'pppppppppppppppp',

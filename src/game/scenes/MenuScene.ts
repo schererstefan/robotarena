@@ -1,12 +1,14 @@
 // Main menu: mode select, per-slot robot picker with sprite previews,
 // cosmetic skins, and per-slot skill loadouts (symmetric point budgets).
 
-import { BlendModes, Scene } from 'phaser';
+import { Scene } from 'phaser';
 import { getRobot, ROBOTS } from '../../robots/registry';
 import { modifierCodes, type ArenaId, type MatchModifiers } from '../../sim/constants';
 import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { artRegistry, chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
+import { coverScale } from '../art/background';
+import menuVistaUrl from '../../../docs/art-evidence/menu-backdrop-vista.webp?url';
 import { isMuted, playClick, playConfirm, playError, playHover, startMenuAmbience, stopMusic, toggleMuted, unlockAudio } from '../audio';
 import {
     clearDailyBoard,
@@ -104,6 +106,18 @@ export interface BattleRequest {
 }
 
 const CX = 512;
+
+/**
+ * Cover-fit magnification for the menu vista backdrop: canvas dims over the
+ * live texture-frame dims (uniform scale, aspect preserved). Deriving it
+ * from the loaded frame keeps the hero exactly full-bleed — never cropped
+ * to a corner, never tiled — with no hardcoded magnification.
+ */
+function menuBackdropCover(scene: Scene): number {
+    const frame = scene.textures.get('menu_vista').get();
+    if (frame.width <= 0 || frame.height <= 0) return 1;
+    return coverScale(frame.width, frame.height, 1024, 768);
+}
 /** Persisted separately from the a11y bundle: battle-trail rendering. */
 const TRAILS_KEY = 'robotarena_trails';
 
@@ -190,6 +204,13 @@ export class MenuScene extends Scene {
         this.tourRequested = data?.tour === true;
     }
 
+    preload(): void {
+        // Real vista backdrop: the approved 2304x1008 webp, bundled by Vite
+        // (?url import) so production serves the same bytes as the evidence
+        // file. Render-only asset: no sim, no randomness.
+        this.load.image('menu_vista', menuVistaUrl);
+    }
+
     create(): void {
         ensureArtTextures(this);
         this.teamSize = 1;
@@ -220,11 +241,19 @@ export class MenuScene extends Scene {
         this.nav = new FocusNav(this);
         this.nav.onEscape = () => this.escapeOverlay();
 
-        // Pixel-art menu backdrop, full-bleed behind every control. Each
-        // screen layer carries its own scrim so the art stays visible.
-        this.add.image(CX, 384, 'menu_backdrop').setScale(8).setDepth(-10);
-        // TEMP experiment: lift the dark quantized backdrop with an ADD copy.
-        this.add.image(CX, 384, 'menu_backdrop').setScale(8).setDepth(-9).setBlendMode(BlendModes.ADD).setAlpha(0.35);
+        // Vista menu backdrop: the real approved webp, drawn once full-bleed
+        // cover-fit behind every control. Each screen layer carries its own
+        // light scrim so the text stays legible while the vista shows
+        // through. The magnification is derived from the live texture frame
+        // (cover-fit) instead of a hardcoded value, so the hero stays
+        // exactly full-bleed — never cropped to a corner, never tiled.
+        if (this.textures.exists('menu_vista')) {
+            this.add.image(CX, 384, 'menu_vista').setScale(menuBackdropCover(this)).setDepth(-10);
+        } else {
+            // Loader failed (asset unreachable): flat dark field keeps the
+            // menu usable instead of a missing-texture break.
+            this.add.rectangle(CX, 384, 1024, 768, 0x06080b).setDepth(-10);
+        }
         this.homeLayer = this.add.container(0, 0).setDepth(0);
         this.setupLayer = this.add.container(0, 0).setDepth(0);
 
@@ -263,6 +292,19 @@ export class MenuScene extends Scene {
             stopMusic();
         });
         startMenuAmbience();
+
+        // Headless screenshot entry: ?bgshot=seed jumps straight into a
+        // seeded battle for deterministic capture. No query: boot normally.
+        try {
+            const shotSeed = new URLSearchParams(window.location.search).get('bgshot');
+            if (shotSeed !== null) {
+                markTutorialSeen();
+                this.startBattleWithSeed(Number.parseInt(shotSeed, 10) || 7);
+                return;
+            }
+        } catch {
+            // Non-browser or no query: boot the menu normally.
+        }
 
         // Return from a battle with the loadout tour requested: the tour
         // needs the setup screen, so switch before opening the editor.
@@ -1721,6 +1763,11 @@ export class MenuScene extends Scene {
     }
 
     private startBattle(): void {
+        this.startBattleWithSeed((Math.random() * 0x7fffffff) | 0);
+    }
+
+    // Explicit-seed battle entry (headless screenshots + the menu Start path).
+    private startBattleWithSeed(seed: number): void {
         const mirrored = this.mirroredLineup(this.lineupIds, this.loadouts);
         this.scene.start('Battle', {
             teamSize: this.teamSize,
@@ -1728,7 +1775,7 @@ export class MenuScene extends Scene {
             loadouts: mirrored.loadouts,
             skins: this.skins.map((s) => ({ ...s })),
             trails: this.trails,
-            seed: (Math.random() * 0x7fffffff) | 0,
+            seed,
             arena: this.arena,
             modifiers: { ...this.mods },
         } satisfies BattleRequest);
