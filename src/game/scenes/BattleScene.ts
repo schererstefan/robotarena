@@ -2635,8 +2635,11 @@ export class BattleScene extends Scene {
                 const skin = this.request.skins[i] as SlotSkin;
                 row.setVisible(true);
                 if (s.alive) {
-                    row.setText(plateRow(skin.callsign, Math.max(s.health, 0) / s.maxHealth, s.dashCd, s.empCd, loadoutCode(this.request.loadouts[i] as SkillLoadout)));
-                    row.setColor(teamCss(team));
+                    const frac = Math.max(s.health, 0) / s.maxHealth;
+                    row.setText(plateRow(skin.callsign, frac, s.dashCd, s.empCd, loadoutCode(this.request.loadouts[i] as SkillLoadout)));
+                    // Critical rows tint red (static: reduced-motion safe; the
+                    // hpMini block count carries the same info for colorblind).
+                    row.setColor(frac <= 0.25 ? COLORS.dangerCss : teamCss(team));
                 } else {
                     row.setText(plateDeadRow(skin.callsign));
                     row.setColor(COLORS.faint);

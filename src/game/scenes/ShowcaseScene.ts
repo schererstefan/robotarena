@@ -319,9 +319,12 @@ export class ShowcaseScene extends Scene {
             const token = ++this.boardToken;
             this.trackTab(this.add.text(CX, 400, ONLINE.loading, FONTS.body).setOrigin(0.5));
             void fetchOnlineBoard().then((result) => {
-                if (token !== this.boardToken || this.tab !== 'board') return;
+                // Keep the data even when the tab changed mid-fetch; the
+                // guards below only skip the re-render, so returning to
+                // BOARD shows the board instead of "unavailable".
                 this.board = result.board;
                 this.boardCached = result.cached;
+                if (token !== this.boardToken || this.tab !== 'board') return;
                 this.renderTab();
             });
             return;
