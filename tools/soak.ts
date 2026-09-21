@@ -1175,13 +1175,16 @@ console.log('barriers');
                 return { towerTurn: Math.max(-1, Math.min(1, diff * 3)), fire: Math.abs(diff) < 0.02 };
             },
         };
+        // Hazard-free: this match measures barrier absorption over 1500
+        // ticks, and the stationary foe would otherwise eat mirrored
+        // strikes mid-test (foe health is part of the assertion).
         const bullet = new Match(
             [
                 { team: 0, controller: shooter },
                 { team: 1, controller: dummy('sat') },
             ],
             seed,
-            { arena: 'blocks' },
+            { arena: 'blocks', modifiers: { noHazards: true } },
         );
         for (let t = 0; t < 1500 && !bullet.result.over; t += 1) bullet.step();
         const snaps = bullet.robotSnapshots;
