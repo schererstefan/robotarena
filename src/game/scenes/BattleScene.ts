@@ -251,6 +251,11 @@ export class BattleScene extends Scene {
     private resultsPrimary: (() => void) | null = null;
     private resultsSecondary: (() => void) | null = null;
     private resultsFinish: (() => void) | null = null;
+    /** Results keyboard row selection: highlighted row + its robot id. */
+    private resultsRowSel: number | null = null;
+    private resultsRowIds: number[] = [];
+    private resultsRowTexts: Phaser.GameObjects.Text[] = [];
+    private resultsRowBase: string[] = [];
     private trails: Array<Array<{ x: number; y: number }>> = [];
     private lastTrailTick = -1;
     private stripes: Phaser.GameObjects.Rectangle[] = [];
@@ -323,6 +328,10 @@ export class BattleScene extends Scene {
         this.resultsPrimary = null;
         this.resultsSecondary = null;
         this.resultsFinish = null;
+        this.resultsRowSel = null;
+        this.resultsRowIds = [];
+        this.resultsRowTexts = [];
+        this.resultsRowBase = [];
         this.chassis = [];
         this.towers = [];
         this.hubs = [];
@@ -756,6 +765,9 @@ export class BattleScene extends Scene {
         this.input.keyboard?.on('keydown-ENTER', this.onResultsConfirm);
         this.input.keyboard?.on('keydown-X', this.onResultsExit);
         this.input.keyboard?.on('keydown-ESC', this.onResultsExit);
+        this.input.keyboard?.on('keydown-UP', this.onResultsRowUp);
+        this.input.keyboard?.on('keydown-DOWN', this.onResultsRowDown);
+        this.input.keyboard?.on('keydown-D', this.onResultsRowSave);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-SPACE', this.onSpaceKey);
             this.input.keyboard?.off('keydown', this.onPilotKeyDown);
@@ -767,6 +779,9 @@ export class BattleScene extends Scene {
             this.input.keyboard?.off('keydown-ENTER', this.onResultsConfirm);
             this.input.keyboard?.off('keydown-X', this.onResultsExit);
             this.input.keyboard?.off('keydown-ESC', this.onResultsExit);
+            this.input.keyboard?.off('keydown-UP', this.onResultsRowUp);
+            this.input.keyboard?.off('keydown-DOWN', this.onResultsRowDown);
+            this.input.keyboard?.off('keydown-D', this.onResultsRowSave);
             stopMusic();
             this.clearFilters();
         });
@@ -953,6 +968,36 @@ export class BattleScene extends Scene {
     private onResultsExit = (): void => {
         if (!this.resultsShown || !this.resultsReady) return;
         this.resultsSecondary?.();
+    };
+
+    /** Results keyboard row selection: selected row renders white. */
+    private refreshResultsRowSel(): void {
+        this.resultsRowTexts.forEach((text, k) => {
+            text.setColor(k === this.resultsRowSel ? COLORS.whiteCss : (this.resultsRowBase[k] as string));
+        });
+    }
+
+    /** Results keyboard: Up/Down moves the row selection, D downloads it. */
+    private onResultsRowMove(dir: 1 | -1): void {
+        if (!this.resultsShown || this.resultsRowIds.length === 0) return;
+        const n = this.resultsRowIds.length;
+        const cur = this.resultsRowSel;
+        this.resultsRowSel = cur === null ? (dir === 1 ? 0 : n - 1) : (cur + dir + n) % n;
+        this.refreshResultsRowSel();
+    }
+
+    private onResultsRowUp = (): void => {
+        this.onResultsRowMove(-1);
+    };
+
+    private onResultsRowDown = (): void => {
+        this.onResultsRowMove(1);
+    };
+
+    private onResultsRowSave = (): void => {
+        if (!this.resultsShown || this.resultsRowSel === null) return;
+        const id = this.resultsRowIds[this.resultsRowSel];
+        if (id !== undefined) this.exportRobot(id);
     };
 
     private onPilotKeyDown = (event: KeyboardEvent): void => {
@@ -2878,8 +2923,15 @@ export class BattleScene extends Scene {
             }
             const hit = this.add.rectangle(512, y, 560, step - 4).setDepth(20);
             hit.setInteractive({ useHandCursor: true });
-            hit.on('pointerover', () => text.setColor(COLORS.whiteCss));
-            hit.on('pointerout', () => text.setColor(s.alive ? teamCss(s.team) : COLORS.faint));
+            const base = s.alive ? teamCss(s.team) : COLORS.faint;
+            this.resultsRowIds.push(s.id);
+            this.resultsRowTexts.push(text);
+            this.resultsRowBase.push(base);
+            hit.on('pointerover', () => {
+                this.resultsRowSel = i;
+                this.refreshResultsRowSel();
+            });
+            hit.on('pointerout', () => this.refreshResultsRowSel());
             hit.on('pointerdown', () => this.exportRobot(s.id));
         });
         const hintY = 274 + snaps.length * step;
