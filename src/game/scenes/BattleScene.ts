@@ -2511,7 +2511,7 @@ export class BattleScene extends Scene {
         const circle = sdOn ? this.match.safeCircle : null;
         for (let i = 0; i < snaps.length; i += 1) {
             const s = snaps[i] as RobotSnapshot;
-            if (!s.alive) continue;
+            if (!s.alive || this.resultsShown) continue;
             const cx = AX + s.x;
             const cy = AY + s.y;
             // HP staging: divider ticks every 25 HP across the bar.
