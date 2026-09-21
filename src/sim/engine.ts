@@ -1,7 +1,7 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SPAWN_HEADING_JITTER, SPAWN_SALT, SPAWN_X, SPAWN_X_JITTER, SPAWN_Y_JITTER, SPAWN_Y_SHIFT, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SPAWN_HEADING_JITTER, SPAWN_SALT, SPAWN_X, SPAWN_X_JITTER, SPAWN_Y_JITTER, SPAWN_Y_SHIFT, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, barriersForSeed, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
 import { angleDiff, assistSteer, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
@@ -195,6 +195,8 @@ export class Match {
     private readonly seed: number;
     private readonly arena: ArenaId;
     private readonly mods: MatchModifiers;
+    /** Seed-derived barrier rects for this match (`blocks` only, else empty). */
+    private readonly barriers: ArenaObstacle[];
     /** Recent ally sightings, pruned to the last SENSOR_SHARE_DELAY ticks. */
     private sightings: SharedSighting[] = [];
     /** Radio messages in flight, pruned to the last COMMS_DELAY ticks. */
@@ -210,6 +212,9 @@ export class Match {
         this.seed = seed;
         this.arena = options.arena === 'blocks' ? 'blocks' : 'open';
         this.mods = sanitizeModifiers(options.modifiers);
+        // Seed-derived, mirror-symmetric barriers: same seed => identical
+        // layout, zero replay-codec bits. Dedicated stream, drawn once here.
+        this.barriers = this.arena === 'blocks' ? barriersForSeed(seed >>> 0) : [];
         const spawns = Match.computeSpawns(lineups, seed);
         lineups.forEach((entry, index) => {
             const spawn = spawns[index] as { x: number; y: number; heading: number };
@@ -286,9 +291,9 @@ export class Match {
         return this.arena;
     }
 
-    /** Obstacle rects for this match's arena (renderer + tests). */
+    /** Barrier rects for this match (renderer + tests). Copies: mutate freely. */
     get obstacles(): ArenaObstacle[] {
-        return ARENA_OBSTACLES[this.arena];
+        return this.barriers.map((o) => ({ ...o }));
     }
 
     /** Sanitized exhibition modifiers for this match. */
@@ -555,7 +560,7 @@ export class Match {
         else if (dx < 0) best = Math.min(best, (0 - robot.x) / dx);
         if (dy > 0) best = Math.min(best, (ARENA_HEIGHT - robot.y) / dy);
         else if (dy < 0) best = Math.min(best, (0 - robot.y) / dy);
-        for (const o of ARENA_OBSTACLES[this.arena]) {
+        for (const o of this.barriers) {
             const t = Match.rayBox(robot.x, robot.y, dx, dy, o);
             if (t !== null && t < best) best = t;
         }
@@ -848,7 +853,7 @@ export class Match {
             tracks,
             arena: {
                 id: this.arena,
-                obstacles: ARENA_OBSTACLES[this.arena].map((o) => ({ ...o })),
+                obstacles: this.barriers.map((o) => ({ ...o })),
                 centerX: ARENA_WIDTH / 2,
                 centerY: ARENA_HEIGHT / 2,
             },
@@ -964,7 +969,7 @@ export class Match {
     }
 
     private collideObstacles(): void {
-        const obstacles = ARENA_OBSTACLES[this.arena];
+        const obstacles = this.barriers;
         if (obstacles.length === 0) return;
         for (const robot of this.robots) {
             if (!robot.alive) continue;
@@ -997,7 +1002,7 @@ export class Match {
     }
 
     private hitsObstacle(x: number, y: number): boolean {
-        for (const o of ARENA_OBSTACLES[this.arena]) {
+        for (const o of this.barriers) {
             if (
                 x >= o.x - BULLET_RADIUS &&
                 x <= o.x + o.w + BULLET_RADIUS &&
@@ -1095,7 +1100,8 @@ export class Match {
      * (seed ^ SPAWN_SALT), team 1 mirrors through the arena center. Draw
      * order is fixed (column shift, then dx/jy/dh per team-0 slot), and the
      * brain RNG streams are untouched. Guarantees for team sizes 1-3: x in
-     * [90,170] (116px clear of blocks), y in [50,590] (clamp never fires),
+     * [90,170] (60px+ clear of the midfield barrier band), y in [50,590]
+     * (clamp never fires),
      * teammate gap >= 70px (spread 150 minus 2x40 jitter), headings within
      * 0.3 rad of horizontal (never into a wall). Asymmetric lineups (never
      * in eval/soak) fall back to independent seeded draws for team 1.

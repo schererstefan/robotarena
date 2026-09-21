@@ -664,7 +664,7 @@ function bakeShadowBlob(scene: Scene): void {
     texture.refresh();
 }
 
-/** Per-block one-time bake key (all blocks layout rects are 90×90). */
+/** Per-block one-time bake key (one texture per barrier dims). */
 export function blockKey(w: number, h: number): string {
     return `block_${w}x${h}`;
 }
