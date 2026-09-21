@@ -389,7 +389,7 @@ export class MenuScene extends Scene {
         for (const t of texts) {
             const cx = x + t.w / 2;
             t.text.setPosition(cx, y);
-            const hit = this.add.rectangle(cx, y, t.w, 30, 0xffffff, 0).setInteractive({ useHandCursor: true });
+            const hit = this.add.rectangle(cx, y, t.w, 40, 0xffffff, 0).setInteractive({ useHandCursor: true });
             this.homeLayer.add(hit);
             owned.push(hit);
             hit.on('pointerover', () => {
@@ -491,7 +491,7 @@ export class MenuScene extends Scene {
         // Heavier scrim: dense controls need the legibility.
         L.add(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.45));
 
-        this.setupButton(84, 40, 110, 34, MENU.back, () => this.showScreen('home'), 0, 0, { tier: 'ghost' });
+        this.setupButton(84, 40, 110, 34, MENU.back, () => this.showScreen('home'), 0, 40, { tier: 'ghost' });
         L.add(this.add.text(CX, 40, MENU.battleSetup, FONTS.heading).setOrigin(0.5));
 
         // Mode controls.
@@ -896,7 +896,7 @@ export class MenuScene extends Scene {
             this.trackEditor(this.add.text(640, y + 4, COMMON.minus, FONTS.button).setOrigin(0.5).setDepth(50));
             minus.setInteractive({ useHandCursor: true });
             minus.on('pointerdown', () => this.bumpSkill(def.id, -1));
-            this.trackEditor(addTouchHit(this, 640, y + 4, 52, 36, () => this.bumpSkill(def.id, -1), 50));
+            this.trackEditor(addTouchHit(this, 640, y + 4, 52, 40, () => this.bumpSkill(def.id, -1), 50));
             targets.push({ x: 640, y: y + 4, w: 36, h: 30, activate: () => this.bumpSkill(def.id, -1) });
             const rankLabel = this.trackEditor(this.add.text(684, y + 4, rankText(rank, def.maxRank), FONTS.mono).setOrigin(0.5).setDepth(50));
             rankLabel.setColor(rank > 0 ? '#7de08a' : COLORS.dim);
@@ -904,7 +904,7 @@ export class MenuScene extends Scene {
             this.trackEditor(this.add.text(740, y + 4, COMMON.plus, FONTS.button).setOrigin(0.5).setDepth(50));
             plus.setInteractive({ useHandCursor: true });
             plus.on('pointerdown', () => this.bumpSkill(def.id, 1));
-            this.trackEditor(addTouchHit(this, 740, y + 4, 52, 36, () => this.bumpSkill(def.id, 1), 50));
+            this.trackEditor(addTouchHit(this, 740, y + 4, 52, 40, () => this.bumpSkill(def.id, 1), 50));
             targets.push({ x: 740, y: y + 4, w: 36, h: 30, activate: () => this.bumpSkill(def.id, 1) });
         });
 
