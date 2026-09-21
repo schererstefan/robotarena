@@ -186,7 +186,7 @@ function dist2(ax: number, ay: number, bx: number, by: number): number {
 }
 
 /**
- * Pick a powerup pad index (fixed pad order) or -1. Nearest ACTIVE pad of
+ * Pick a powerup pad index (canonical pad order) or -1. Nearest ACTIVE pad of
  * the wanted kind: repair when hurt, else amp/overdrive (repair top-up
  * when wounded and nothing better burns). Dark (respawning) pads are
  * never picked. Holds the current pick while it stays active and no

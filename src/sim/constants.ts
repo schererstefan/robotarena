@@ -262,8 +262,9 @@ export const EMP_RADIUS = 220;
 export const EMP_SLOW_TICKS = TICK_HZ * 3;
 export const EMP_SLOW_MULT = 0.45;
 
-// Powerup pads (P1): static map feature, always on. Positions are fixed
-// arena fractions (mirror-symmetric); kinds cycle with a seed offset.
+// Powerup pads (P1): static map feature, always on. Positions are
+// seed-randomized per match (mirror-symmetric); kinds cycle with a seed
+// offset.
 export const PAD_RADIUS = 26;
 export const PAD_RESPAWN_TICKS = 900; // 15 s dark after a pickup
 export const AMP_TICKS = 360; // 6 s of double bullet damage
@@ -271,6 +272,130 @@ export const OVERDRIVE_TICKS = 360; // 6 s of boosted move speed
 export const REPAIR_HP = 60;
 export const AMP_MULT = 2;
 export const OVERDRIVE_MULT = 1.35;
+
+/**
+ * Randomized pad placement (tuning/random-pads): each match seed deals its
+ * own 4-pad layout (2 drawn spots + their center mirrors), so pads are
+ * contested instead of memorized. Same seed => identical layout, zero
+ * replay-codec bits (dedicated `seed ^ PAD_SALT` stream, brain RNG
+ * untouched) — the barrier/spawn precedent.
+ *
+ * Fairness rules (checked at generation, asserted in the soak):
+ * - point-mirrored through the arena center (480, 320): each drawn spot's
+ *   mirror shares its kind, so 1v1 matchups stay fair by construction;
+ * - drawn from the central contest band (x 304..656, y 112..528, 8px
+ *   lattice): >= PAD_MIN_SPAWN_DIST from every possible spawn point
+ *   (spawn columns x 90..170 / 790..870 hold for every lineup size, so the
+ *   band's x edge alone guarantees it), and never in a corner or edge
+ *   dead strip — pads sit where fights already happen, near the turret
+ *   column, instead of beside a spawn;
+ * - every pair of the 4 final pads keeps a PAD_MIN_GAP center gap: no
+ *   stacking, and near-center draws fail fast because each spot is checked
+ *   against its own mirror; spots are placed sequentially (draw, mirror,
+ *   gap-check against placed) so crowded `blocks` layouts still fit;
+ * - pad circles stay clear of obstacles (PAD_OBSTACLE_CLEAR) and off the
+ *   turret structures (PAD_MIN_TURRET_DIST), so every pad is reachable;
+ * - kinds keep the fixed-layout scheme (mirror pairs share a kind, cycling
+ *   amp/repair/overdrive with a seed offset): 2+2 split, same per-kind
+ *   counts as the old fixed layout.
+ */
+/** Dedicated-stream salt for pad placement (distinct from SPAWN/BARRIER/HAZ salts). */
+export const PAD_SALT = 0x9ad9ad;
+/** Pads per match: 2 drawn spots + 2 center mirrors. */
+export const PAD_COUNT = 4;
+/** Minimum center-to-center distance between any two pads. */
+export const PAD_MIN_GAP = 150;
+/** Minimum distance from any pad to any possible spawn point (guaranteed by the contest band). */
+export const PAD_MIN_SPAWN_DIST = 130;
+/** Pad-center clearance from obstacle rects (edge to pad center). */
+export const PAD_OBSTACLE_CLEAR = PAD_RADIUS + 10;
+/** Minimum pad-center distance from either turret structure. */
+export const PAD_MIN_TURRET_DIST = 60;
+/** Contest band for drawn pad spots (8px lattice, mirror-closed: 960-304=656, 640-112=528). */
+export const PAD_BAND = { x0: 304, x1: 656, y0: 112, y1: 528 };
+
+/** One drawn pad spot: lattice position plus its mirror-pair id (the engine maps pairs to kinds). */
+export interface PadSpot {
+    x: number;
+    y: number;
+    pair: 0 | 1;
+}
+
+function mirrorPadSpot(x: number, y: number): { x: number; y: number } {
+    return { x: ARENA_WIDTH - x, y: ARENA_HEIGHT - y };
+}
+
+/** Point-to-rect distance (same clamp rule as the engine's collideObstacles). */
+function padRectDist(x: number, y: number, o: ArenaObstacle): number {
+    const cx = Math.max(o.x, Math.min(x, o.x + o.w));
+    const cy = Math.max(o.y, Math.min(y, o.y + o.h));
+    return Math.hypot(x - cx, y - cy);
+}
+
+/** Static per-spot checks: clear of turret structures and obstacles. */
+function padSpotStaticOk(x: number, y: number, obstacles: ArenaObstacle[]): boolean {
+    if (Math.hypot(x - ARENA_WIDTH / 2, y - ARENA_HEIGHT * 0.3) < PAD_MIN_TURRET_DIST) return false;
+    if (Math.hypot(x - ARENA_WIDTH / 2, y - ARENA_HEIGHT * 0.7) < PAD_MIN_TURRET_DIST) return false;
+    for (const o of obstacles) {
+        if (padRectDist(x, y, o) < PAD_OBSTACLE_CLEAR) return false;
+    }
+    return true;
+}
+
+/**
+ * Deterministic pad spots for a match seed: 2 drawn lattice cells in the
+ * contest band plus their center mirrors, sorted by (x, y) for canonical
+ * order. Takes the live obstacle list (`blocks` barriers, empty on `open`)
+ * so pads never land inside terrain. Falls back to the legacy fixed
+ * fractions when rejection sampling exhausts (still symmetric, same kind
+ * scheme) — never random, never empty.
+ */
+export function padSpotsForSeed(seed: number, obstacles: ArenaObstacle[] = []): PadSpot[] {
+    const rng = createRng((seed ^ PAD_SALT) >>> 0);
+    const nx = (PAD_BAND.x1 - PAD_BAND.x0) / 8 + 1;
+    const ny = (PAD_BAND.y1 - PAD_BAND.y0) / 8 + 1;
+    const draw = (): { x: number; y: number } => ({
+        x: PAD_BAND.x0 + Math.floor(rng() * nx) * 8,
+        y: PAD_BAND.y0 + Math.floor(rng() * ny) * 8,
+    });
+    // Sequential placement: each drawn spot plus its mirror must clear the
+    // static checks and keep PAD_MIN_GAP from every already-placed spot
+    // (including each spot against its own mirror, so center-hugging draws
+    // fail fast and never poison the stream). Sequential retries beat joint
+    // pair sampling on crowded `blocks` layouts, where two simultaneous
+    // fits are rare but one-at-a-time fits are plentiful.
+    const placed: PadSpot[] = [];
+    for (let attempt = 0; attempt < 1000 && placed.length < PAD_COUNT; attempt += 1) {
+        const c = draw();
+        const m = mirrorPadSpot(c.x, c.y);
+        if (Math.hypot(c.x - m.x, c.y - m.y) < PAD_MIN_GAP) continue;
+        if (!padSpotStaticOk(c.x, c.y, obstacles) || !padSpotStaticOk(m.x, m.y, obstacles)) continue;
+        const pair = (placed.length === 0 ? 0 : 1) as 0 | 1;
+        let clash = false;
+        for (const s of placed) {
+            if (Math.hypot(c.x - s.x, c.y - s.y) < PAD_MIN_GAP) clash = true;
+            if (Math.hypot(m.x - s.x, m.y - s.y) < PAD_MIN_GAP) clash = true;
+        }
+        if (clash) continue;
+        placed.push({ ...c, pair }, { ...m, pair });
+    }
+    if (placed.length === PAD_COUNT) {
+        return placed.sort((p, q) => p.x - q.x || p.y - q.y);
+    }
+    // Rejection exhausted (near-impossible on this band): the legacy fixed
+    // fractions are symmetric and carry the same pair scheme — never random,
+    // never empty. Tests sweep hundreds of seeds to prove this path is cold.
+    const fx = [0.22, 0.78, 0.22, 0.78];
+    const fy = [0.3, 0.3, 0.7, 0.7];
+    const pairOf: Array<0 | 1> = [0, 1, 1, 0];
+    return fx
+        .map((x, i) => ({
+            x: (x as number) * ARENA_WIDTH,
+            y: (fy[i] as number) * ARENA_HEIGHT,
+            pair: pairOf[i] as 0 | 1,
+        }))
+        .sort((p, q) => p.x - q.x || p.y - q.y);
+}
 
 // Map turrets (T1): static structures on the arena center column, always on.
 // Two turrets at fixed arena fractions (0.50 x by 0.30/0.70 y), starting
@@ -280,8 +405,8 @@ export const OVERDRIVE_MULT = 1.35;
 // starts decay of uncaptured progress back toward neutral. Owned turrets
 // never decay: recapture is the counterplay. Captured turrets fire at the
 // nearest enemy in TURRET_RANGE every TURRET_FIRE_INTERVAL ticks.
-export const TURRET_CAPTURE_RADIUS = 80;
-export const TURRET_CAPTURE_TICKS = 180;
+export const TURRET_CAPTURE_RADIUS = 100;
+export const TURRET_CAPTURE_TICKS = 90;
 export const TURRET_DECAY_TICKS = 300;
 export const TURRET_RANGE = 260;
 export const TURRET_FIRE_INTERVAL = 45;
