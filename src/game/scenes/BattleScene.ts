@@ -2516,14 +2516,19 @@ export class BattleScene extends Scene {
         if (tagObj && !R) tagObj.setAlpha(0);
 
         const snaps = this.match.robotSnapshots;
+        // Results rows are two 16px lines (stat row + faint loadout code).
+        // Step/code offset adapt to the row count so small lineups breathe
+        // while 3v3 keeps today's compact spacing above the buttons.
+        const step = snaps.length <= 2 ? 44 : snaps.length <= 4 ? 36 : 30;
+        const codeDy = snaps.length <= 2 ? 20 : snaps.length <= 4 ? 18 : 13;
         const rowObjs: Phaser.GameObjects.Text[] = [];
         const skullObjs: Phaser.GameObjects.Image[] = [];
         snaps.forEach((s, i) => {
-            const y = 274 + i * 30;
+            const y = 274 + i * step;
             const skin = this.request.skins[i] as SlotSkin;
             const row = resultRow(s.alive, skin.callsign, s.name, s.kills, Math.round(s.damageDealt), s.shotsFired);
             const x0 = R ? 232 : 220;
-            const code = this.add.text(x0, y + 13, s.code, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
+            const code = this.add.text(x0, y + codeDy, s.code, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
             code.setColor(COLORS.faint);
             const text = this.add.text(x0, y, row, FONTS.monoSmall).setOrigin(0, 0.5).setDepth(20);
             text.setColor(s.alive ? teamCss(s.team) : COLORS.faint);
@@ -2538,24 +2543,27 @@ export class BattleScene extends Scene {
                 if (!R) skull.setAlpha(0);
                 skullObjs.push(skull);
             }
-            const hit = this.add.rectangle(512, y, 560, 26).setDepth(20);
+            const hit = this.add.rectangle(512, y, 560, step - 4).setDepth(20);
             hit.setInteractive({ useHandCursor: true });
             hit.on('pointerdown', () => this.exportRobot(s.id));
         });
-        const hintY = 274 + snaps.length * 30;
+        const hintY = 274 + snaps.length * step;
+        // Tail pad separates the last code subline from the MVP line; large
+        // lineups skip it so the replay block stays clear of the buttons.
+        const tailPad = snaps.length <= 4 ? 10 : 0;
         // MVP line: most kills, damageDealt tiebreak — trophy icon + text.
         const mvpIdx = this.computeMvp(snaps);
         const mvpSnap = snaps[mvpIdx] as RobotSnapshot;
         const mvpSkin = this.request.skins[mvpIdx] as SlotSkin;
         const mvpObj = this.add
-            .text(512, hintY, mvpLine(mvpSkin.callsign, mvpSnap.kills, mvpSnap.damageDealt), {
+            .text(512, hintY + tailPad, mvpLine(mvpSkin.callsign, mvpSnap.kills, mvpSnap.damageDealt), {
                 ...FONTS.monoSmall,
                 color: COLORS.goldCss,
             })
             .setOrigin(0.5)
             .setDepth(20);
-        const trophy = this.add.image(512 - mvpObj.width / 2 - 14, hintY, uiIconKey('trophy')).setDepth(20);
-        const hintObj = this.add.text(512, hintY + 20, BATTLE.exportHint, FONTS.small).setOrigin(0.5).setDepth(20);
+        const trophy = this.add.image(512 - mvpObj.width / 2 - 14, hintY + tailPad, uiIconKey('trophy')).setDepth(20);
+        const hintObj = this.add.text(512, hintY + tailPad + 24, BATTLE.exportHint, FONTS.small).setOrigin(0.5).setDepth(20);
         if (!R) {
             mvpObj.setAlpha(0);
             trophy.setAlpha(0);
@@ -2574,13 +2582,13 @@ export class BattleScene extends Scene {
         if (this.customMatch) {
             // The code can't restore imported robots, so don't show one.
             const unavail = this.add
-                .text(512, hintY + 44, BATTLE.replayUnavailable, { ...FONTS.monoSmall, color: COLORS.goldCss })
+                .text(512, hintY + tailPad + 50, BATTLE.replayUnavailable, { ...FONTS.monoSmall, color: COLORS.goldCss })
                 .setOrigin(0.5)
                 .setDepth(20);
             if (!R) unavail.setAlpha(0);
             replayObjs = [unavail];
         } else {
-            replayObjs = this.showReplayCode(code, hintY + 18, !R);
+            replayObjs = this.showReplayCode(code, hintY + tailPad + 24, !R);
         }
 
         const showcase = this.request.showcase;

@@ -116,12 +116,12 @@ export class TournamentScene extends Scene {
     }
 
     private buildSetup(): void {
-        this.trackSetup(this.add.text(CX, 44, TOURNAMENT.title, FONTS.title).setOrigin(0.5));
+        this.trackSetup(this.add.text(CX, 84, TOURNAMENT.title, FONTS.title).setOrigin(0.5));
         this.trackSetup(
-            this.add.text(CX, 86, TOURNAMENT.subtitle, FONTS.small).setOrigin(0.5),
+            this.add.text(CX, 124, TOURNAMENT.subtitle, FONTS.small).setOrigin(0.5),
         );
         ([4, 8] as const).forEach((size, i) => {
-            const btn = this.trackSetupButton(CX - 110 + i * 220, 136, () => this.setSize(size));
+            const btn = this.trackSetupButton(CX - 110 + i * 220, 172, () => this.setSize(size));
             this.sizeButtons.push(btn);
         });
         this.refreshSizeLabels();
@@ -175,7 +175,7 @@ export class TournamentScene extends Scene {
     private rebuildEntrants(): void {
         for (const obj of this.entrantObjects) obj.destroy();
         this.entrantObjects = [];
-        const startY = this.size === 4 ? 250 : 196;
+        const startY = this.size === 4 ? 266 : 220;
         const step = this.size === 4 ? 64 : 56;
         this.entrants.forEach((id, i) => {
             const y = startY + i * step;
