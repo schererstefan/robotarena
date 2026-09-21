@@ -465,6 +465,11 @@ export function dailyResultsLine(): string {
     return `${BATTLE.tagDaily} - BEST SAVED TO DAILY BOARD`;
 }
 
+/** Results caption for pilot battles (human-driven, never recorded). */
+export function pilotResultsLine(): string {
+    return `${BATTLE.tagPilot} - NOT RECORDED`;
+}
+
 /** Reel auto-advance countdown ("NEXT IN 3..."). */
 export function reelCountdown(secondsLeft: number): string {
     return `NEXT IN ${secondsLeft}...`;

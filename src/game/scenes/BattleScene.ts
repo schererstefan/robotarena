@@ -52,6 +52,7 @@ import {
     hudTeamPips,
     killCreditBanner,
     mvpLine,
+    pilotResultsLine,
     plateDeadRow,
     plateRow,
     plateTotal,
@@ -2935,6 +2936,14 @@ export class BattleScene extends Scene {
         } else if (this.request.daily !== undefined) {
             tagObj = this.add
                 .text(512, 250, dailyResultsLine(), {
+                    ...FONTS.monoSmall,
+                    color: COLORS.goldCss,
+                })
+                .setOrigin(0.5)
+                .setDepth(20);
+        } else if (this.request.pilot === true) {
+            tagObj = this.add
+                .text(512, 250, pilotResultsLine(), {
                     ...FONTS.monoSmall,
                     color: COLORS.goldCss,
                 })
