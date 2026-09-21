@@ -19,7 +19,7 @@
 
 import { Scene } from 'phaser';
 import { isColorblind, teamColorFor } from './accessibility';
-import { BIG_MUZZLE, RECOIL_A, RECOIL_B, SPAWN_A, SPAWN_B, TREADS_A, TREADS_B } from './art/anim';
+import { BIG_MUZZLE, RECOIL_A, RECOIL_B, SPAWN_A, SPAWN_B, TREADS_A, TREADS_B, TREADS_C } from './art/anim';
 import { CHASSIS_V2 } from './art/chassis';
 import { MENU_BACKDROP } from './art/backdrop';
 import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_LAMP_B, DECOR_VENT } from './art/decor';
@@ -113,6 +113,7 @@ export function artRegistry(): ArtEntry[] {
         ['recoil_b', RECOIL_B, 16, 16],
         ['treads_a', TREADS_A, 16, 4],
         ['treads_b', TREADS_B, 16, 4],
+        ['treads_c', TREADS_C, 16, 4],
     ];
     for (const [key, map, w, h] of fixed) entries.push({ key, map, w, h });
     return entries;
@@ -365,6 +366,7 @@ function bakeDir8Variants(scene: Scene): void {
     bakeDir8(scene, 'tower_twin', TOWER_TWIN, EMPTY_RECOLOR);
     bakeDir8(scene, 'treads_a', TREADS_A, EMPTY_RECOLOR);
     bakeDir8(scene, 'treads_b', TREADS_B, EMPTY_RECOLOR);
+    bakeDir8(scene, 'treads_c', TREADS_C, EMPTY_RECOLOR);
     for (const [id, map] of Object.entries(WRECKS)) bakeDir8(scene, `wreck_${id}`, map, EMPTY_RECOLOR);
     bakeDir8(scene, 'muzzle', MUZZLE_V2, EMPTY_RECOLOR);
     bakeDir8(scene, 'muzzle_big', BIG_MUZZLE, EMPTY_RECOLOR);
@@ -765,9 +767,10 @@ export function towerDirKey(robotId: string, dir: number): string {
     return `${towerKey(robotId)}_d${dir}`;
 }
 
-/** Nearest-direction tread key (roll frame A/B × 8 headings). */
-export function treadsDirKey(flipped: boolean, dir: number): string {
-    return `treads_${flipped ? 'b' : 'a'}_d${dir}`;
+/** Nearest-direction tread key (roll frame A/B/C × 8 headings). */
+export function treadsDirKey(frame: boolean | number, dir: number): string {
+    const letter = typeof frame === 'number' ? (frame === 2 ? 'c' : frame === 1 ? 'b' : 'a') : frame ? 'b' : 'a';
+    return `treads_${letter}_d${dir}`;
 }
 
 /** Nearest-direction wreck key. */

@@ -9,9 +9,9 @@
 // top-left light (`l` up, `m` down in shadow `d` grooves); one bright `w`
 // drive tooth per row jumps 1px per frame (row 1: x4 -> x5 -> x6, row 2:
 // x10 -> x11 -> x12) so direction reads even at 1x. Colors per map: k d l m w.
-// HOOK (engine track): register `treads_c` in artRegistry (art.ts) and replace
-// the A/B flip boolean in BattleScene with a 3-cycle index (A -> B -> C) on
-// the existing TREAD_SWAP_PX accumulator. Reduced-motion keeps frame A static.
+// TREADS_C is registered + dir8-baked (art.ts) and consumed by the
+// BattleScene A -> B -> C cycle on TREAD_SWAP_PX.
+// Reduced-motion keeps frame A static.
 //
 // Death sequence (16x16, DEATH_1/2/3): flash -> collapse -> ember fade, played
 // at the death position/heading, then the wreck swaps in. Suggested uneven

@@ -210,7 +210,8 @@ export class BattleScene extends Scene {
     private treadAcc: number[] = [];
     private treadLastX: number[] = [];
     private treadLastY: number[] = [];
-    private treadFlip: boolean[] = [];
+    /** Tread roll frame 0/1/2 (A/B/C cycle on distance; A static under reduced motion). */
+    private treadFlip: number[] = [];
     private hurtT: number[] = [];
     private punchT: number[] = [];
     private punchOn: boolean[] = [];
@@ -536,7 +537,7 @@ export class BattleScene extends Scene {
             this.treadAcc.push(0);
             this.treadLastX.push(-9999);
             this.treadLastY.push(-9999);
-            this.treadFlip.push(false);
+            this.treadFlip.push(0);
             const tower = this.add.image(0, 0, towerDirKey(robotId, dir8ForHeading(snap.tower))).setScale(2).setDepth(5);
             tower.setTint(skin.paint);
             const hub = this.add.image(0, 0, 'hub').setScale(2).setDepth(6);
@@ -612,11 +613,14 @@ export class BattleScene extends Scene {
             this.introDur = Math.min(1.2, 0.55 + n * 0.12);
             this.introElapsed = 0;
             this.introActive = true;
+            // Depth 12: above the bottom-strip panels/plate art (10/11)
+            // drawn later at the same y, so the hint stays visible.
             this.introSkipHint = this.add
                 .text(AX + ARENA_WIDTH / 2, 712, BATTLE.introSkip, FONTS.monoSmall)
                 .setOrigin(0.5)
-                .setDepth(10)
+                .setDepth(12)
                 .setAlpha(0.8);
+            this.introSkipHint.setStroke('#0b0e12', 3);
         }
 
         // Bullet + particle + explosion-flash pools (no mid-fight allocation).
@@ -2004,10 +2008,10 @@ export class BattleScene extends Scene {
                 this.treadAcc[i] = (this.treadAcc[i] as number) + stepLen;
                 if ((this.treadAcc[i] as number) >= TREAD_SWAP_PX) {
                     this.treadAcc[i] = 0;
-                    this.treadFlip[i] = !(this.treadFlip[i] as boolean);
+                    this.treadFlip[i] = ((this.treadFlip[i] as number) + 1) % 3;
                 }
             }
-            const wantTread = treadsDirKey(this.treadFlip[i] as boolean, dir8ForHeading(s.heading));
+            const wantTread = treadsDirKey(this.treadFlip[i] as number, dir8ForHeading(s.heading));
             if (tread.texture.key !== wantTread) tread.setTexture(wantTread);
             // Bake-time damage stages (<50% stage 1, <25% stage 2) +
             // nearest-direction frame (texture swap, no tint, never rotated).
