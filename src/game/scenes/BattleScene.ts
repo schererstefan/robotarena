@@ -11,7 +11,7 @@ import { loadoutCode, type SkillLoadout } from '../../sim/skills';
 import { decodeReplay, encodeReplay } from '../../sim/replay';
 import { getRobot } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
-import { SD_RING_R, auraDirKey, bakedTextureCount, blockKey, chassisTeamKey, dir8ForHeading, ensureArtTextures, ensureBlockTexture, muzzleDirKey, towerDirKey, towerKey, treadsDirKey, uiIconKey, wreckDirKey } from '../art';
+import { SD_RING_R, auraDirKey, bakedTextureCount, blockKey, chassisTeamKey, dir8ForHeading, ensureArtTextures, ensureBlockTexture, muzzleDirKey, repaintArenaFloor, towerDirKey, towerKey, treadsDirKey, uiIconKey, wreckDirKey } from '../art';
 import {
     playBattleStart,
     playClick,
@@ -153,6 +153,8 @@ export class BattleScene extends Scene {
     private bullets: Phaser.GameObjects.Image[] = [];
     private muzzles: Phaser.GameObjects.Image[] = [];
     private particles: Particle[] = [];
+    /** Headless screenshot freeze (?bgshot): stops update() stepping past the capture tick. */
+    private bgshotFreeze = false;
     private recoil: number[] = [];
     private muzzleLife: number[] = [];
     private muzzleBig: boolean[] = [];
@@ -452,6 +454,7 @@ export class BattleScene extends Scene {
         this.fpsEma = 60;
         this.quality = 0;
         this.qualityTimer = 0;
+        this.bgshotFreeze = false;
         this.goodStreak = 0;
         this.indicators = [];
         this.pilot = null;
@@ -491,6 +494,11 @@ export class BattleScene extends Scene {
         // Static layers: composed floor (overlay, decals, vignette baked in),
         // wall strips + corners + gates. Verticals use the transposed tile
         // so stripes run down the wall instead of across it.
+        // Seeded repaint (render-only): the shared floor texture is recomposed
+        // for this match seed — tonal shift, panel seams, floor lights,
+        // center-mark variant, grain, vignette and edge glow vary per seed;
+        // landmarks stay fixed, replays repaint identically.
+        repaintArenaFloor(this, this.request.seed);
         this.add.image(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT / 2, 'floor_big').setDepth(0);
         const wall = (x: number, y: number, w: number, h: number, key: string) => {
             this.add.tileSprite(x, y, w, h, key).setDepth(1);
@@ -808,6 +816,28 @@ export class BattleScene extends Scene {
 
         if (this.request.tutorial === true) this.buildTutorial();
 
+        // Headless mid-combat screenshots (?bgshot=seed in the page URL).
+        // Virtual-time rAF yields ~zero deltas, so the sim never advances via
+        // update(): pre-step to a fixed tick here for a deterministic frame.
+        try {
+            if (new URLSearchParams(window.location.search).get('bgshot') !== null) {
+                this.finishIntro();
+                // Tick 120: robots have left spawn and projectors are out,
+                // but no kill banners/flashes/damage numbers are live yet.
+                let guard = 0;
+                while (!this.match.result.over && this.match.result.tick < 120 && guard < 160) {
+                    this.match.step();
+                    guard += 1;
+                }
+                // Freeze update() stepping: virtual-time rAF occasionally
+                // yields nonzero deltas that would drift the tick past 120
+                // and break run-to-run screenshot equality.
+                this.bgshotFreeze = true;
+            }
+        } catch {
+            // Non-browser: boot the battle normally.
+        }
+
         this.syncSprites(this.match.robotSnapshots, this.match.bulletSnapshots, 0);
         this.drawDynamic(this.match.robotSnapshots);
         this.syncFilters();
@@ -909,7 +939,7 @@ export class BattleScene extends Scene {
         }
         if (this.slowmoT > 0 && !this.paused) this.slowmoT -= dt;
         let stepped = false;
-        if (!this.paused && !this.match.result.over && !this.introActive) {
+        if (!this.paused && !this.bgshotFreeze && !this.match.result.over && !this.introActive) {
             // Hitstop: freeze acc (replay-safe: tick content unchanged, only
             // pacing) for a beat on kills/charged hits. Skipped in reduced
             // motion — the banner + wreck carry the event instead.

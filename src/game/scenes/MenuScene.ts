@@ -1,12 +1,13 @@
 // Main menu: mode select, per-slot robot picker with sprite previews,
 // cosmetic skins, and per-slot skill loadouts (symmetric point budgets).
 
-import { BlendModes, Scene } from 'phaser';
+import { Scene } from 'phaser';
 import { getRobot, ROBOTS } from '../../robots/registry';
 import { modifierCodes, type ArenaId, type MatchModifiers } from '../../sim/constants';
 import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { artRegistry, chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
+import { coverScale } from '../art/background';
 import { isMuted, playClick, playConfirm, playError, playHover, startMenuAmbience, stopMusic, toggleMuted, unlockAudio } from '../audio';
 import {
     clearDailyBoard,
@@ -104,6 +105,18 @@ export interface BattleRequest {
 }
 
 const CX = 512;
+
+/**
+ * Cover-fit magnification for the menu hero backdrop: canvas dims over the
+ * live texture-frame dims (uniform scale, aspect preserved). For the 384x288
+ * bake this is 8/3; deriving it keeps the hero full-bleed if the bake dims
+ * ever change instead of silently zooming into a corner.
+ */
+function menuBackdropCover(scene: Scene): number {
+    const frame = scene.textures.get('menu_backdrop').get();
+    if (frame.width <= 0 || frame.height <= 0) return 8;
+    return coverScale(frame.width, frame.height, 1024, 768);
+}
 /** Persisted separately from the a11y bundle: battle-trail rendering. */
 const TRAILS_KEY = 'robotarena_trails';
 
@@ -222,9 +235,13 @@ export class MenuScene extends Scene {
 
         // Pixel-art menu backdrop, full-bleed behind every control. Each
         // screen layer carries its own scrim so the art stays visible.
-        this.add.image(CX, 384, 'menu_backdrop').setScale(8).setDepth(-10);
-        // TEMP experiment: lift the dark quantized backdrop with an ADD copy.
-        this.add.image(CX, 384, 'menu_backdrop').setScale(8).setDepth(-9).setBlendMode(BlendModes.ADD).setAlpha(0.35);
+        // Backdrop scaling (art/varied-backgrounds): the magnification is
+        // derived from the live texture frame (cover-fit) instead of a
+        // hardcoded 8x, so the hero stays exactly full-bleed — never cropped
+        // to a corner, never tiled. Single draw: the old ADD-blend copy is
+        // gone — it double-drove the image at 0.35 alpha, clipping brights
+        // and hazing the mids the dither pass kept.
+        this.add.image(CX, 384, 'menu_backdrop').setScale(menuBackdropCover(this)).setDepth(-10);
         this.homeLayer = this.add.container(0, 0).setDepth(0);
         this.setupLayer = this.add.container(0, 0).setDepth(0);
 
@@ -263,6 +280,19 @@ export class MenuScene extends Scene {
             stopMusic();
         });
         startMenuAmbience();
+
+        // Headless screenshot entry: ?bgshot=seed jumps straight into a
+        // seeded battle for deterministic capture. No query: boot normally.
+        try {
+            const shotSeed = new URLSearchParams(window.location.search).get('bgshot');
+            if (shotSeed !== null) {
+                markTutorialSeen();
+                this.startBattleWithSeed(Number.parseInt(shotSeed, 10) || 7);
+                return;
+            }
+        } catch {
+            // Non-browser or no query: boot the menu normally.
+        }
 
         // Return from a battle with the loadout tour requested: the tour
         // needs the setup screen, so switch before opening the editor.
@@ -1721,6 +1751,11 @@ export class MenuScene extends Scene {
     }
 
     private startBattle(): void {
+        this.startBattleWithSeed((Math.random() * 0x7fffffff) | 0);
+    }
+
+    // Explicit-seed battle entry (headless screenshots + the menu Start path).
+    private startBattleWithSeed(seed: number): void {
         const mirrored = this.mirroredLineup(this.lineupIds, this.loadouts);
         this.scene.start('Battle', {
             teamSize: this.teamSize,
@@ -1728,7 +1763,7 @@ export class MenuScene extends Scene {
             loadouts: mirrored.loadouts,
             skins: this.skins.map((s) => ({ ...s })),
             trails: this.trails,
-            seed: (Math.random() * 0x7fffffff) | 0,
+            seed,
             arena: this.arena,
             modifiers: { ...this.mods },
         } satisfies BattleRequest);

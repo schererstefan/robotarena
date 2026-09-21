@@ -8,6 +8,7 @@ import { Match, sanitizeIntent, type LineupEntry, type RobotSnapshot } from '../
 import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
 import { checkRobotSource, suggestFilename, WORKSHOP_TEMPLATE, workshopPassed } from '../src/game/workshop';
 import { markTutorialSeen, resetTutorialFlag, shouldShowTutorial } from '../src/game/tutorial';
+import { bgThemeForSeed, coverScale, hashSeed01 } from '../src/game/art/background';
 import {
     clearDailyBoard,
     clearHistory,
@@ -4168,6 +4169,55 @@ console.log('pinned-codes');
         check(`${pin.format} pinned code decodes`, data !== null);
         check(`${pin.format} pinned code re-sims exactly`, fp === pin.fp);
     }
+}
+
+// --- Backgrounds: seeded variety is deterministic + actually varied ------
+// Render-only contract (art/varied-backgrounds): the menu-hero cover scale
+// and the calm arena theme (tonal shift, panel seams, floor lights,
+// center-mark variant, edge glow, vignette) are pure functions of explicit
+// inputs (no Math.random/Date.now), so replays repaint identically while
+// distinct seeds diverge.
+console.log('backgrounds');
+{
+    check('menu hero cover scale fits the 384x288 bake', coverScale(384, 288, 1024, 768) === 8 / 3);
+    check('cover scale takes the width-bound max', coverScale(64, 96, 1024, 768) === 16);
+    check('cover scale takes the height-bound max', coverScale(256, 96, 1024, 768) === 8);
+    check('cover scale guards degenerate dims', coverScale(0, 96, 1024, 768) === 1);
+    const themeA = bgThemeForSeed(7);
+    const themeB = bgThemeForSeed(7);
+    check('same seed themes identically', JSON.stringify(themeA) === JSON.stringify(themeB));
+    const seeds = [7, 42, 1234, 777001, 987654];
+    const themes = seeds.map((s) => bgThemeForSeed(s));
+    const gradients = new Set(themes.map((t) => t.top));
+    const marks = new Set(themes.map((t) => t.centerMark));
+    const panelLayouts = new Set(themes.map((t) => JSON.stringify(t.panels)));
+    const lightLayouts = new Set(themes.map((t) => JSON.stringify(t.lights)));
+    const edgeGlows = new Set(themes.map((t) => t.edgeGlow));
+    check('distinct seeds vary the tonal shift', gradients.size >= 2, `${gradients.size} gradients`);
+    check('distinct seeds vary the center mark', marks.size >= 2, [...marks].join(','));
+    check('distinct seeds vary the panel layout', panelLayouts.size >= 2);
+    check('distinct seeds vary the light layout', lightLayouts.size >= 2);
+    check('distinct seeds vary the edge glow', edgeGlows.size >= 2);
+    // Calm-budget guards: sparse, dim, in-bounds.
+    let calmOk = true;
+    for (const t of themes) {
+        if (t.panels.length < 3 || t.panels.length > 6) calmOk = false;
+        if (t.lights.length < 3 || t.lights.length > 6) calmOk = false;
+        if (t.edgeGlow < 0.1 || t.edgeGlow > 0.22) calmOk = false;
+        if (t.vignette < 0.38 || t.vignette > 0.52) calmOk = false;
+        for (const p of t.panels) {
+            if (p.x < 40 || p.y < 40 || p.x + p.w > 920 || p.y + p.h > 600) calmOk = false;
+        }
+        for (const l of t.lights) {
+            if (l.x < 70 || l.x > 890 || l.y < 70 || l.y > 570) calmOk = false;
+        }
+    }
+    check('calm budget: sparse dim in-bounds panels/lights', calmOk);
+    for (const s of seeds) {
+        const h = hashSeed01(s);
+        check(`seed hash in [0,1) for seed ${s}`, h >= 0 && h < 1);
+    }
+    check('seed hash deterministic', hashSeed01(1234) === hashSeed01(1234));
 }
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);
