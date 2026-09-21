@@ -62,7 +62,7 @@ y grows downward). The sim ticks at 60 Hz.
 | `events`       | What happened during the step just completed (empty at tick 0): `hit-by`, `kill`, `ally-down`, `foe-down`, `sudden-death-pulse`, `wall-bump`, `ram`, `pickup` (`pickup` carries `pad`: the pad kind collected). Sorted kind-then-id, capped at 8. |
 | `bullets`      | Incoming foe-team bullets inside your sensor cone, nearest first, capped at 12: `x`, `y`, `vx`, `vy`, `distance`, `bearing`, `closing` (positive = approaching), `damage`. |
 | `tracks`       | Engine-kept memory: one entry per living foe ever in your cone (`id`, `x`, `y`, `heading`, `speed`, `lastSeenTick`, `seenNow`), refreshed on every sighting, sorted by id. |
-| `arena`        | Static layout: `id` (`open`/`blocks`), `obstacles` (`{x,y,w,h}`), `centerX`, `centerY`. Symmetric public state. |
+| `arena`        | Layout: `id` (`open`/`blocks`), `obstacles` (`{x,y,w,h}` barrier rects, seed-derived on `blocks`), `centerX`, `centerY`. Symmetric public state. |
 | `zone`         | Safe circle: `phase` (`normal`/`shrinking`), `suddenDeathIn` (ticks), `circle` (`{x,y,r}`), `distToSafety`, `inside`. |
 | `grid`         | Your team's 12×8 heat-map (`cell` 80): `foes` (presence from cone sightings, decays 1/tick) and `danger` (recent damage) integer arrays. |
 | `match`        | Match state: `arena`, `modifiers`, `tickCap`, `killsYou`, `killsTeam`, `aliveFoes`. |
@@ -86,7 +86,7 @@ and collisions (`wall-bump`, `ram`). `bullets` shows incoming rounds your
 tower currently covers, with closing speed for dodging. `tracks` is the
 engine's memory of every foe your cone has seen — stale positions stay
 available after the foe leaves the cone, flagged with `seenNow: false`.
-`arena` is the static (symmetric, public) obstacle map plus the
+`arena` is the (symmetric, public) barrier map plus the
 `blocked.ahead` whisker for steering; `zone` is the sudden-death circle with
 your distance to safety; `grid` is your team's coarse 12×8 heat-map of foe
 presence and recent damage; `match` carries kills and the living-foe count.
@@ -249,9 +249,19 @@ the moment they come ready, so pulse them. Like every Intent field, a missing
 From `src/sim/constants.ts`: top speed 150 u/s (reverse ×0.6), turn 2.7 rad/s,
 tower 3.6 rad/s, gun range 470, 0.4 s cooldown, 12 damage, 100 health, no
 friendly fire. Arena is 960×640 with mirrored spawns. The BLOCKS layout adds
-four center blocks (mirrored through the arena center); robots and bullets
-collide with them, but your sensors don't report them — walls sense still
-measures the outer walls only. Matches run 2.5 minutes, then sudden death:
+four barrier segments, dealt from the match seed (2 drawn rects + their
+center mirrors, so both teams face identical terrain; same seed + loadouts
+⇒ identical layout, and replay codes are unchanged — the layout is derived,
+not stored). Robots collide with barriers (stop/slide push-out, no
+tunneling: segments are far thicker than one drive step) and bullets die on
+impact. Barriers are public: `sense.arena.obstacles` lists the rects,
+`self.blocked.ahead` measures to the nearest wall *or barrier* along your
+heading, and `common.ts` `rayClearance(x, y, angle, obstacles)` tests a
+firing lane against them. No new sense fields or events were added —
+`walls` still measures the outer walls only. Barriers stay in the midfield
+band with 56px+ gaps between every pair, so every gap fits a robot and no
+pocket ever seals; sudden death still breaks any stall. Matches run
+2.5 minutes, then sudden death:
 a safe circle centered on the arena shrinks from full cover to zero over
 30 seconds, pulsing 6 damage every 6 ticks to robots outside it (staggered
 per robot, so both sides never pulse together). Only simultaneous

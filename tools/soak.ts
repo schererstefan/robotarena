@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BARRIER_COUNT, BARRIER_MIN_GAP, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, barriersForSeed, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, sanitizeIntent, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
@@ -65,13 +65,16 @@ function runMatch(ids: string[], teams: Array<0 | 1>, seed: number, loadouts?: S
 }
 
 function fingerprint(match: Match): string {
-    // Full precision: any divergence, however small, must show.
+    // Full precision: any divergence, however small, must show. The barrier
+    // segment pins the seed-derived layout so resimulation must reproduce
+    // the same terrain (empty on `open`).
     const snaps = match.robotSnapshots.map((s) =>
         [s.code, s.maxHealth, s.alive ? 1 : 0, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired, s.cooldown, s.charge, s.dashCd, s.empCd, s.slowed ? 1 : 0].join(','),
     );
     const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team, b.hot ? 1 : 0].join(',')).join(';');
+    const barriers = match.obstacles.map((o) => [o.x, o.y, o.w, o.h].join(',')).join(';');
     const pads = match.pickupLog.join(';');
-    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${pads}`;
+    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${barriers}|${pads}`;
 }
 
 // --- 1. Determinism: same seed, same everything ------------------------------
@@ -829,25 +832,28 @@ console.log('arena');
         1,
         { arena: 'void' as ArenaId },
     ).arenaId === 'open');
-    // Every block mirrors through the arena center onto another block.
-    const rects = ARENA_OBSTACLES.blocks;
-    const mirrored = rects.every((o) =>
-        rects.some(
-            (p) =>
-                p.x === ARENA_WIDTH - o.x - o.w &&
-                p.y === ARENA_HEIGHT - o.y - o.h &&
-                p.w === o.w &&
-                p.h === o.h,
-        ),
-    );
-    check('blocks mirror through arena center', mirrored);
-    const clearOf = (x: number, y: number): boolean =>
-        rects.every((o) => {
-            const cx = Math.max(o.x, Math.min(x, o.x + o.w));
-            const cy = Math.max(o.y, Math.min(y, o.y + o.h));
-            // Epsilon: push-out normalization leaves float dust (~1e-14).
-            return Math.hypot(x - cx, y - cy) >= ROBOT_RADIUS - 1e-6;
-        });
+    // Every barrier mirrors through the arena center onto another barrier.
+    // Ground truth is per-match: the `blocks` layout is seed-derived.
+    const mirroredLayout = (rects: Array<{ x: number; y: number; w: number; h: number }>): boolean =>
+        rects.every((o) =>
+            rects.some(
+                (p) =>
+                    p.x === ARENA_WIDTH - o.x - o.w &&
+                    p.y === ARENA_HEIGHT - o.y - o.h &&
+                    p.w === o.w &&
+                    p.h === o.h,
+            ),
+        );
+    check('blocks mirror through arena center', mirroredLayout(blocks.obstacles));
+    const clearOf =
+        (rects: Array<{ x: number; y: number; w: number; h: number }>) =>
+        (x: number, y: number): boolean =>
+            rects.every((o) => {
+                const cx = Math.max(o.x, Math.min(x, o.x + o.w));
+                const cy = Math.max(o.y, Math.min(y, o.y + o.h));
+                // Epsilon: push-out normalization leaves float dust (~1e-14).
+                return Math.hypot(x - cx, y - cy) >= ROBOT_RADIUS - 1e-6;
+            });
     // Spawns for 1v1 through 3v3 never start inside a block.
     let spawnsClear = true;
     for (const teamSize of [1, 2, 3]) {
@@ -863,8 +869,9 @@ console.log('arena');
             return { team: teams[i] as 0 | 1, controller: entry.create() };
         });
         const fresh = new Match(lineups, 9, { arena: 'blocks' });
+        const freshClear = clearOf(fresh.obstacles);
         for (const s of fresh.robotSnapshots) {
-            if (!clearOf(s.x, s.y)) spawnsClear = false;
+            if (!freshClear(s.x, s.y)) spawnsClear = false;
         }
     }
     check('spawns never start inside blocks', spawnsClear);
@@ -875,6 +882,7 @@ console.log('arena');
         return { team: (i === 0 ? 0 : 1) as 0 | 1, controller: entry.create() };
     });
     const probe = new Match(probeLineups, 77, { arena: 'blocks' });
+    const probeClear = clearOf(probe.obstacles);
     let clipped = false;
     let sampled = 0;
     while (!probe.result.over) {
@@ -882,7 +890,7 @@ console.log('arena');
         sampled += 1;
         if (sampled % 10 === 0) {
             for (const s of probe.robotSnapshots) {
-                if (s.alive && !clearOf(s.x, s.y)) clipped = true;
+                if (s.alive && !probeClear(s.x, s.y)) clipped = true;
             }
         }
     }
@@ -922,10 +930,14 @@ console.log('spawn-variation');
     let gapOk = true;
     let headingOk = true;
     let blocksOk = true;
-    const rects = ARENA_OBSTACLES.blocks;
     for (let seed = 1; seed <= 60; seed += 1) {
         for (const teamSize of [1, 2, 3]) {
-            const snaps = snapPos(seed * 7919 + 13, teamSize);
+            const layoutSeed = seed * 7919 + 13;
+            const snaps = snapPos(layoutSeed, teamSize);
+            // Spawn columns never overlap that seed's own barrier layout
+            // (spawns are arena-independent, so the open-arena snapshot
+            // positions apply to `blocks` matches too).
+            const rects = barriersForSeed(layoutSeed >>> 0);
             for (let i = 0; i < teamSize; i += 1) {
                 const a = snaps[i] as { x: number; y: number; heading: number };
                 const b = snaps[teamSize + i] as { x: number; y: number; heading: number };
@@ -968,6 +980,199 @@ console.log('spawn-variation');
     check('teammates keep minimum separation', gapOk);
     check('spawn headings face midfield, never a wall', headingOk);
     check('varied spawns clear obstacle blocks', blocksOk);
+}
+
+// --- 5b3. Barriers: seed-derived, symmetric, solid, playable ----------------
+console.log('barriers');
+{
+    const dummy = (id: string): RobotController => ({
+        meta: { id, name: id, author: 'test', version: '0', description: '' },
+        update: (): Intent => ({}),
+    });
+    const blocksMatch = (seed: number): Match =>
+        new Match(
+            [
+                { team: 0, controller: dummy('a') },
+                { team: 1, controller: dummy('b') },
+            ],
+            seed,
+            { arena: 'blocks' },
+        );
+    // Determinism: same seed + loadouts => identical layout.
+    const sameSeed =
+        JSON.stringify(blocksMatch(4242).obstacles) === JSON.stringify(blocksMatch(4242).obstacles);
+    check('barrier layout is deterministic per seed', sameSeed);
+    // Count, symmetry, and generation guards across 64 seeds.
+    const seen = new Set<string>();
+    let countOk = true;
+    let symOk = true;
+    let guardOk = true;
+    let fallbacks = 0;
+    const canonical = JSON.stringify(
+        ARENA_OBSTACLES.blocks.map((o) => ({ ...o })).sort((a, b) => a.x - b.x || a.y - b.y),
+    );
+    for (let seed = 1; seed <= 2000; seed += 1) {
+        if (JSON.stringify(barriersForSeed((seed * 131 + 7) >>> 0)) === canonical) fallbacks += 1;
+    }
+    for (let seed = 1; seed <= 64; seed += 1) {
+        const rects = blocksMatch(seed * 131 + 7).obstacles;
+        seen.add(JSON.stringify(rects));
+        if (rects.length !== BARRIER_COUNT) countOk = false;
+        const isFallback = JSON.stringify(rects) === canonical;
+        for (const o of rects) {
+            if (o.x < 248 || o.x + o.w > 712 || o.y < 88 || o.y + o.h > 552) guardOk = false;
+            // Drawn rects are multiples of 8px in 56..104; the canonical
+            // 90x90 fallback is accepted as-is.
+            if (!isFallback && (o.w < 56 || o.w > 104 || o.h < 56 || o.h > 104 || o.w % 8 !== 0 || o.h % 8 !== 0)) {
+                guardOk = false;
+            }
+            const mirror = rects.some(
+                (p) =>
+                    p.x === ARENA_WIDTH - o.x - o.w &&
+                    p.y === ARENA_HEIGHT - o.y - o.h &&
+                    p.w === o.w &&
+                    p.h === o.h,
+            );
+            if (!mirror) symOk = false;
+        }
+        for (let i = 0; i < rects.length; i += 1) {
+            for (let j = i + 1; j < rects.length; j += 1) {
+                const a = rects[i] as { x: number; y: number; w: number; h: number };
+                const b = rects[j] as { x: number; y: number; w: number; h: number };
+                const dx = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w));
+                const dy = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
+                const gap = dx <= 0 && dy <= 0 ? 0 : dx <= 0 ? dy : dy <= 0 ? dx : Math.hypot(dx, dy);
+                if (gap < BARRIER_MIN_GAP - 1e-9) guardOk = false;
+            }
+        }
+    }
+    check('every blocks match deals 4 barriers', countOk);
+    check('every barrier layout mirrors through the center', symOk);
+    check('barrier band, sizes, and gaps hold on 64 seeds', guardOk);
+    check('canonical fallback never fires on 2000 seeds', fallbacks === 0, `${fallbacks} fallbacks`);
+    check('barrier layouts vary by seed', seen.size > 1, `${seen.size} distinct / 64`);
+    // Movement: a dashing ram never penetrates, and does reach the barrier.
+    {
+        const seed = 918273;
+        const rammer: RobotController = {
+            meta: { id: 'rammer', name: 'Rammer', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                const o = (sense.arena?.obstacles ?? [])[0] as
+                    | { x: number; y: number; w: number; h: number }
+                    | undefined;
+                if (!o) return {};
+                const cx = o.x + o.w / 2;
+                const cy = o.y + o.h / 2;
+                const dx = cx - sense.self.x;
+                const dy = cy - sense.self.y;
+                const d = Math.hypot(dx, dy) || 1;
+                return { moveMode: 1, moveX: cx + (dx / d) * 300, moveY: cy + (dy / d) * 300, dash: true };
+            },
+        };
+        const ram = new Match(
+            [
+                { team: 0, controller: rammer },
+                { team: 1, controller: dummy('sat') },
+            ],
+            seed,
+            { arena: 'blocks' },
+        );
+        const rects = ram.obstacles;
+        let penetrated = false;
+        let touched = false;
+        for (let t = 0; t < 900; t += 1) {
+            ram.step();
+            const s = ram.robotSnapshots[0] as { x: number; y: number };
+            for (const o of rects) {
+                const cx = Math.max(o.x, Math.min(s.x, o.x + o.w));
+                const cy = Math.max(o.y, Math.min(s.y, o.y + o.h));
+                const d = Math.hypot(s.x - cx, s.y - cy);
+                if (d < ROBOT_RADIUS - 1e-6) penetrated = true;
+                if (d < ROBOT_RADIUS + 2) touched = true;
+            }
+        }
+        check('dashing ram never penetrates a barrier', !penetrated);
+        check('dashing ram reaches the barrier face', touched);
+    }
+    // Bullets: point-blank fire into a barrier harms nobody.
+    {
+        const seed = 555123;
+        const shooter: RobotController = {
+            meta: { id: 'shooter', name: 'Shooter', author: 'test', version: '0', description: '' },
+            update: (sense: SenseState): Intent => {
+                const rects = sense.arena?.obstacles ?? [];
+                let target = rects[0] as { x: number; y: number; w: number; h: number } | undefined;
+                for (const r of rects) {
+                    if (target === undefined || r.w > target.w) target = r;
+                }
+                if (!target) return {};
+                const o = target;
+                const cx = o.x + o.w / 2;
+                const stageY = o.y + o.h + 60;
+                const self = sense.self;
+                if (Math.hypot(cx - self.x, stageY - self.y) > 30) {
+                    return { moveMode: 1, moveX: cx, moveY: stageY };
+                }
+                const want = Math.atan2(o.y + o.h - self.y, cx - self.x);
+                let diff = want - self.tower;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                return { towerTurn: Math.max(-1, Math.min(1, diff * 3)), fire: Math.abs(diff) < 0.02 };
+            },
+        };
+        const bullet = new Match(
+            [
+                { team: 0, controller: shooter },
+                { team: 1, controller: dummy('sat') },
+            ],
+            seed,
+            { arena: 'blocks' },
+        );
+        for (let t = 0; t < 1500 && !bullet.result.over; t += 1) bullet.step();
+        const snaps = bullet.robotSnapshots;
+        const self = snaps[0] as { shotsFired: number; damageDealt: number };
+        const foe = snaps[1] as { health: number; maxHealth: number };
+        check(
+            'barriers absorb point-blank fire',
+            self.shotsFired > 5 && self.damageDealt === 0 && foe.health === foe.maxHealth,
+            `shots=${self.shotsFired} dealt=${self.damageDealt} foe=${foe.health}/${foe.maxHealth}`,
+        );
+    }
+    // Playable: a batch of blocks-arena matches resolves, error-free, before
+    // the defensive cap (sudden death always breaks stalls).
+    {
+        const botIds = ['hunter', 'orbiter', 'rusher', 'sniper', 'ghost', 'turret'];
+        let resolved = 0;
+        let decided = 0;
+        let errors = 0;
+        let maxTick = 0;
+        const games = 8 * 3;
+        for (let seed = 101; seed <= 108; seed += 1) {
+            for (const teamSize of [1, 2, 3]) {
+                const lineups: LineupEntry[] = [];
+                for (let i = 0; i < teamSize * 2; i += 1) {
+                    const id = botIds[(i + seed) % botIds.length] as string;
+                    const entry = ROBOTS.find((r) => r.meta.id === id);
+                    if (!entry) throw new Error(`unknown robot ${id}`);
+                    lineups.push({
+                        team: (i < teamSize ? 0 : 1) as 0 | 1,
+                        controller: entry.create(),
+                        loadout: { ...entry.loadout },
+                    });
+                }
+                const m = new Match(lineups, seed * 1000 + teamSize, { arena: 'blocks' });
+                m.runToEnd();
+                if (m.result.over) resolved += 1;
+                if (m.result.winner !== -1) decided += 1;
+                maxTick = Math.max(maxTick, m.result.tick);
+                for (const s of m.robotSnapshots) errors += s.errors;
+            }
+        }
+        check('blocks batch resolves every match', resolved === games, `${resolved}/${games}`);
+        check('blocks batch stays error-free', errors === 0, `${errors} errors`);
+        check('blocks batch ends before the defensive cap', maxTick < MAX_TICKS_TOTAL, `max tick ${maxTick}`);
+        console.log(`  info blocks batch: ${decided}/${games} decisive, max tick ${maxTick}`);
+    }
 }
 
 // --- 5c. Sudden death: circle shrinks, outsiders pulse, draws vanish ------
@@ -2075,6 +2280,7 @@ console.log('senses');
         check(`spawn sense carries every channel (${arena})`, Array.isArray(s.events) && Array.isArray(s.bullets) && Array.isArray(s.tracks) && s.arena !== undefined && s.zone !== undefined && s.grid !== undefined && s.match !== undefined);
         check(`spawn events/bullets/tracks start empty (${arena})`, s.events?.length === 0 && s.bullets?.length === 0 && s.tracks?.length === 0);
         check(`arena reports ${arena} + center`, s.arena?.id === arena && s.arena?.centerX === ARENA_WIDTH / 2 && s.arena?.centerY === ARENA_HEIGHT / 2 && (s.arena?.obstacles.length ?? -1) === ARENA_OBSTACLES[arena].length);
+        check(`arena reports this match's own barriers (${arena})`, JSON.stringify(s.arena?.obstacles ?? null) === JSON.stringify(whiskerMatch.obstacles));
         check(`zone opens normal with ${MAX_TICKS} ticks to spare (${arena})`, s.zone?.phase === 'normal' && s.zone?.suddenDeathIn === MAX_TICKS && s.zone?.inside === true && s.zone?.distToSafety === 0);
         check(`grid is 12x8 zeroed (${arena})`, s.grid?.w === SENSE_GRID_W && s.grid?.h === SENSE_GRID_H && s.grid?.cell === SENSE_GRID_CELL && s.grid?.foes.length === 96 && s.grid?.danger.length === 96 && (s.grid?.foes.every((v) => v === 0) ?? false));
         check(`match reports arena + caps (${arena})`, s.match?.arena === arena && s.match?.tickCap === MAX_TICKS_TOTAL && s.match?.killsYou === 0 && s.match?.killsTeam === 0 && s.match?.aliveFoes === 1);
@@ -2085,7 +2291,7 @@ console.log('senses');
         const py = w0.y + Math.sin(w0.heading) * (ahead + ROBOT_RADIUS);
         const eps = 1e-6;
         const onWall = Math.abs(px) < eps || Math.abs(px - ARENA_WIDTH) < eps || Math.abs(py) < eps || Math.abs(py - ARENA_HEIGHT) < eps;
-        const onBlock = ARENA_OBSTACLES[arena].some((o) => {
+        const onBlock = whiskerMatch.obstacles.some((o) => {
             const onV = (Math.abs(px - o.x) < eps || Math.abs(px - (o.x + o.w)) < eps) && py >= o.y - eps && py <= o.y + o.h + eps;
             const onH = (Math.abs(py - o.y) < eps || Math.abs(py - (o.y + o.h)) < eps) && px >= o.x - eps && px <= o.x + o.w + eps;
             return onV || onH;
@@ -3364,17 +3570,19 @@ console.log('pinned-codes');
     // rusher vs turret, seed 4242, open, default builds — one code per
     // format, both describing the same match (winner 1 @ tick 290).
     // Re-pinned for complexity/spawn seeded variation (deterministic
-    // re-sim x2; outcome unchanged, spawn geometry moved the end state).
+    // re-sim x2; outcome unchanged, spawn geometry moved the end state),
+    // then for complexity/barriers (trailing barrier segment; empty on
+    // open, sim end state identical).
     const pins: Array<{ format: string; code: string; fp: string }> = [
         {
             format: 'RA2',
             code: 'RA2-4000-2290-3860-2200-4328-0091-0',
-            fp: 'open|{}|1@290|OVR3 TRG1 PLT2,130,0,0,578.9258332055584,504.4712165470966,2.4838022661497137,-0.6757560931448545,0,60,6,16,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,40,653.9098876986923,440.21522725762117,-2.536764874794541,2.418550658083492,1,132,12,10,0,0,0,0|640.4499522260696,459.11108519103584,0,0',
+            fp: 'open|{}|1@290|OVR3 TRG1 PLT2,130,0,0,578.9258332055584,504.4712165470966,2.4838022661497137,-0.6757560931448545,0,60,6,16,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,40,653.9098876986923,440.21522725762117,-2.536764874794541,2.418550658083492,1,132,12,10,0,0,0,0|640.4499522260696,459.11108519103584,0,0|',
         },
         {
             format: 'RA1',
             code: 'RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MjQyLCJ0IjoxLCJsIjpbInJ1c2hlciIsInR1cnJldCJdLCJvIjpbIjA6Myw1OjEsODoyIiwiMjoxLDM6Miw1OjIsNjoxIl0sImEiOiJvcGVuIiwibSI6IiJ9',
-            fp: 'open|{}|1@290|OVR3 TRG1 PLT2,130,0,0,578.9258332055584,504.4712165470966,2.4838022661497137,-0.6757560931448545,0,60,6,16,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,40,653.9098876986923,440.21522725762117,-2.536764874794541,2.418550658083492,1,132,12,10,0,0,0,0|640.4499522260696,459.11108519103584,0,0',
+            fp: 'open|{}|1@290|OVR3 TRG1 PLT2,130,0,0,578.9258332055584,504.4712165470966,2.4838022661497137,-0.6757560931448545,0,60,6,16,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,40,653.9098876986923,440.21522725762117,-2.536764874794541,2.418550658083492,1,132,12,10,0,0,0,0|640.4499522260696,459.11108519103584,0,0|',
         },
     ];
     for (const pin of pins) {
