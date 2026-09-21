@@ -104,6 +104,17 @@ export interface BattleRequest {
 }
 
 const CX = 512;
+/** Persisted separately from the a11y bundle: battle-trail rendering. */
+const TRAILS_KEY = 'robotarena_trails';
+
+function loadTrails(): boolean {
+    try {
+        const raw = localStorage.getItem(TRAILS_KEY);
+        return raw === null ? true : raw === '1';
+    } catch {
+        return true;
+    }
+}
 /** Max stats rows per overlay page (the panel fits 8 + daily + buttons). */
 const STATS_ROWS = 8;
 
@@ -149,6 +160,7 @@ export class MenuScene extends Scene {
     private footerFlow: Phaser.GameObjects.GameObject[] = [];
     private showcaseAvailable = false;
     private tickerTimer: ReturnType<typeof setInterval> | null = null;
+    private tickerLines: string[] = [];
     private statsTab: 'local' | 'online' = 'local';
     private onlineBoard: OnlineBoard | null = null;
     private onlineCached = false;
@@ -194,6 +206,8 @@ export class MenuScene extends Scene {
         this.footerFlow = [];
         this.showcaseAvailable = false;
         this.tickerTimer = null;
+        this.tickerLines = [];
+        this.trails = loadTrails();
         this.onlineBoard = null;
         this.onlineCached = false;
         this.onlineTried = false;
@@ -563,6 +577,7 @@ export class MenuScene extends Scene {
 
     /** Cycle champion headlines through the page marquee under the canvas. */
     private startTicker(lines: string[]): void {
+        this.tickerLines = lines;
         this.stopTicker();
         if (lines.length === 0) return;
         const el = document.getElementById('marquee');
@@ -614,8 +629,9 @@ export class MenuScene extends Scene {
     }
 
     private onMuteKey = (): void => {
-        // Typing in the replay-code input must not flip the mute toggle.
-        if (document.activeElement instanceof HTMLInputElement) return;
+        // Typing in a DOM dialog must not flip the mute toggle.
+        const active = document.activeElement;
+        if (active instanceof HTMLInputElement || active instanceof HTMLSelectElement || active instanceof HTMLTextAreaElement) return;
         unlockAudio();
         this.toggleMute();
     };
@@ -638,6 +654,15 @@ export class MenuScene extends Scene {
     private toggleMotion(): void {
         setReducedMotion(!isReducedMotion());
         this.refreshMotionLabel();
+        // Apply live: LOW freezes the marquee rotation, FULL resumes it.
+        if (isReducedMotion()) {
+            if (this.tickerTimer !== null) {
+                clearInterval(this.tickerTimer);
+                this.tickerTimer = null;
+            }
+        } else {
+            this.startTicker(this.tickerLines);
+        }
     }
 
     private refreshMotionLabel(): void {
@@ -713,6 +738,11 @@ export class MenuScene extends Scene {
 
     private toggleTrails(): void {
         this.trails = !this.trails;
+        try {
+            localStorage.setItem(TRAILS_KEY, this.trails ? '1' : '0');
+        } catch {
+            // Private mode: the toggle still applies for this session.
+        }
         this.refreshTrailsLabel();
     }
 
