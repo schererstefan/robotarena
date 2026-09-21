@@ -45,7 +45,7 @@ const TIER_STYLE: Record<ButtonTier, { fill: number; edge: number; hoverFill: nu
     primary: { fill: 0x3a2f12, edge: 0xffd23f, hoverFill: 0x4a3c16, hoverEdge: 0xffd23f, text: '#ffd23f' },
     default: { fill: COLORS.panel, edge: COLORS.panelEdge, hoverFill: COLORS.panelHover, hoverEdge: COLORS.team[0], text: COLORS.ink },
     danger: { fill: 0x33161a, edge: 0xff5d5d, hoverFill: 0x421b20, hoverEdge: 0xff5d5d, text: '#ff8a8a' },
-    ghost: { fill: COLORS.panel, edge: 0x2b3542, hoverFill: COLORS.panelHover, hoverEdge: 0x7d8b9b, text: COLORS.dim },
+    ghost: { fill: COLORS.panel, edge: COLORS.panelEdge, hoverFill: COLORS.panelHover, hoverEdge: COLORS.faintNum, text: COLORS.dim },
 };
 
 export function makeButton(
@@ -161,7 +161,7 @@ export function addTouchHit(
 
 export function makePanel(scene: Scene, x: number, y: number, w: number, h: number, title?: string): Phaser.GameObjects.GameObject[] {
     const out: Phaser.GameObjects.GameObject[] = [
-        scene.add.rectangle(x, y, w, h, 0x0b0e12).setStrokeStyle(4, 0x0b0e12),
+        scene.add.rectangle(x, y, w, h, COLORS.pageBg).setStrokeStyle(4, COLORS.pageBg),
         scene.add.rectangle(x, y, w - 8, h - 8, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge),
         // Top highlight + header bar + reclaimed panel_tile corner chrome.
         scene.add.rectangle(x, y - h / 2 + 6, w - 12, 2, COLORS.white, 0.07),

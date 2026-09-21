@@ -2385,8 +2385,9 @@ export class BattleScene extends Scene {
         }
         for (const ind of this.indicators) this.drawEdgeIndicator(g, ind);
         // Readability set (single dyn redraw, O(N²), N ≤ 6): HP divider
-        // ticks, charge cast-bars, EMP rings, victim-centered threat arcs
-        // (white = contested), focus-fire ▼, SD outside pips. The SD circle
+        // ticks, charge cast-bars, EMP rings, active amp/overdrive buff marks,
+        // victim-centered threat arcs (white = contested), focus-fire ▼, SD
+        // outside pips. The SD circle
         // itself is the pre-baked sprite now (syncSdRing), not dyn strokes.
         const tickNow = this.match.result.tick;
         const sdOn = this.match.result.suddenDeath;
@@ -2422,6 +2423,25 @@ export class BattleScene extends Scene {
                 const er = this.reducedMotion ? EMP_RADIUS : (0.5 - et) * (EMP_RADIUS / 0.5);
                 g.lineStyle(2, 0x9be7ff, Math.min(et * 2, 1) * 0.7);
                 g.strokeCircle(cx, cy, Math.max(er, 4));
+            }
+            // Active pad buffs (shape + color, never color-only): amp reuses
+            // the pad's gold filled-diamond as an overhead pip; overdrive
+            // reuses ground-ring language as a white double ring outside the
+            // threat-arc radius. Static under reduced motion. Read-only via
+            // effectTicks: zero sim changes, deterministic per tick.
+            const fx = this.match.effectTicks(s.id);
+            if (fx.amp > 0) {
+                const ampA = this.reducedMotion ? 0.9 : 0.6 + 0.3 * Math.sin(tickNow * 0.15 + i * 1.7);
+                g.fillStyle(COLORS.gold, ampA);
+                this.diamondPath(g, cx, cy - 66, 6);
+                g.fillPath();
+            }
+            if (fx.overdrive > 0) {
+                const odA = this.reducedMotion ? 0.8 : 0.55 + 0.25 * Math.sin(tickNow * 0.2 + i * 2.1);
+                g.lineStyle(2, COLORS.white, odA);
+                g.strokeCircle(cx, cy, 27);
+                g.lineStyle(1, COLORS.white, odA * 0.7);
+                g.strokeCircle(cx, cy, 31);
             }
             // Victim-centered threat arcs: one attacker = their team color
             // facing them; ≥2 = white contested ring + gold focus ▼.
