@@ -85,8 +85,10 @@ export class TournamentScene extends Scene {
         }
         this.input.on('pointerdown', this.onAnyPointer);
         this.input.keyboard?.on('keydown-M', this.onMuteKey);
+        this.input.keyboard?.on('keydown-ESC', this.onEscapeKey);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
+            this.input.keyboard?.off('keydown-ESC', this.onEscapeKey);
         });
     }
 
@@ -107,6 +109,11 @@ export class TournamentScene extends Scene {
     private onMuteKey = (): void => {
         unlockAudio();
         toggleMuted();
+    };
+
+    /** Escape exits to Menu from setup and bracket alike (session store persists). */
+    private onEscapeKey = (): void => {
+        this.scene.start('Menu');
     };
 
     // ---- Setup ------------------------------------------------------------
