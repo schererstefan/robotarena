@@ -255,6 +255,7 @@ export class BattleScene extends Scene {
     private resultsReplayCopy: (() => void) | null = null;
     /** Results layout: long codes (big lineups) wrap to two lines. */
     private resultsCodeLong = false;
+    private resultsCodeLines = 1;
     private resultsRowSel: number | null = null;
     private resultsRowIds: number[] = [];
     private resultsRowTexts: Phaser.GameObjects.Text[] = [];
@@ -333,6 +334,7 @@ export class BattleScene extends Scene {
         this.resultsFinish = null;
         this.resultsReplayCopy = null;
         this.resultsCodeLong = false;
+        this.resultsCodeLines = 1;
         this.resultsRowSel = null;
         this.resultsRowIds = [];
         this.resultsRowTexts = [];
@@ -3021,8 +3023,9 @@ export class BattleScene extends Scene {
                 tutorial: this.request.tutorial,
             });
         };
-        // Two-line codes drop the buttons + footer 18px so nothing collides.
-        const lowerDy = this.resultsCodeLong ? 18 : 0;
+        // Multi-line codes drop the buttons + footer ~18px per extra line
+        // so nothing collides (legacy RA1 codes can take several lines).
+        const lowerDy = this.resultsCodeLong ? (this.resultsCodeLines - 1) * 18 : 0;
         const hintKeys = (hint: string): void => {
             this.add.text(512, 614 + lowerDy, hint, FONTS.monoSmall).setOrigin(0.5).setDepth(20);
         };
@@ -3187,11 +3190,35 @@ export class BattleScene extends Scene {
             .setDepth(20);
         codeText.setWordWrapWidth(560);
         if (codeText.width > 560) {
-            // Hyphenated codes never wrap on their own: split the groups
-            // across two centered lines instead of overflowing the panel.
-            const parts = code.split('-');
-            const mid = Math.ceil(parts.length / 2);
-            codeText.setText(`${parts.slice(0, mid).join('-')}\n${parts.slice(mid).join('-')}`);
+            // Hyphenated codes never wrap on their own, and legacy RA1
+            // codes (clear-skies/custom lineups) are longer still: greedily
+            // pack hyphen groups into 560px lines, hard-splitting any group
+            // that overflows a line alone, so nothing escapes the panel.
+            const fits = (s: string): boolean => {
+                codeText.setText(s);
+                return codeText.width <= 560;
+            };
+            const lines: string[] = [];
+            let cur = '';
+            for (const group of code.split('-')) {
+                const cand = cur === '' ? group : `${cur}-${group}`;
+                if (fits(cand)) {
+                    cur = cand;
+                    continue;
+                }
+                if (cur !== '') lines.push(cur);
+                let rest = group;
+                while (rest !== '' && !fits(rest)) {
+                    let n = rest.length - 1;
+                    while (n > 1 && !fits(rest.slice(0, n))) n -= 1;
+                    lines.push(rest.slice(0, n));
+                    rest = rest.slice(n);
+                }
+                cur = rest;
+            }
+            if (cur !== '') lines.push(cur);
+            codeText.setText(lines.join('\n'));
+            this.resultsCodeLines = lines.length;
             this.resultsCodeLong = true;
         }
         codeText.setInteractive({ useHandCursor: true });
