@@ -61,8 +61,9 @@ export const BRAIN_DEFAULTS: BrainParams = {
 };
 
 /**
- * Per-robot presets: personalities kept as mode flavors. Only hunter is
- * converted so far; the rest are defined, validated, and ready to wire.
+ * Per-robot presets: personalities kept as mode flavors. Hunter, rusher,
+ * and brawler are converted so far; the rest are defined, validated, and
+ * ready to wire.
  * (hunter-hc1 reuses the hunter preset when it converts; it is frozen on
  * legacy behavior until the next tune.)
  */

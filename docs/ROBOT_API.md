@@ -206,7 +206,7 @@ is no way to exceed your loadout's stats.
 
 Application order each tick: brains → radio collect → dash/EMP → move
 assist → drive normalize → turret assist → fire gate → bullets → pads →
-map turrets (capture, then fire) → sudden death.
+map turrets (capture, then fire) → hazards → sudden death.
 
 ## Team radio: the `comms.ts` helpers
 
@@ -315,13 +315,15 @@ pocket ever seals; sudden death still breaks any stall. Matches run
 2.5 minutes, then sudden death:
 a safe circle centered on the arena shrinks from full cover to zero over
 30 seconds, pulsing 6 damage every 6 ticks to robots outside it (staggered
-per robot, so both sides never pulse together). Only simultaneous
-elimination draws — stalling the clock no longer saves you.
+per robot, so both sides never pulse together). Simultaneous elimination
+draws — stalling the clock no longer saves you (past the tick cap the
+engine falls back to total health, then damage dealt, with an exact tie
+staying a draw).
 
 **Exhibition modifiers** (menu MODS panel; barred from stats, tagged in the
 HUD): double damage (every shot ×2, all bullets render hot), hardcore fog
-(your `sense.self.stats.sensorRange` and scan cone halve — read stats, never
-hardcode 540), mirror mode (both teams run identical robots and builds),
+(your `sense.self.stats.sensorRange` halves while the scan cone keeps full
+width — read stats, never hardcode 540), mirror mode (both teams run identical robots and builds),
 clear skies (`noHazards`: no asteroid strikes — strikes are on by default).
 Modded matches replay exactly via the same replay codes.
 
@@ -336,16 +338,16 @@ Modded matches replay exactly via the same replay codes.
    `leadAngle`/`leadShot`, `dodgeVector`, `rayClearance`, `toGrid`,
    `manageCharge`, `createStallTracker`), `./comms.ts` (team radio:
    `castFocusVote`, `focusTarget`, `castContact`, `latestContact`,
-   `resolveRoles`, `formationSlot`), and `./roles.ts` (squad roles:
-   `castClaim`, `castSlotHold`, `collectClaims`, `myRole`,
-   `latestSlotHold`, `createRoleTracker`, `roleGoal`). No Phaser, no DOM,
-   no Node APIs.
+   `resolveRoles`, `formationSlot`). No Phaser, no DOM,
+   no Node APIs. (`./roles.ts` squad-role helpers are shipped-robot
+   internals — user robots cannot import them; the workshop rejects
+   anything outside `../sim/*`, `./common.ts`, and `./comms.ts`.)
    Two refinements: (a) robots loaded through the in-game importer
    (Menu → IMPORT, exhibition only) must be **single-file** — value imports
    cannot be resolved from a blob module, so inline any helpers you need;
    (b) `./brain.ts`, `./genome.ts`, and sibling-robot imports
    (`./hunter`, …) are internal-only: shipped robots are multi-file, user
-   robots stay within `../sim/*` + `./common.ts` + `./comms.ts` + `./roles.ts`.
+   robots stay within `../sim/*` + `./common.ts` + `./comms.ts`.
 4. **No throwing.** Exceptions are caught and your robot idles that tick — but a
    robot that throws constantly is just parked scrap. Guard your math.
 5. **State in closures.** Module-level mutable state is shared across matches;
@@ -369,9 +371,9 @@ the brain retreats to safety no matter the bids. Firing always needs your
 own cone — votes and tracks steer, they never shoot.
 
 Personalities are presets (`BRAIN_PRESETS`), not forks: rusher is
-bloodthirsty, sniper kites long, brawler barely retreats. Only hunter is
-converted so far; the other seven presets are defined and validated,
-ready to wire. Brain knobs are the `brain.*` genome group
+bloodthirsty, sniper kites long, brawler barely retreats. Hunter, rusher,
+and brawler run the brain by default; the other five presets are defined
+and validated, ready to wire. Brain knobs are the `brain.*` genome group
 (`retreatHp`, `kiteRange`, `flankRange`, `stayBonus`, `aggression`,
 `focusBonus`, `orbitDir`) and tune like any other param.
 
