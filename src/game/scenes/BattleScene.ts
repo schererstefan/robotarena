@@ -2480,7 +2480,9 @@ export class BattleScene extends Scene {
             const cx = AX + s.x;
             const cy = AY + s.y;
             // Full-charge muzzle pre-glow dot (shape + position, not color-only).
-            if (s.charge >= 1) {
+            // Hidden with the plates on results: a frozen full charge would
+            // stick the dot behind the panel (cones stay as ambiance).
+            if (s.charge >= 1 && !this.resultsShown) {
                 g.fillStyle(COLORS.gold, 0.9);
                 g.fillCircle(cx + Math.cos(s.tower) * 32, cy + Math.sin(s.tower) * 32, 3);
             }
