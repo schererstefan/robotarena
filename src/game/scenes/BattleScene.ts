@@ -891,10 +891,13 @@ export class BattleScene extends Scene {
             this.diffPads();
             this.diffTurrets();
         }
-        const tick = this.match.result.tick;
-        if (this.request.trails && tick % 3 === 0 && tick !== this.lastTrailTick && !this.match.result.over) {
+        // One result read for the post-step frame: no more steps run below.
+        const res = this.match.result;
+        const tick = res.tick;
+        if (this.request.trails && tick % 3 === 0 && tick !== this.lastTrailTick && !res.over) {
             this.lastTrailTick = tick;
-            snaps.forEach((s, i) => {
+            for (let i = 0; i < snaps.length; i += 1) {
+                const s = snaps[i] as RobotSnapshot;
                 const trail = this.trails[i] as Array<{ x: number; y: number }>;
                 if (s.alive) {
                     trail.push({ x: s.x, y: s.y });
@@ -902,13 +905,13 @@ export class BattleScene extends Scene {
                 } else if (trail.length > 0) {
                     trail.shift();
                 }
-            });
+            }
         }
         if (!this.paused) {
             this.updateParticles(dt);
             this.decayEffects(dt);
             this.updateTrauma(dt);
-            this.tickThroes(dt);
+            this.tickThroes(dt, snaps);
             this.tickSkulls(dt);
         }
         this.tickFlicker(dt);
@@ -919,7 +922,7 @@ export class BattleScene extends Scene {
         this.syncSprites(snaps, bullets, dt);
         this.drawDynamic(snaps);
         this.syncHud(snaps, bullets);
-        if (this.match.result.over && !this.resultsShown) {
+        if (res.over && !this.resultsShown) {
             // Deciding-kill slow-mo holds the results panel ~0.8 s so the
             // pre-fired banner + zoom read before the panel lands.
             if (this.slowmoT > 0 && !this.reducedMotion) return;
@@ -1092,17 +1095,23 @@ export class BattleScene extends Scene {
     private diffSnapshots(snaps: RobotSnapshot[]): void {
         // Attacker attribution (render-only): credit health drops to whichever
         // robot's damageDealt grew most in this window.
+        // tickNow/sdOn are hoisted: get result allocates per read, and the
+        // values are frozen for the whole diff (no steps run inside).
+        const tickNow = this.match.result.tick;
+        const sdOn = this.match.result.suddenDeath;
         let topDealer = -1;
         let topDealt = 0;
-        snaps.forEach((s, i) => {
+        for (let i = 0; i < snaps.length; i += 1) {
+            const s = snaps[i] as RobotSnapshot;
             const p = this.prev[i] as RobotSnapshot;
             const delta = s.damageDealt - p.damageDealt;
             if (delta > topDealt) {
                 topDealt = delta;
                 topDealer = i;
             }
-        });
-        snaps.forEach((s, i) => {
+        }
+        for (let i = 0; i < snaps.length; i += 1) {
+            const s = snaps[i] as RobotSnapshot;
             const p = this.prev[i] as RobotSnapshot;
             const cx = AX + s.x;
             const cy = AY + s.y;
@@ -1135,7 +1144,7 @@ export class BattleScene extends Scene {
                 this.dmgAcc += dmg;
                 if (!s.alive) {
                     this.spawnDamageNumber(cx, cy - 18, dmg, 'kill');
-                } else if (this.match.result.suddenDeath && topDealer < 0) {
+                } else if (sdOn && topDealer < 0) {
                     this.spawnDamageNumber(cx, cy - 18, dmg, 'sd');
                     this.hurtT[i] = 2;
                     playHit(dmg, s.x);
@@ -1166,7 +1175,7 @@ export class BattleScene extends Scene {
             } else if (s.health > p.health && s.alive) {
                 // Regen (nanorepair) ticks fractional HP: batch to ≤1/s/robot.
                 this.healAcc[i] = (this.healAcc[i] as number) + (s.health - p.health);
-                const tick = this.match.result.tick;
+                const tick = tickNow;
                 if (tick - (this.lastHealTick[i] as number) >= 60 && (this.healAcc[i] as number) >= 1) {
                     this.spawnDamageNumber(cx, cy - 18, Math.floor(this.healAcc[i] as number), 'heal');
                     this.healAcc[i] = 0;
@@ -1216,8 +1225,8 @@ export class BattleScene extends Scene {
                     ((wallTouch && !this.prevWallTouch[i]) || (ramTouch && !this.prevRamTouch[i]));
                 this.prevWallTouch[i] = wallTouch;
                 this.prevRamTouch[i] = ramTouch;
-                if (entered && this.match.result.tick - (this.lastBumpTick[i] as number) >= 60) {
-                    this.lastBumpTick[i] = this.match.result.tick;
+                if (entered && tickNow - (this.lastBumpTick[i] as number) >= 60) {
+                    this.lastBumpTick[i] = tickNow;
                     this.burst(cx, cy, COLORS.faintNum, 3, 90, 160);
                     playHit(1, s.x);
                 }
@@ -1230,10 +1239,10 @@ export class BattleScene extends Scene {
                 if (this.reducedMotion) this.explode(i, cx, cy, topDealer);
                 else this.startThroes(i, topDealer);
             }
-            if (s.alive && s.health <= 30 && s.health > 0 && this.match.result.tick % 12 === 0) {
+            if (s.alive && s.health <= 30 && s.health > 0 && tickNow % 12 === 0) {
                 this.burst(cx, cy - 10, COLORS.faintNum, 1, 30, -60);
             }
-        });
+        }
         this.prev = snaps;
     }
 
@@ -1249,13 +1258,15 @@ export class BattleScene extends Scene {
      * jitter over ≤450 ms, then the delayed detonation. The kill banner
      * fires from explode(), so it lands post-detonation.
      */
-    private tickThroes(dt: number): void {
+    private tickThroes(dt: number, snaps: RobotSnapshot[]): void {
         for (let i = 0; i < this.throesT.length; i += 1) {
             const t = this.throesT[i] as number;
             if (t <= 0) continue;
             const next = t - dt;
             this.throesT[i] = next;
-            const snap = this.match.robotSnapshots[i] as RobotSnapshot;
+            // Reuse the frame's snapshots: the getter builds a fresh array
+            // (plus per-robot objects) on every read.
+            const snap = snaps[i] as RobotSnapshot;
             const cx = AX + snap.x;
             const cy = AY + snap.y;
             const stage = this.throesStage[i] as number;
@@ -1307,8 +1318,10 @@ export class BattleScene extends Scene {
 
     /** SD danger-fill: pre-baked sprite scaled per frame + amber→red→white. */
     private syncSdRing(): void {
-        const tick = this.match.result.tick;
-        const show = tick >= SD_WARN_TICK && !this.match.result.over;
+        // One result read: the getter allocates a fresh object per access.
+        const res = this.match.result;
+        const tick = res.tick;
+        const show = tick >= SD_WARN_TICK && !res.over;
         this.sdRing.setVisible(show);
         if (!show) return;
         const circle = this.match.safeCircle;
@@ -1316,7 +1329,7 @@ export class BattleScene extends Scene {
         this.sdRing.setPosition(AX + circle.x, AY + circle.y);
         this.sdRing.setScale(Math.max(circle.r, 1) / SD_RING_R);
         this.sdRing.setTint(frac > 0.66 ? COLORS.team[0] : frac > 0.33 ? COLORS.danger : COLORS.white);
-        this.sdRing.setAlpha(this.match.result.suddenDeath ? 0.85 : 0.45);
+        this.sdRing.setAlpha(res.suddenDeath ? 0.85 : 0.45);
         // SD grade cross-tween: re-saturate only when the bucket moves.
         const bucket = Math.round(frac * 20);
         if (bucket !== this.lastGradeFrac) {
@@ -1333,9 +1346,18 @@ export class BattleScene extends Scene {
      */
     private syncHazards(): void {
         const live = this.match.scorchSnapshots;
-        const liveIds = new Set(live.map((s) => s.id));
-        for (const [id, decal] of [...this.hazSeen]) {
-            if (!liveIds.has(id)) {
+        // Allocation-free liveness: both sides are tiny and bounded, so a
+        // linear id scan beats a per-frame Set + map-array + spread.
+        // Deleting during Map iteration is safe.
+        for (const [id, decal] of this.hazSeen) {
+            let gone = true;
+            for (const sc of live) {
+                if (sc.id === id) {
+                    gone = false;
+                    break;
+                }
+            }
+            if (gone) {
                 decal.setVisible(false);
                 this.hazSeen.delete(id);
             }
@@ -1926,7 +1948,8 @@ export class BattleScene extends Scene {
 
     private syncSprites(snaps: RobotSnapshot[], bullets: BulletSnapshot[], dt: number): void {
         const tick = this.match.result.tick;
-        snaps.forEach((s, i) => {
+        for (let i = 0; i < snaps.length; i += 1) {
+            const s = snaps[i] as RobotSnapshot;
             const cx = AX + s.x;
             const cy = AY + s.y;
             const body = this.chassis[i] as Phaser.GameObjects.Image;
@@ -2172,11 +2195,12 @@ export class BattleScene extends Scene {
             this.prevEmpReady[i] = empReady;
             (this.iconDash[i] as Phaser.GameObjects.Image).setVisible(plateOn).setPosition(cx - 30, cy + 30);
             (this.iconEmp[i] as Phaser.GameObjects.Image).setVisible(plateOn).setPosition(cx + 30, cy + 30);
-        });
+        }
         // Bullets from pool (tint only when the slot's team changes).
         // Cur/prev positions feed the dyn-Graphics hot-bullet tracers.
         let hot = false;
-        this.bullets.forEach((img, i) => {
+        for (let i = 0; i < this.bullets.length; i += 1) {
+            const img = this.bullets[i] as Phaser.GameObjects.Image;
             this.prevBX[i] = this.curBX[i] as number;
             this.prevBY[i] = this.curBY[i] as number;
             const b = bullets[i];
@@ -2191,7 +2215,7 @@ export class BattleScene extends Scene {
                 this.hotSlot[i] = false;
                 this.curBX[i] = -9999;
                 this.curBY[i] = -9999;
-                return;
+                continue;
             }
             this.curBX[i] = b.x;
             this.curBY[i] = b.y;
@@ -2204,23 +2228,27 @@ export class BattleScene extends Scene {
                 img.setTexture(want);
                 img.setTint(bulletColor(b.team));
             }
-        });
+        }
         this.hotLive = hot;
     }
 
     private drawDynamic(snaps: RobotSnapshot[]): void {
         const g = this.dyn;
         g.clear();
+        // Hoisted: get result allocates per read; no steps run inside.
+        const tickNow = this.match.result.tick;
+        const sdOn = this.match.result.suddenDeath;
         if (this.request.trails) {
-            snaps.forEach((_ignored, i) => {
+            for (let i = 0; i < snaps.length; i += 1) {
                 const skin = this.request.skins[i] as SlotSkin;
                 const trail = this.trails[i] as Array<{ x: number; y: number }>;
-                trail.forEach((point, k) => {
+                for (let k = 0; k < trail.length; k += 1) {
+                    const point = trail[k] as { x: number; y: number };
                     const frac = (k + 1) / trail.length;
                     g.fillStyle(skin.paint, 0.05 + frac * 0.2);
                     g.fillRect(AX + point.x - 2, AY + point.y - 2, 4, 4);
-                });
-            });
+                }
+            }
         }
         // Anti-clutter rule: FOV cones dim while charged fire is live, paying
         // for the added tracer brightness (no net glow growth).
@@ -2228,13 +2256,14 @@ export class BattleScene extends Scene {
         // Staged-intro telegraph rings: shrinking team circles on each pad
         // until its robot drops (drawn in dyn: zero new objects).
         if (this.introActive && !this.reducedMotion) {
-            snaps.forEach((s, i) => {
+            for (let i = 0; i < snaps.length; i += 1) {
+                const s = snaps[i] as RobotSnapshot;
                 const lt = this.introElapsed - i * 0.12;
-                if (lt >= 0.25) return;
+                if (lt >= 0.25) continue;
                 const t = Math.max(lt, 0) / 0.25;
                 g.lineStyle(2, teamColor(s.team), 0.85);
                 g.strokeCircle(AX + s.x, AY + s.y, 34 - 14 * t);
-            });
+            }
         }
         // Powerup pads: team-neutral diamond/ring markers per kind. Active
         // pads pulse (outer ring = pickup radius); dark pads render dim.
@@ -2265,7 +2294,7 @@ export class BattleScene extends Scene {
                 }
                 continue;
             }
-            const pulse = this.reducedMotion ? 0.7 : 0.55 + 0.3 * Math.sin(this.match.result.tick * 0.15 + (pad.x + pad.y) * 0.01);
+            const pulse = this.reducedMotion ? 0.7 : 0.55 + 0.3 * Math.sin(tickNow * 0.15 + (pad.x + pad.y) * 0.01);
             g.lineStyle(2, color, pulse);
             g.strokeCircle(px, py, PAD_RADIUS);
             if (pad.kind === 'amp') {
@@ -2395,11 +2424,10 @@ export class BattleScene extends Scene {
         // victim-centered threat arcs (white = contested), focus-fire ▼, SD
         // outside pips. The SD circle
         // itself is the pre-baked sprite now (syncSdRing), not dyn strokes.
-        const tickNow = this.match.result.tick;
-        const sdOn = this.match.result.suddenDeath;
         const circle = sdOn ? this.match.safeCircle : null;
-        snaps.forEach((s, i) => {
-            if (!s.alive) return;
+        for (let i = 0; i < snaps.length; i += 1) {
+            const s = snaps[i] as RobotSnapshot;
+            if (!s.alive) continue;
             const cx = AX + s.x;
             const cy = AY + s.y;
             // HP staging: divider ticks every 25 HP across the bar.
@@ -2481,7 +2509,7 @@ export class BattleScene extends Scene {
                 g.fillStyle(COLORS.danger, 0.95);
                 g.fillTriangle(cx - 6, cy + 50, cx + 6, cy + 50, cx, cy + 42);
             }
-        });
+        }
         // Pilot aim reticle: faint sight line plus a crosshair at the cursor.
         if (this.pilot) {
             const s0 = snaps[0] as RobotSnapshot | undefined;
@@ -2545,21 +2573,23 @@ export class BattleScene extends Scene {
     private syncHud(snaps: RobotSnapshot[], bullets: BulletSnapshot[]): void {
         // SD escalation: 10 s pre-warning banner + red timer, then the
         // collapse banner. The danger-fill sprite + minimap echo ride along.
-        const nowTick = this.match.result.tick;
-        if (!this.sdWarned && !this.match.result.over && nowTick >= SD_WARN_TICK) {
+        // One result read: the getter allocates a fresh object per access,
+        // and no sim steps run inside syncHud so the values are frozen.
+        const res = this.match.result;
+        const nowTick = res.tick;
+        if (!this.sdWarned && !res.over && nowTick >= SD_WARN_TICK) {
             this.sdWarned = true;
             this.queueBanner(sdPreWarning(10), COLORS.dangerCss);
             this.hudTimer.setColor(COLORS.dangerCss);
         }
-        if (this.match.result.suddenDeath && !this.sdAnnounced) {
+        if (res.suddenDeath && !this.sdAnnounced) {
             this.sdAnnounced = true;
             this.queueBanner(BATTLE.bannerSuddenDeath, COLORS.dangerCss);
         }
         // SD alarm, throttled ~1/s by tick (silent while paused).
-        if (this.match.result.suddenDeath && !this.match.result.over) {
-            const tick = this.match.result.tick;
-            if (tick - this.lastSdCueTick >= 60) {
-                this.lastSdCueTick = tick;
+        if (res.suddenDeath && !res.over) {
+            if (nowTick - this.lastSdCueTick >= 60) {
+                this.lastSdCueTick = nowTick;
                 playSuddenDeath();
             }
         }
@@ -2570,23 +2600,23 @@ export class BattleScene extends Scene {
             if (s.team === 0) alive0 += 1;
             else alive1 += 1;
         }
-        const second = Math.floor(this.match.result.tick / 60);
+        const second = Math.floor(nowTick / 60);
         if (alive0 !== this.lastAlive[0] || alive1 !== this.lastAlive[1]) {
             this.lastAlive = [alive0, alive1];
             this.hudPips.setText(hudTeamPips(alive0, this.total0, alive1, this.total1));
         }
         if (second !== this.lastHudSecond) {
             this.lastHudSecond = second;
-            this.hudTimer.setText(formatClock(this.match.result.tick));
+            this.hudTimer.setText(formatClock(nowTick));
         }
         // Minimap redraws at most every 3rd tick (perf budget).
-        if (this.match.result.tick - this.lastMapTick >= 3 || this.match.result.over) {
-            this.lastMapTick = this.match.result.tick;
+        if (nowTick - this.lastMapTick >= 3 || res.over) {
+            this.lastMapTick = nowTick;
             this.drawMinimap(snaps, bullets);
         }
         // Team plates refresh at 4 Hz (every 15 ticks).
-        if (this.match.result.tick - this.lastPlateTick >= 15 || this.match.result.over) {
-            this.lastPlateTick = this.match.result.tick;
+        if (nowTick - this.lastPlateTick >= 15 || res.over) {
+            this.lastPlateTick = nowTick;
             this.refreshPlates(snaps);
         }
     }
