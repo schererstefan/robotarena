@@ -2460,15 +2460,20 @@ export class BattleScene extends Scene {
         // Asteroid telegraphs (W1): danger ring at the blast radius plus a
         // shrinking gold countdown ring, drawn in dyn (zero new objects).
         // Always drawn, even under reduced motion: the telegraph is dodge
-        // information, not flair.
-        for (const h of this.match.hazardSnapshots) {
-            const frac = Math.max(h.ticksToImpact, 0) / HAZ_TELEGRAPH_TICKS;
-            g.fillStyle(COLORS.danger, 0.08 + (1 - frac) * 0.08);
-            g.fillCircle(AX + h.x, AY + h.y, h.radius);
-            g.lineStyle(2, COLORS.danger, 0.9 - frac * 0.55);
-            g.strokeCircle(AX + h.x, AY + h.y, h.radius);
-            g.lineStyle(2, COLORS.gold, 0.8);
-            g.strokeCircle(AX + h.x, AY + h.y, Math.max(h.radius * frac, 2));
+        // information, not flair. Cleared with everything else on results:
+        // frozen ticksToImpact would stick the rings behind the panel.
+        // (Render-side skip only: the getter returns a fresh array, and the
+        // sim stays untouched.)
+        if (!this.resultsShown) {
+            for (const h of this.match.hazardSnapshots) {
+                const frac = Math.max(h.ticksToImpact, 0) / HAZ_TELEGRAPH_TICKS;
+                g.fillStyle(COLORS.danger, 0.08 + (1 - frac) * 0.08);
+                g.fillCircle(AX + h.x, AY + h.y, h.radius);
+                g.lineStyle(2, COLORS.danger, 0.9 - frac * 0.55);
+                g.strokeCircle(AX + h.x, AY + h.y, h.radius);
+                g.lineStyle(2, COLORS.gold, 0.8);
+                g.strokeCircle(AX + h.x, AY + h.y, Math.max(h.radius * frac, 2));
+            }
         }
         for (const s of snaps) {
             if (!s.alive) continue;
