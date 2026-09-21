@@ -133,7 +133,7 @@ export function soundLabel(muted: boolean): string {
 }
 
 export function colorLabel(colorblind: boolean): string {
-    return colorblind ? 'COLOR: CB' : 'COLOR: STD';
+    return colorblind ? 'COLOR: COLORBLIND' : 'COLOR: STANDARD';
 }
 
 export function motionLabel(reduced: boolean): string {
@@ -159,7 +159,7 @@ export function cyclerLabel(value: string): string {
 
 /** Skills-button readout: points spent in this slot. */
 export function skillsButtonLabel(cost: number): string {
-    return `SKL ${cost}`;
+    return `SKILLS ${cost}`;
 }
 
 /** Menu description line under the slots. */
@@ -283,7 +283,7 @@ export const IMPORT_DIALOG = {
 } as const;
 
 export function importSlotOption(slot: number, team: 1 | 2, robotName: string): string {
-    return `SLOT ${slot + 1} (team ${team}) — ${robotName.toUpperCase()}`;
+    return `SLOT ${slot + 1} (TEAM ${team}) — ${robotName.toUpperCase()}`;
 }
 
 export function importDoneNotice(robotName: string, slot: number): string {
@@ -573,7 +573,7 @@ export function resultsTitle(pilot: boolean, winner: -1 | 0 | 1): string {
 }
 
 export function resultsSub(seed: number, tick: number): string {
-    return `seed ${seed} - ${formatSecs1(tick)}`;
+    return `SEED ${seed} - ${formatSecs1(tick)}`;
 }
 
 export function exhibitionResultsLine(parts: string[]): string {
@@ -588,7 +588,7 @@ export function resultRow(
     damage: number,
     shots: number,
 ): string {
-    return `${alive ? '>' : 'x'} ${callsign} (${name})  ${kills} KO  ${damage} dmg  ${shots} shots`;
+    return `${alive ? '>' : 'x'} ${callsign} (${name})  ${kills} KO  ${damage} DMG  ${shots} shots`;
 }
 
 // ---- Tournament -----------------------------------------------------------

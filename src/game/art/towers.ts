@@ -19,7 +19,7 @@ export const TOWER_LIGHT: PixelMap = [
     '...kkkkk........',
     '...kcllwk.......',
     '...kllwwdkkkkkkk',
-    '...kltwwwwwwwwwk',
+    '...kltwwwwwwwcck',
     '...kwwdddkkkkkkk',
     '...kwdddk.......',
     '....kkkk........',
