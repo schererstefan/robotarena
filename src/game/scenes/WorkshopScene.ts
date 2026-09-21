@@ -119,6 +119,8 @@ export class WorkshopScene extends Scene {
         this.domButton(row, COMMON.menu, false, () => this.scene.start('Menu'));
 
         this.refresh();
+        // Keyboard-first: land focus in the editor so typing starts at once.
+        area.focus();
     }
 
     private domButton(parent: HTMLElement, label: string, accent: boolean, onClick: () => void): void {
