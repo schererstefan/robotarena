@@ -59,13 +59,14 @@ y grows downward). The sim ticks at 60 Hz.
 | `shared`       | Foe sightings shared by allies, delivered **30 ticks late**, nearest first. Position-only: `id`, `team`, `x`, `y`, `distance`, `bearing` are valid; `heading`, `speed`, `health` are always `0`. Never includes foes you see yourself, your own sightings echoed back, dead foes, or anything in 1v1 (no allies). |
 | `walls`        | Distance to each arena wall: `left`, `right`, `top`, `bottom`.           |
 | `rand()`       | Deterministic random draw in `[0, 1)`. Use this for any randomness.      |
-| `events`       | What happened during the step just completed (empty at tick 0): `hit-by`, `kill`, `ally-down`, `foe-down`, `sudden-death-pulse`, `wall-bump`, `ram`. Sorted kind-then-id, capped at 8. |
+| `events`       | What happened during the step just completed (empty at tick 0): `hit-by`, `kill`, `ally-down`, `foe-down`, `sudden-death-pulse`, `wall-bump`, `ram`, `blast` (asteroid hit: `amount`, no `fromId` — the world did it). Sorted kind-then-id, capped at 8. |
 | `bullets`      | Incoming foe-team bullets inside your sensor cone, nearest first, capped at 12: `x`, `y`, `vx`, `vy`, `distance`, `bearing`, `closing` (positive = approaching), `damage`. |
 | `tracks`       | Engine-kept memory: one entry per living foe ever in your cone (`id`, `x`, `y`, `heading`, `speed`, `lastSeenTick`, `seenNow`), refreshed on every sighting, sorted by id. |
 | `arena`        | Static layout: `id` (`open`/`blocks`), `obstacles` (`{x,y,w,h}`), `centerX`, `centerY`. Symmetric public state. |
 | `zone`         | Safe circle: `phase` (`normal`/`shrinking`), `suddenDeathIn` (ticks), `circle` (`{x,y,r}`), `distToSafety`, `inside`. |
 | `grid`         | Your team's 12×8 heat-map (`cell` 80): `foes` (presence from cone sightings, decays 1/tick) and `danger` (recent damage) integer arrays. |
 | `match`        | Match state: `arena`, `modifiers`, `tickCap`, `killsYou`, `killsTeam`, `aliveFoes`. |
+| `hazards`      | Announced asteroid strikes (empty when none, or all match with `noHazards`): live telegraphs counting down plus the impact-tick frame (`ticksToImpact` 0), sorted by countdown then position — `x`, `y`, `ticksToImpact`, `radius` (70), `damage` (25). World-public: every living robot sees every strike. |
 | `inbox`        | Teammates' radio from exactly 6 ticks ago, sorted (`sent`, `from`), capped at 4. Never your own echo, never from the dead, never cross-team. Empty in 1v1. |
 
 Sensor cone: 540 units range, ~63° wide, centered on your `tower` angle. You only
@@ -81,15 +82,19 @@ The second sense group is event and memory channels. `events` tells you what
 the last step did to you — being hit (`hit-by` carries `amount`/`bearing`/
 `fromId`, and `self.lastDamage` keeps the latest one all match), scoring
 (`kill`), deaths on either side (`ally-down`/`foe-down`), sudden-death ticks,
-and collisions (`wall-bump`, `ram`). `bullets` shows incoming rounds your
+and collisions (`wall-bump`, `ram`), plus asteroid hits (`blast`: `amount`,
+no `fromId`). `bullets` shows incoming rounds your
 tower currently covers, with closing speed for dodging. `tracks` is the
 engine's memory of every foe your cone has seen — stale positions stay
 available after the foe leaves the cone, flagged with `seenNow: false`.
 `arena` is the static (symmetric, public) obstacle map plus the
 `blocked.ahead` whisker for steering; `zone` is the sudden-death circle with
 your distance to safety; `grid` is your team's coarse 12×8 heat-map of foe
-presence and recent damage; `match` carries kills and the living-foe count.
-All seven are fresh copies every tick — mutate them freely, nothing leaks
+presence and recent damage; `match` carries kills and the living-foe count;
+`hazards` lists announced asteroid strikes (90-tick telegraph, 70-radius
+blast for 25 damage, mirrored across the center column) so you can dodge —
+empty when none are announced or the match runs `noHazards`.
+All eight are fresh copies every tick — mutate them freely, nothing leaks
 back into the sim. They are typed optional (treat them as possibly absent),
 but the engine always provides them.
 
@@ -257,7 +262,8 @@ elimination draws — stalling the clock no longer saves you.
 **Exhibition modifiers** (menu MODS panel; barred from stats, tagged in the
 HUD): double damage (every shot ×2, all bullets render hot), hardcore fog
 (your `sense.self.stats.sensorRange` and scan cone halve — read stats, never
-hardcode 540), mirror mode (both teams run identical robots and builds).
+hardcode 540), mirror mode (both teams run identical robots and builds),
+clear skies (`noHazards`: no asteroid strikes — strikes are on by default).
 Modded matches replay exactly via the same replay codes.
 
 ## Rules for robot code

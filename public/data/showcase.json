@@ -20,39 +20,39 @@
    },
    "stats": {
     "before": {
-     "wins": 30,
-     "losses": 32,
-     "draws": 2,
-     "winRate": 0.484375,
+     "wins": 42,
+     "losses": 22,
+     "draws": 0,
+     "winRate": 0.65625,
      "games": 64
     },
     "after": {
-     "wins": 49,
-     "losses": 11,
-     "draws": 4,
-     "winRate": 0.796875,
+     "wins": 52,
+     "losses": 12,
+     "draws": 0,
+     "winRate": 0.8125,
      "games": 64
     }
    },
    "featuredReplays": [
     {
-     "label": "vs turret (open, seed 85229582)",
-     "code": "RA2-418M-G070-3BG0-6124-4328-01WA-0",
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA2-4SPX-0SAG-3BG0-6124-3011-005G-0",
      "outcome": "win"
     },
     {
-     "label": "vs turret (open, seed 85229582)",
-     "code": "RA2-418M-G070-3886-4G01-R030-H3VP-0",
+     "label": "vs rusher (open, seed 1725761109)",
+     "code": "RA2-4SPX-0SAG-3860-2201-R030-H3CE-0",
      "outcome": "win"
     },
     {
-     "label": "vs turret (blocks, seed 85229582)",
-     "code": "RA2-418M-G071-3BG0-6124-4328-00M0-0",
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA2-4SPX-0SAH-3BG0-6124-3011-0065-G",
      "outcome": "win"
     },
     {
-     "label": "vs turret (blocks, seed 85229582)",
-     "code": "RA2-418M-G071-3886-4G01-R030-H2EE-0",
+     "label": "vs rusher (blocks, seed 1725761109)",
+     "code": "RA2-4SPX-0SAH-3860-2201-R030-H2PB-0",
      "outcome": "win"
     }
    ],
@@ -82,26 +82,21 @@
    },
    "stats": {
     "before": {
-     "wins": 39,
-     "losses": 25,
+     "wins": 48,
+     "losses": 16,
      "draws": 0,
-     "winRate": 0.609375,
+     "winRate": 0.75,
      "games": 64
     },
     "after": {
-     "wins": 56,
-     "losses": 8,
+     "wins": 52,
+     "losses": 12,
      "draws": 0,
-     "winRate": 0.875,
+     "winRate": 0.8125,
      "games": 64
     }
    },
    "featuredReplays": [
-    {
-     "label": "vs rusher (open, seed 1725761109)",
-     "code": "RA2-4SPX-0SAG-3BT0-5004-3011-01C9-G",
-     "outcome": "win"
-    },
     {
      "label": "vs rusher (open, seed 1725761109)",
      "code": "RA2-4SPX-0SAG-3860-2201-X02G-02QX-G",
@@ -115,6 +110,11 @@
     {
      "label": "vs rusher (blocks, seed 1725761109)",
      "code": "RA2-4SPX-0SAH-3860-2201-X02G-03VV-G",
+     "outcome": "win"
+    },
+    {
+     "label": "vs turret (open, seed 85229582)",
+     "code": "RA2-418M-G070-3BT0-5004-4328-0183-0",
      "outcome": "win"
     }
    ],
@@ -142,17 +142,17 @@
    },
    "stats": {
     "before": {
-     "wins": 28,
-     "losses": 34,
-     "draws": 2,
-     "winRate": 0.453125,
+     "wins": 47,
+     "losses": 17,
+     "draws": 0,
+     "winRate": 0.734375,
      "games": 64
     },
     "after": {
-     "wins": 52,
-     "losses": 12,
+     "wins": 55,
+     "losses": 9,
      "draws": 0,
-     "winRate": 0.8125,
+     "winRate": 0.859375,
      "games": 64
     }
    },
@@ -203,17 +203,17 @@
    },
    "stats": {
     "before": {
-     "wins": 31,
-     "losses": 33,
-     "draws": 0,
-     "winRate": 0.484375,
+     "wins": 27,
+     "losses": 36,
+     "draws": 1,
+     "winRate": 0.4296875,
      "games": 64
     },
     "after": {
-     "wins": 49,
-     "losses": 15,
+     "wins": 44,
+     "losses": 20,
      "draws": 0,
-     "winRate": 0.765625,
+     "winRate": 0.6875,
      "games": 64
     }
    },
@@ -264,17 +264,17 @@
    },
    "stats": {
     "before": {
-     "wins": 24,
-     "losses": 40,
+     "wins": 23,
+     "losses": 41,
      "draws": 0,
-     "winRate": 0.375,
+     "winRate": 0.359375,
      "games": 64
     },
     "after": {
-     "wins": 45,
-     "losses": 16,
-     "draws": 3,
-     "winRate": 0.7265625,
+     "wins": 28,
+     "losses": 35,
+     "draws": 1,
+     "winRate": 0.4453125,
      "games": 64
     }
    },
@@ -326,31 +326,21 @@
    },
    "stats": {
     "before": {
-     "wins": 32,
-     "losses": 32,
+     "wins": 20,
+     "losses": 44,
      "draws": 0,
-     "winRate": 0.5,
+     "winRate": 0.3125,
      "games": 64
     },
     "after": {
-     "wins": 33,
-     "losses": 31,
+     "wins": 30,
+     "losses": 34,
      "draws": 0,
-     "winRate": 0.515625,
+     "winRate": 0.46875,
      "games": 64
     }
    },
    "featuredReplays": [
-    {
-     "label": "vs rusher (open, seed 1725761109)",
-     "code": "RA2-4SPX-0SAG-3B82-0980-3011-004T-0",
-     "outcome": "win"
-    },
-    {
-     "label": "vs rusher (open, seed 1725761109)",
-     "code": "RA2-4SPX-0SAG-3860-2201-M104-M1K4-0",
-     "outcome": "win"
-    },
     {
      "label": "vs rusher (blocks, seed 1725761109)",
      "code": "RA2-4SPX-0SAH-3B82-0980-3011-00D5-0",
@@ -359,6 +349,16 @@
     {
      "label": "vs rusher (blocks, seed 1725761109)",
      "code": "RA2-4SPX-0SAH-3860-2201-M104-M1YR-G",
+     "outcome": "win"
+    },
+    {
+     "label": "vs turret (blocks, seed 85229582)",
+     "code": "RA2-418M-G071-3886-4G01-M104-M1JB-G",
+     "outcome": "win"
+    },
+    {
+     "label": "vs orbiter (blocks, seed 2739665351)",
+     "code": "RA2-58TB-Z73H-3B82-0980-AG10-G08P-0",
      "outcome": "win"
     }
    ],
@@ -387,17 +387,17 @@
    },
    "stats": {
     "before": {
-     "wins": 25,
-     "losses": 39,
+     "wins": 20,
+     "losses": 44,
      "draws": 0,
-     "winRate": 0.390625,
+     "winRate": 0.3125,
      "games": 64
     },
     "after": {
-     "wins": 35,
-     "losses": 29,
+     "wins": 28,
+     "losses": 36,
      "draws": 0,
-     "winRate": 0.546875,
+     "winRate": 0.4375,
      "games": 64
     }
    },
@@ -449,17 +449,17 @@
    },
    "stats": {
     "before": {
-     "wins": 16,
-     "losses": 48,
-     "draws": 0,
-     "winRate": 0.25,
+     "wins": 19,
+     "losses": 43,
+     "draws": 2,
+     "winRate": 0.3125,
      "games": 64
     },
     "after": {
      "wins": 30,
-     "losses": 34,
-     "draws": 0,
-     "winRate": 0.46875,
+     "losses": 32,
+     "draws": 2,
+     "winRate": 0.484375,
      "games": 64
     }
    },

@@ -107,18 +107,34 @@ export type SenseEventKind =
     | 'foe-down'
     | 'sudden-death-pulse'
     | 'wall-bump'
-    | 'ram';
+    | 'ram'
+    | 'blast';
 
 export interface SenseEvent {
     /** Tick the event happened (the step just completed). */
     tick: number;
     kind: SenseEventKind;
-    /** Damage, for `hit-by` and `sudden-death-pulse`. */
+    /** Damage, for `hit-by`, `sudden-death-pulse`, and `blast`. */
     amount?: number;
     /** Absolute bearing from you to the shooter, for `hit-by`. */
     bearing?: number;
-    /** Other robot: shooter (`hit-by`), victim (`kill`, `*-down`), bumper (`ram`). */
+    /** Other robot: shooter (`hit-by`), victim (`kill`, `*-down`), bumper (`ram`). Absent for `blast` (the world did it). */
     fromId?: number;
+}
+
+/**
+ * One asteroid strike: a telegraph counting down, then the impact tick.
+ * World-public (like `zone`): every living robot sees every strike.
+ */
+export interface SensedHazard {
+    x: number;
+    y: number;
+    /** Ticks until impact (0 = impacting on this step). */
+    ticksToImpact: number;
+    /** Blast radius in arena units. */
+    radius: number;
+    /** Damage dealt inside the radius. */
+    damage: number;
 }
 
 /** An incoming (foe-team) bullet inside your sensor cone. */
@@ -249,6 +265,14 @@ export interface SenseState {
     grid?: SenseGrid;
     /** Match-level state. Optional, engine-provided. */
     match?: SenseMatch;
+    /**
+     * Announced asteroid strikes: live telegraphs counting down plus the
+     * impact-tick frame (`ticksToImpact` 0), sorted by countdown then
+     * position. World-public: every living robot sees every strike. Empty
+     * when the match runs hazard-free (`noHazards`) or none are announced.
+     * Optional, engine-provided.
+     */
+    hazards?: SensedHazard[];
     /**
      * Teammates' radio messages from exactly COMMS_DELAY ticks ago, sorted
      * (sent, from), capped at COMMS_INBOX_MAX. Never your own echo, never

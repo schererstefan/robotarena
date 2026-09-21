@@ -1,11 +1,11 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SPAWN_HEADING_JITTER, SPAWN_SALT, SPAWN_X, SPAWN_X_JITTER, SPAWN_Y_JITTER, SPAWN_Y_SHIFT, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
+import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_RADIUS, HAZ_SALT, HAZ_SCORCH_TICKS, HAZ_TELEGRAPH_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SPAWN_HEADING_JITTER, SPAWN_SALT, SPAWN_X, SPAWN_X_JITTER, SPAWN_Y_JITTER, SPAWN_Y_SHIFT, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
 import { angleDiff, assistSteer, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
-import { COMMS_KINDS, IDLE_INTENT, type CommsKind, type DamageSite, type InboxMessage, type Intent, type OutboxMessage, type RobotController, type SensedAlly, type SensedBullet, type SensedRobot, type SenseEvent, type SenseState, type TrackedFoe } from './types';
+import { COMMS_KINDS, IDLE_INTENT, type CommsKind, type DamageSite, type InboxMessage, type Intent, type OutboxMessage, type RobotController, type SensedAlly, type SensedBullet, type SensedHazard, type SensedRobot, type SenseEvent, type SenseState, type TrackedFoe } from './types';
 
 export interface RobotSnapshot {
     id: number;
@@ -38,6 +38,26 @@ export interface BulletSnapshot {
     y: number;
     team: 0 | 1;
     hot: boolean;
+}
+
+/** One live asteroid telegraph (announced, not yet resolved). */
+export interface HazardSnapshot {
+    x: number;
+    y: number;
+    /** Ticks until impact (0 = impacting on this step). */
+    ticksToImpact: number;
+    radius: number;
+    damage: number;
+}
+
+/** One strike scorch mark (impact record, fades with age). */
+export interface ScorchSnapshot {
+    /** Stable id for render-side decal bookkeeping. */
+    id: number;
+    x: number;
+    y: number;
+    /** Ticks since impact. */
+    age: number;
 }
 
 export interface MatchResult {
@@ -126,6 +146,23 @@ interface SharedSighting {
     y: number;
 }
 
+/** One announced asteroid strike: a telegraph counting down to impact. */
+interface Strike {
+    x: number;
+    y: number;
+    announceTick: number;
+    impactTick: number;
+    resolved: boolean;
+}
+
+/** One strike impact mark (render-side scorch decal source). */
+interface Scorch {
+    id: number;
+    x: number;
+    y: number;
+    tick: number;
+}
+
 export interface LineupEntry {
     team: 0 | 1;
     controller: RobotController;
@@ -205,6 +242,11 @@ export class Match {
     /** Events of the last completed step (delivered) and the current step (building), per robot id. */
     private prevEvents: SenseEvent[][] = [];
     private curEvents: SenseEvent[][] = [];
+    /** Announced asteroid strikes (the log; resolved entries stay for the fingerprint). */
+    private strikes: Strike[] = [];
+    /** Strike impact marks, pruned past HAZ_SCORCH_TICKS. */
+    private scorches: Scorch[] = [];
+    private scorchSeq = 0;
 
     constructor(lineups: LineupEntry[], seed: number, options: MatchOptions = {}) {
         this.seed = seed;
@@ -326,6 +368,30 @@ export class Match {
 
     get bulletSnapshots(): BulletSnapshot[] {
         return this.bullets.map((b) => ({ x: b.x, y: b.y, team: b.team, hot: b.damage > BULLET_DAMAGE }));
+    }
+
+    /** Live asteroid telegraphs, sorted by countdown then position. */
+    get hazardSnapshots(): HazardSnapshot[] {
+        return this.liveHazards().map((s) => ({
+            x: s.x,
+            y: s.y,
+            ticksToImpact: s.impactTick - this.tick,
+            radius: HAZ_RADIUS,
+            damage: HAZ_DAMAGE,
+        }));
+    }
+
+    /** Strike impact marks (pruned past HAZ_SCORCH_TICKS), oldest first. */
+    get scorchSnapshots(): ScorchSnapshot[] {
+        return this.scorches.map((sc) => ({ id: sc.id, x: sc.x, y: sc.y, age: this.tick - sc.tick }));
+    }
+
+    /**
+     * Full strike log for the fingerprint: every announced impact point in
+     * announce order. Copies: mutating the result never touches the sim.
+     */
+    get hazardStrikes(): Array<{ x: number; y: number; announceTick: number; impactTick: number }> {
+        return this.strikes.map((s) => ({ x: s.x, y: s.y, announceTick: s.announceTick, impactTick: s.impactTick }));
     }
 
     step(): void {
@@ -471,6 +537,10 @@ export class Match {
         });
         // 5. Bullets.
         this.stepBullets();
+        // 5b. Powerup-pads slot: the powerups track owns stepPads() on this
+        // disjoint branch (heal-before-hazard ordering decided at merge).
+        // 5c. Hazards: seed-scheduled asteroid strikes, pre-sudden-death only.
+        this.stepHazards();
         // 6. Sudden death: past the cap, robots outside the circle pulse damage.
         if (this.tick >= MAX_TICKS) this.suddenDeath();
         // 7. Sense channels: freeze this step's events for delivery and roll
@@ -874,6 +944,17 @@ export class Match {
                 killsTeam,
                 aliveFoes,
             },
+            // Asteroid telegraphs: world-public, every living robot sees
+            // every strike (fresh copies, like every other channel).
+            hazards: this.liveHazards().map(
+                (s): SensedHazard => ({
+                    x: s.x,
+                    y: s.y,
+                    ticksToImpact: s.impactTick - this.tick,
+                    radius: HAZ_RADIUS,
+                    damage: HAZ_DAMAGE,
+                }),
+            ),
             inbox: this.inboxFor(robot),
         };
     }
@@ -1038,6 +1119,74 @@ export class Match {
             if (!hit) survivors.push(bullet);
         }
         this.bullets = survivors;
+    }
+
+    /** Unresolved strikes, sorted by impact tick then position. */
+    private liveHazards(): Strike[] {
+        return this.strikes
+            .filter((s) => !s.resolved)
+            .sort((a, b) => a.impactTick - b.impactTick || a.x - b.x || a.y - b.y);
+    }
+
+    /**
+     * Asteroid strikes (complexity/W1). Seed-scheduled mirrored pairs in the
+     * pre-sudden-death window: announce on the cooldown grid, resolve after
+     * the telegraph lead. Determinism: one draw from a dedicated stream
+     * (seed ^ HAZ_SALT ^ announce tick) per pair — robot RNG streams and
+     * brain behavior never shift the schedule, and no Math.random anywhere.
+     */
+    private stepHazards(): void {
+        if (this.mods.noHazards === true) return;
+        if (this.tick >= MAX_TICKS) return;
+        if (
+            this.tick >= HAZ_FIRST_TICK &&
+            (this.tick - HAZ_FIRST_TICK) % HAZ_COOLDOWN_TICKS === 0 &&
+            this.tick + HAZ_TELEGRAPH_TICKS < MAX_TICKS
+        ) {
+            this.announceStrikePair();
+        }
+        for (const strike of this.strikes) {
+            if (!strike.resolved && strike.impactTick === this.tick) this.resolveStrike(strike);
+        }
+        if (this.scorches.length > 0) {
+            this.scorches = this.scorches.filter((sc) => this.tick - sc.tick < HAZ_SCORCH_TICKS);
+        }
+    }
+
+    /**
+     * Target one uniform-random living robot's current position plus its
+     * mirror across the center column (x=480). Announce-time positions are
+     * fixed, so the impact is dodgeable; the mirror keeps every strike
+     * team-symmetric whatever the target pick does.
+     */
+    private announceStrikePair(): void {
+        const living = this.robots.filter((r) => r.alive);
+        if (living.length === 0) return;
+        const rand = createRng((this.seed ^ HAZ_SALT ^ this.tick) >>> 0);
+        const target = living[Math.floor(rand() * living.length)] as (typeof living)[number];
+        const impactTick = this.tick + HAZ_TELEGRAPH_TICKS;
+        this.strikes.push(
+            { x: target.x, y: target.y, announceTick: this.tick, impactTick, resolved: false },
+            { x: ARENA_WIDTH - target.x, y: target.y, announceTick: this.tick, impactTick, resolved: false },
+        );
+    }
+
+    /**
+     * Flat world damage inside HAZ_RADIUS (center-distance, exact): no
+     * shooter, so no lastDamage write and no kill credit — slay(null) only
+     * notifies. Damaged robots get a `blast` event plus a danger stamp.
+     */
+    private resolveStrike(strike: Strike): void {
+        strike.resolved = true;
+        for (const robot of this.robots) {
+            if (!robot.alive) continue;
+            if (dist(strike.x, strike.y, robot.x, robot.y) > HAZ_RADIUS) continue;
+            robot.health -= HAZ_DAMAGE;
+            this.emit(robot.id, { kind: 'blast', amount: HAZ_DAMAGE });
+            this.stampDanger(robot, HAZ_DAMAGE);
+            if (robot.health <= 0) this.slay(robot, null);
+        }
+        this.scorches.push({ id: this.scorchSeq++, x: strike.x, y: strike.y, tick: this.tick });
     }
 
     private suddenDeath(): void {

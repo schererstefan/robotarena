@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, HAZ_TELEGRAPH_TICKS, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, sanitizeIntent, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
@@ -71,7 +71,8 @@ function fingerprint(match: Match): string {
         [s.code, s.maxHealth, s.alive ? 1 : 0, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired, s.cooldown, s.charge, s.dashCd, s.empCd, s.slowed ? 1 : 0].join(','),
     );
     const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team, b.hot ? 1 : 0].join(',')).join(';');
-    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}`;
+    const hazards = match.hazardStrikes.map((s) => [s.x, s.y, s.announceTick, s.impactTick].join(',')).join(';');
+    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${hazards}`;
 }
 
 // --- 1. Determinism: same seed, same everything ------------------------------
@@ -87,6 +88,57 @@ console.log('determinism');
     const f = runMatch(['hunter', 'orbiter'], [0, 1], 1234, undefined, 'blocks');
     const g = runMatch(['hunter', 'orbiter'], [0, 1], 1234, undefined, 'blocks');
     check('identical fingerprint on blocks arena', fingerprint(f) === fingerprint(g));
+}
+
+// --- 1b. Hazards: deterministic schedule, mirrored pairs, opt-out -------
+console.log('hazards');
+{
+    // Passive robots never damage each other, so the match always survives
+    // past the first strike announcement (tick 300) into the telegraph.
+    const seenHazards: number[] = [];
+    const passive = (record: boolean): RobotController => ({
+        meta: { id: 'passive', name: 'Passive', author: 'test', version: '0', description: '' },
+        update: (sense: SenseState): Intent => {
+            if (record) seenHazards.push(sense.hazards?.length ?? 0);
+            return {};
+        },
+    });
+    function hazardMatch(seed: number, modifiers: MatchModifiers = {}): Match {
+        const match = new Match(
+            [
+                { team: 0, controller: passive(true) },
+                { team: 1, controller: passive(false) },
+            ],
+            seed,
+            { modifiers },
+        );
+        for (let i = 0; i < 400 && !match.over; i += 1) match.step();
+        return match;
+    }
+    const h1 = hazardMatch(42);
+    const h2 = hazardMatch(42);
+    check(
+        'hazard schedule is deterministic for identical seed',
+        h1.hazardStrikes.length > 0 && JSON.stringify(h1.hazardStrikes) === JSON.stringify(h2.hazardStrikes),
+        `strikes=${h1.hazardStrikes.length}`,
+    );
+    const strikes = h1.hazardStrikes;
+    let mirrored = strikes.length > 0 && strikes.length % 2 === 0;
+    for (let i = 0; i + 1 < strikes.length; i += 2) {
+        const a = strikes[i] as { x: number; y: number; announceTick: number; impactTick: number };
+        const b = strikes[i + 1] as { x: number; y: number; announceTick: number; impactTick: number };
+        if (a.announceTick !== b.announceTick || a.impactTick !== b.impactTick) mirrored = false;
+        if (Math.abs(a.x + b.x - ARENA_WIDTH) > 1e-6 || a.y !== b.y) mirrored = false;
+        if (a.impactTick - a.announceTick !== HAZ_TELEGRAPH_TICKS) mirrored = false;
+    }
+    check('strike pairs are center-column mirrored with full telegraph lead', mirrored);
+    check('announced strikes reach the hazards sense channel', seenHazards.some((n) => n > 0));
+    const off = hazardMatch(42, { noHazards: true });
+    check('noHazards opts out of all strikes', off.hazardStrikes.length === 0);
+    check(
+        'modifier flag changes the match fingerprint',
+        fingerprint(off) !== fingerprint(h1),
+    );
 }
 
 // --- 2. Intent clamping: a cheating robot cannot break physics ---------------
@@ -977,6 +1029,9 @@ console.log('sudden-death');
         meta: { id, name: id, author: 'test', version: '0', description: '' },
         update: (): Intent => ({ throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false }),
     });
+    // Hazard-free: this section measures the collapse mechanics, and stationary
+    // dummies would otherwise eat mirrored strikes (25 damage each) and end
+    // the match before the cap — stalling `while (tick < MAX_TICKS)` forever.
     const stalled = (): Match =>
         new Match(
             [
@@ -984,6 +1039,7 @@ console.log('sudden-death');
                 { team: 1, controller: dummy('dummy-b') },
             ],
             11,
+            { modifiers: { noHazards: true } },
         );
     const match = stalled();
     while (match.result.tick < MAX_TICKS) match.step();
@@ -1023,6 +1079,7 @@ console.log('sudden-death');
             { team: 1, controller: sitter('sit-b') },
         ],
         11,
+        { modifiers: { noHazards: true } },
     );
     let guardSit = 0;
     while (!sit.result.over && guardSit <= MAX_TICKS_TOTAL) {
@@ -2662,6 +2719,9 @@ console.log('comms');
             return { throttle: 1, turn: Math.max(-1, Math.min(1, diff * 2)) };
         },
     });
+    // Hazard-free: this match measures radio lifetime against the sudden-death
+    // clock, and a stationary spammer would otherwise eat mirrored strikes
+    // and die mid-game (death=5641 observed).
     const dying = new Match(
         [
             { team: 0, controller: spammer },
@@ -2679,6 +2739,7 @@ console.log('comms');
             { team: 1, controller: toCenter('b') },
         ],
         11,
+        { modifiers: { noHazards: true } },
     );
     let deathTick = -1;
     for (let i = 0; i < MAX_TICKS_TOTAL && !dying.result.over; i += 1) {
@@ -3170,6 +3231,10 @@ console.log('brain');
     // Factory-pure comparison under a pinned loadout: the brain-vs-legacy
     // interaction with a loadout is balance-eval territory (see eval:rr),
     // while this check guards the Phase 7 factory conversion itself.
+    // Hazard-free by design: it reproduces the pre-W1 world this guard was
+    // written for, so mirrored-strike noise in 12-game tallies cannot mask
+    // (or fake) the conversion signal. Hazard balance is judged by eval:rr
+    // degeneracy, not by this unit guard.
     {
         const hunterEntry = ROBOTS.find((r) => r.meta.id === 'hunter');
         if (!hunterEntry) throw new Error('no hunter');
@@ -3192,7 +3257,7 @@ console.log('brain');
                                           { team: 0, controller: foe.create(), loadout: { ...foe.loadout } },
                                           { team: 1, controller: make(), loadout: { ...pinnedLoadout } },
                                       ];
-                            const m = new Match(lineups, seed, { arena });
+                            const m = new Match(lineups, seed, { arena, modifiers: { noHazards: true } });
                             m.runToEnd();
                             if ((m.result.winner === 0 && order === 0) || (m.result.winner === 1 && order === 1)) wins += 1;
                         }
@@ -3255,16 +3320,19 @@ console.log('pinned-codes');
     // format, both describing the same match (winner 1 @ tick 290).
     // Re-pinned for complexity/spawn seeded variation (deterministic
     // re-sim x2; outcome unchanged, spawn geometry moved the end state).
+    // W1 note: the match ends at tick 290, before the first announcement
+    // (tick 300), so only the fingerprint format moved (trailing empty
+    // hazards segment); the sim behavior is unchanged.
     const pins: Array<{ format: string; code: string; fp: string }> = [
         {
             format: 'RA2',
             code: 'RA2-4000-2290-3860-2200-4328-0091-0',
-            fp: 'open|{}|1@290|OVR3 TRG1 PLT2,130,0,0,578.9258332055584,504.4712165470966,2.4838022661497137,-0.6757560931448545,0,60,6,16,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,40,653.9098876986923,440.21522725762117,-2.536764874794541,2.418550658083492,1,132,12,10,0,0,0,0|640.4499522260696,459.11108519103584,0,0',
+            fp: 'open|{}|1@290|OVR3 TRG1 PLT2,130,0,0,578.9258332055584,504.4712165470966,2.4838022661497137,-0.6757560931448545,0,60,6,16,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,40,653.9098876986923,440.21522725762117,-2.536764874794541,2.418550658083492,1,132,12,10,0,0,0,0|640.4499522260696,459.11108519103584,0,0|',
         },
         {
             format: 'RA1',
             code: 'RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo0MjQyLCJ0IjoxLCJsIjpbInJ1c2hlciIsInR1cnJldCJdLCJvIjpbIjA6Myw1OjEsODoyIiwiMjoxLDM6Miw1OjIsNjoxIl0sImEiOiJvcGVuIiwibSI6IiJ9',
-            fp: 'open|{}|1@290|OVR3 TRG1 PLT2,130,0,0,578.9258332055584,504.4712165470966,2.4838022661497137,-0.6757560931448545,0,60,6,16,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,40,653.9098876986923,440.21522725762117,-2.536764874794541,2.418550658083492,1,132,12,10,0,0,0,0|640.4499522260696,459.11108519103584,0,0',
+            fp: 'open|{}|1@290|OVR3 TRG1 PLT2,130,0,0,578.9258332055584,504.4712165470966,2.4838022661497137,-0.6757560931448545,0,60,6,16,0,0,0,0|SRV1 SCN2 TRG2 MRK1,100,1,40,653.9098876986923,440.21522725762117,-2.536764874794541,2.418550658083492,1,132,12,10,0,0,0,0|640.4499522260696,459.11108519103584,0,0|',
         },
     ];
     for (const pin of pins) {
