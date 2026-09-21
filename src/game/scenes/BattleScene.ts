@@ -1280,7 +1280,7 @@ export class BattleScene extends Scene {
         this.lampB?.setVisible(this.flickOn);
     }
 
-    /** Death skull-markers hold 5 s over the wreck, then fade. */
+    /** Death skull-markers hold full alpha 3 s over the wreck, then fade 2 s. */
     private tickSkulls(dt: number): void {
         for (const skull of this.skulls) {
             if (skull.ttl <= 0) continue;
@@ -1293,9 +1293,9 @@ export class BattleScene extends Scene {
         }
     }
 
-    private placeSkull(x: number, y: number): void {
+    private placeSkull(x: number, y: number, team: 0 | 1): void {
         const skull = this.skulls.find((k) => k.ttl <= 0) ?? this.skulls[0]!;
-        skull.text.setPosition(x, y - 44).setAlpha(1).setVisible(true);
+        skull.text.setPosition(x, y - 44).setColor(teamCss(team)).setAlpha(1).setVisible(true);
         skull.ttl = 5;
     }
 
@@ -1587,7 +1587,7 @@ export class BattleScene extends Scene {
         }
         this.fireRing(cx, cy, true);
         this.killZoom();
-        this.placeSkull(cx, cy);
+        this.placeSkull(cx, cy, snap.team);
         this.fireBloom();
         playExplosion(snap.x);
         // Framed explosion from the pool (6 slots for 6 robots max), then a
@@ -1608,7 +1608,7 @@ export class BattleScene extends Scene {
             this.time.delayedCall(260, () => boom.setTexture('boom_4'));
             this.time.delayedCall(430, () => boom.destroy());
         }
-        const wreck = this.add.image(cx, cy, wreckDirKey(robotId, dir8ForHeading(snap.heading + 0.5))).setScale(2).setDepth(3);
+        const wreck = this.add.image(cx, cy, wreckDirKey(robotId, dir8ForHeading(snap.heading))).setScale(2).setDepth(3);
         wreck.setAlpha(0.95);
         // Wreck settle: Bounce ease-out + a dust kick (static when reduced).
         if (!this.reducedMotion) {
