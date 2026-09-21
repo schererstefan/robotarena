@@ -8,7 +8,7 @@ import { getRobot } from '../../robots/registry';
 import type { ArenaId } from '../../sim/constants';
 import { decodeReplay } from '../../sim/replay';
 import { loadoutCode, type SkillLoadout } from '../../sim/skills';
-import { playClick, toggleMuted, unlockAudio } from '../audio';
+import { playClick, playHover, toggleMuted, unlockAudio } from '../audio';
 import { CALLSIGNS, defaultSkin } from '../customize';
 import { FocusNav, type NavTarget } from '../nav';
 import { fetchOnlineBoard, type OnlineBoard } from '../onlineBoard';
@@ -274,7 +274,10 @@ export class ShowcaseScene extends Scene {
             const bg = track(this.add.rectangle(CX, y, 680, 26, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(50));
             track(this.add.text(CX - 325, y, showcaseReplayLine(rep.label, rep.outcome), FONTS.monoSmall).setOrigin(0, 0.5).setDepth(50));
             bg.setInteractive({ useHandCursor: true });
-            bg.on('pointerover', () => bg.setStrokeStyle(1, COLORS.team[0]));
+            bg.on('pointerover', () => {
+                bg.setStrokeStyle(1, COLORS.team[0]);
+                playHover();
+            });
             bg.on('pointerout', () => bg.setStrokeStyle(1, COLORS.panelEdge));
             bg.on('pointerdown', () => this.watchCode(rep.code, champ.botId));
             overlayNav.push({ x: CX, y, w: 680, h: 26, activate: () => this.watchCode(rep.code, champ.botId) });
@@ -284,7 +287,10 @@ export class ShowcaseScene extends Scene {
             const bg = track(this.add.rectangle(x, listEnd + 44, 200, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
             track(this.add.text(x, listEnd + 44, label, FONTS.button).setOrigin(0.5).setDepth(50));
             bg.setInteractive({ useHandCursor: true });
-            bg.on('pointerover', () => bg.setStrokeStyle(2, COLORS.team[0]));
+            bg.on('pointerover', () => {
+                bg.setStrokeStyle(2, COLORS.team[0]);
+                playHover();
+            });
             bg.on('pointerout', () => bg.setStrokeStyle(2, COLORS.panelEdge));
             bg.on('pointerdown', onClick);
             overlayNav.push({ x, y: listEnd + 44, w: 200, h: 40, activate: onClick });
@@ -342,7 +348,10 @@ export class ShowcaseScene extends Scene {
                 const bg = this.trackTab(this.add.rectangle(CX + 250, y, 110, 22, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge));
                 this.trackTab(this.add.text(CX + 250, y, ONLINE.watch, FONTS.buttonSmall).setOrigin(0.5));
                 bg.setInteractive({ useHandCursor: true });
-                bg.on('pointerover', () => bg.setStrokeStyle(1, COLORS.team[0]));
+                bg.on('pointerover', () => {
+                    bg.setStrokeStyle(1, COLORS.team[0]);
+                    playHover();
+                });
                 bg.on('pointerout', () => bg.setStrokeStyle(1, COLORS.panelEdge));
                 bg.on('pointerdown', () => this.watchCode(row.showcaseCode, row.botId));
                 this.navContentTarget(CX + 250, y, 110, 22, () => this.watchCode(row.showcaseCode, row.botId));

@@ -7,7 +7,7 @@ import { Scene } from 'phaser';
 import { getRobot, ROBOTS } from '../../robots/registry';
 import { Match } from '../../sim/engine';
 import { loadoutCode } from '../../sim/skills';
-import { unlockAudio, playClick, toggleMuted } from '../audio';
+import { unlockAudio, playClick, playHover, toggleMuted } from '../audio';
 import { CALLSIGNS, defaultSkin } from '../customize';
 import {
     bracketedLabel,
@@ -135,7 +135,10 @@ export class TournamentScene extends Scene {
         const bg = this.trackSetup(this.add.rectangle(x, y, 200, 42, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge));
         const text = this.trackSetup(this.add.text(x, y, '', FONTS.button).setOrigin(0.5));
         bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerover', () => bg.setStrokeStyle(2, COLORS.team[0]));
+        bg.on('pointerover', () => {
+            bg.setStrokeStyle(2, COLORS.team[0]);
+            playHover();
+        });
         bg.on('pointerout', () => bg.setStrokeStyle(2, COLORS.panelEdge));
         bg.on('pointerdown', onClick);
         return { setLabel: (label: string) => text.setText(label) };
@@ -145,7 +148,10 @@ export class TournamentScene extends Scene {
         const bg = this.trackSetup(this.add.rectangle(x, y, w, h, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge));
         this.trackSetup(this.add.text(x, y, label, FONTS.button).setOrigin(0.5));
         bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerover', () => bg.setStrokeStyle(2, COLORS.team[0]));
+        bg.on('pointerover', () => {
+            bg.setStrokeStyle(2, COLORS.team[0]);
+            playHover();
+        });
         bg.on('pointerout', () => bg.setStrokeStyle(2, COLORS.panelEdge));
         bg.on('pointerdown', onClick);
     }
@@ -185,7 +191,10 @@ export class TournamentScene extends Scene {
             const text = this.trackEntrant(this.add.text(CX + 40, y, cyclerLabel(entry.meta.name), FONTS.buttonSmall).setOrigin(0.5));
             text.setColor(COLORS.ink);
             bg.setInteractive({ useHandCursor: true });
-            bg.on('pointerover', () => bg.setStrokeStyle(2, COLORS.team[0]));
+            bg.on('pointerover', () => {
+                bg.setStrokeStyle(2, COLORS.team[0]);
+                playHover();
+            });
             bg.on('pointerout', () => bg.setStrokeStyle(2, COLORS.panelEdge));
             bg.on('pointerdown', () => this.cycleEntrant(i));
             this.trackEntrant(this.add.text(770, y, loadoutCode(entry.loadout), FONTS.monoSmall).setOrigin(0, 0.5));
@@ -400,7 +409,10 @@ export class TournamentScene extends Scene {
         const bg = this.trackBracket(this.add.rectangle(x, y, w, h, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge));
         this.trackBracket(this.add.text(x, y, label, FONTS.button).setOrigin(0.5));
         bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerover', () => bg.setStrokeStyle(2, COLORS.team[0]));
+        bg.on('pointerover', () => {
+            bg.setStrokeStyle(2, COLORS.team[0]);
+            playHover();
+        });
         bg.on('pointerout', () => bg.setStrokeStyle(2, COLORS.panelEdge));
         bg.on('pointerdown', onClick);
     }

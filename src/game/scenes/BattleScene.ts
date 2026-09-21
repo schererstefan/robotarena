@@ -1093,6 +1093,7 @@ export class BattleScene extends Scene {
                 } else if (this.match.result.suddenDeath && topDealer < 0) {
                     this.spawnDamageNumber(cx, cy - 18, dmg, 'sd');
                     this.hurtT[i] = 2;
+                    playHit(dmg, s.x);
                 } else if (dmg > this.normalDamage) {
                     this.spawnDamageNumber(cx, cy - 18, dmg, 'charged');
                     this.hurtT[i] = 2;

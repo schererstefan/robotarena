@@ -731,7 +731,10 @@ export class MenuScene extends Scene {
         const text = this.track(this.add.text(x, y, label, FONTS.buttonSmall).setOrigin(0.5));
         text.setColor(color);
         bg.setInteractive({ useHandCursor: true });
-        bg.on('pointerover', () => bg.setStrokeStyle(2, COLORS.team[0]));
+        bg.on('pointerover', () => {
+            bg.setStrokeStyle(2, COLORS.team[0]);
+            playHover();
+        });
         bg.on('pointerout', () => bg.setStrokeStyle(2, COLORS.panelEdge));
         bg.on('pointerdown', onClick);
     }
@@ -767,11 +770,22 @@ export class MenuScene extends Scene {
             previewTower.setTint(skin.paint).setRotation(-0.5);
             const previewHub = this.track(this.add.image(152, y, 'hub').setScale(2));
             previewHub.setTint(skin.paint);
+            // Finish preview, exactly as the battle renders it: Ring circle
+            // (radius ROBOT_RADIUS + 6) or Stripe bar; Solid adds nothing.
+            const sway: Phaser.GameObjects.GameObject[] = [preview, previewTower, previewHub];
+            if (skin.finish === 'Ring') {
+                const previewRing = this.track(this.add.graphics());
+                previewRing.lineStyle(2, skin.paint, 0.85);
+                previewRing.strokeCircle(152, y, 20);
+                sway.push(previewRing);
+            } else if (skin.finish === 'Stripe') {
+                sway.push(this.track(this.add.rectangle(152, y, 26, 5, skin.paint)));
+            }
             // Idle life: gentle preview sway via tween (no new MenuScene
             // update loop; frozen under reduced motion).
             if (!isReducedMotion()) {
                 this.tweens.add({
-                    targets: [preview, previewTower, previewHub],
+                    targets: sway,
                     y: y + 3,
                     duration: 900 + i * 70,
                     yoyo: true,
