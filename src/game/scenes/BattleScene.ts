@@ -263,6 +263,8 @@ export class BattleScene extends Scene {
     private resultsRowIds: number[] = [];
     private resultsRowTexts: Phaser.GameObjects.Text[] = [];
     private resultsRowBase: string[] = [];
+    /** Pilot help bar: hidden once results land (dead controls need no help). */
+    private pilotHelp: Array<Phaser.GameObjects.Rectangle | Phaser.GameObjects.Text> = [];
     private trails: Array<Array<{ x: number; y: number }>> = [];
     private lastTrailTick = -1;
     private stripes: Phaser.GameObjects.Rectangle[] = [];
@@ -342,6 +344,7 @@ export class BattleScene extends Scene {
         this.resultsRowIds = [];
         this.resultsRowTexts = [];
         this.resultsRowBase = [];
+        this.pilotHelp = [];
         this.chassis = [];
         this.towers = [];
         this.hubs = [];
@@ -701,11 +704,12 @@ export class BattleScene extends Scene {
         const seedText = this.add.text(AX + ARENA_WIDTH - 12, 26, seedLabel(this.request.seed, tags), FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
         if (this.exhibition) seedText.setColor(COLORS.goldCss);
         if (this.request.pilot === true) {
-            this.add.rectangle(AX + ARENA_WIDTH / 2, AY + 14, 700, 20, 0x000000, 0.6).setDepth(10);
-            this.add
+            const helpBg = this.add.rectangle(AX + ARENA_WIDTH / 2, AY + 14, 700, 20, 0x000000, 0.6).setDepth(10);
+            const helpText = this.add
                 .text(AX + ARENA_WIDTH / 2, AY + 14, BATTLE.pilotHelp, FONTS.monoSmall)
                 .setOrigin(0.5)
                 .setDepth(10);
+            this.pilotHelp = [helpBg, helpText];
         }
         this.banner = this.add.text(AX + ARENA_WIDTH / 2, AY + 56, '', FONTS.heading).setOrigin(0.5).setDepth(10).setAlpha(0);
         if (this.exhibition) {
@@ -2881,6 +2885,8 @@ export class BattleScene extends Scene {
             settleTournamentMatch(tourney.round, tourney.index, winner, result.winner !== 0 && result.winner !== 1, result.tick);
         }
         stopMusic();
+        // Dead controls need no help: drop the pilot bar with the results.
+        for (const obj of this.pilotHelp) obj.setVisible(false);
         if (result.winner === -1) {
             playDraw();
         } else if (this.request.pilot === true) {
