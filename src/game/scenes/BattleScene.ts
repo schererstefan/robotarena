@@ -56,6 +56,7 @@ import {
     plateTotal,
     reelCountdown,
     reelExitCountdown,
+    replayResultsLine,
     resultsKeyHint,
     resultsKeysHint,
     resultRow,
@@ -2917,6 +2918,14 @@ export class BattleScene extends Scene {
         } else if (this.request.showcase !== undefined) {
             tagObj = this.add
                 .text(512, 250, showcaseResultsLine(), {
+                    ...FONTS.monoSmall,
+                    color: COLORS.goldCss,
+                })
+                .setOrigin(0.5)
+                .setDepth(20);
+        } else if (this.request.replay === true) {
+            tagObj = this.add
+                .text(512, 250, replayResultsLine(), {
                     ...FONTS.monoSmall,
                     color: COLORS.goldCss,
                 })

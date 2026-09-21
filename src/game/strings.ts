@@ -455,6 +455,11 @@ export function showcaseResultsLine(): string {
     return `${BATTLE.tagShowcase} - NOT RECORDED`;
 }
 
+/** Results caption for replay battles (re-watched history, never recorded). */
+export function replayResultsLine(): string {
+    return `${BATTLE.tagReplay} - NOT RECORDED`;
+}
+
 /** Reel auto-advance countdown ("NEXT IN 3..."). */
 export function reelCountdown(secondsLeft: number): string {
     return `NEXT IN ${secondsLeft}...`;
