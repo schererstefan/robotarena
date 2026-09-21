@@ -597,7 +597,7 @@ export class BattleScene extends Scene {
             this.treads.push(this.add.image(0, 0, treadsDirKey(false, dir8ForHeading(snap.heading))).setScale(2).setDepth(3.5));
             // Contact shadow: dithered blob under the robot (depth 2.5 sits
             // above the dyn layer, below every robot part).
-            this.shadows.push(this.add.image(0, 0, 'shadow_blob').setScale(2).setDepth(2.5).setAlpha(0.8));
+            this.shadows.push(this.add.image(0, 0, 'shadow_blob').setScale(3).setDepth(2.5).setAlpha(0.8));
             this.treadAcc.push(0);
             this.treadLastX.push(-9999);
             this.treadLastY.push(-9999);
@@ -616,7 +616,7 @@ export class BattleScene extends Scene {
             const stripe = this.add.rectangle(0, 0, 26, 5, skin.paint).setDepth(4);
             stripe.setVisible(skin.finish === 'Stripe');
             this.stripes.push(stripe);
-            const aura = this.add.image(0, 0, 'charge_aura').setScale(2.5).setDepth(3).setVisible(false);
+            const aura = this.add.image(0, 0, 'charge_aura').setScale(4).setDepth(3).setVisible(false);
             aura.setBlendMode(BlendModes.ADD);
             this.auras.push(aura);
             this.auraGlow.push(null);
@@ -1282,20 +1282,20 @@ export class BattleScene extends Scene {
                 // matching nearest-direction frame (never rotated).
                 this.muzzleBig[i] = p.charge > 0.4;
                 (this.muzzles[i] as Phaser.GameObjects.Image).setScale(2 + Math.random() * 0.8);
-                this.burst(cx + Math.cos(s.tower) * 26, cy + Math.sin(s.tower) * 26, 0xffe28a, 4, 120, 0);
+                this.burst(cx + Math.cos(s.tower) * 34, cy + Math.sin(s.tower) * 34, 0xffe28a, 4, 120, 0);
                 playShoot(p.charge > 0.4, s.x);
             }
             if (s.health < p.health) {
                 const dmg = Math.round(p.health - s.health);
                 this.dmgAcc += dmg;
                 if (!s.alive) {
-                    this.spawnDamageNumber(cx, cy - 18, dmg, 'kill');
+                    this.spawnDamageNumber(cx, cy - 48, dmg, 'kill');
                 } else if (sdOn && topDealer < 0) {
-                    this.spawnDamageNumber(cx, cy - 18, dmg, 'sd');
+                    this.spawnDamageNumber(cx, cy - 48, dmg, 'sd');
                     this.hurtT[i] = 2;
                     playHit(dmg, s.x);
                 } else if (dmg > this.normalDamage) {
-                    this.spawnDamageNumber(cx, cy - 18, dmg, 'charged');
+                    this.spawnDamageNumber(cx, cy - 48, dmg, 'charged');
                     this.hurtT[i] = 2;
                     this.burst(cx, cy, COLORS.danger, 6, 170, 300);
                     this.addTrauma(0.35);
@@ -1303,7 +1303,7 @@ export class BattleScene extends Scene {
                     if (!this.reducedMotion) this.hitstop = Math.max(this.hitstop, 2);
                     playHit(dmg, s.x);
                 } else {
-                    this.spawnDamageNumber(cx, cy - 18, dmg, 'hit');
+                    this.spawnDamageNumber(cx, cy - 48, dmg, 'hit');
                     // Plain-hit legibility: a longer white chassis blink
                     // (frame-counted, tint-only so it survives reduced
                     // motion) plus a small white core spark over the
@@ -1323,7 +1323,7 @@ export class BattleScene extends Scene {
                 this.healAcc[i] = (this.healAcc[i] as number) + (s.health - p.health);
                 const tick = tickNow;
                 if (tick - (this.lastHealTick[i] as number) >= 60 && (this.healAcc[i] as number) >= 1) {
-                    this.spawnDamageNumber(cx, cy - 18, Math.floor(this.healAcc[i] as number), 'heal');
+                    this.spawnDamageNumber(cx, cy - 48, Math.floor(this.healAcc[i] as number), 'heal');
                     this.healAcc[i] = 0;
                     this.lastHealTick[i] = tick;
                 }
@@ -1796,7 +1796,7 @@ export class BattleScene extends Scene {
         if (!this.reducedMotion) {
             wreck.setScale(2.6);
             this.tweens.add({ targets: wreck, scale: 2, duration: 380, ease: 'Bounce.easeOut' });
-            this.burst(cx, cy + 10, COLORS.faintNum, 5, 70, 260);
+            this.burst(cx, cy + 40, COLORS.faintNum, 5, 70, 260);
         }
         const victim = (this.request.skins[i] as SlotSkin).callsign;
         if (!this.firstBlood) {
@@ -2133,7 +2133,7 @@ export class BattleScene extends Scene {
                 } else {
                     if (!(this.introLanded[i] as boolean)) {
                         this.introLanded[i] = true;
-                        this.burst(cx, cy + 10, COLORS.faintNum, 5, 70, 260);
+                        this.burst(cx, cy + 40, COLORS.faintNum, 5, 70, 260);
                     }
                     const t = Math.min((lt - 0.25) / 0.25, 1);
                     const e = 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
@@ -2289,23 +2289,23 @@ export class BattleScene extends Scene {
             const ghost = this.barGhost[i] as Phaser.GameObjects.Rectangle;
             const fg = this.barFg[i] as Phaser.GameObjects.Rectangle;
             const plateOn = visible && introAlpha > 0.5 && !this.resultsShown;
-            bg.setVisible(plateOn).setPosition(cx, cy - 28);
+            bg.setVisible(plateOn).setPosition(cx, cy - 54);
             // White ghost lag bar: drains toward the live value, snaps up.
             let gfrac = this.ghostFrac[i] as number;
             if (frac < gfrac) gfrac = Math.max(frac, gfrac - dt * 0.5);
             else gfrac = frac;
             this.ghostFrac[i] = gfrac;
-            ghost.setVisible(plateOn).setPosition(cx - 22 + (44 * gfrac) / 2, cy - 28);
+            ghost.setVisible(plateOn).setPosition(cx - 22 + (44 * gfrac) / 2, cy - 54);
             ghost.setSize(44 * gfrac, 4);
-            fg.setVisible(plateOn).setPosition(cx - 22 + (44 * frac) / 2, cy - 28);
+            fg.setVisible(plateOn).setPosition(cx - 22 + (44 * frac) / 2, cy - 54);
             fg.setSize(44 * frac, 4);
             // Low-HP pulse + '!' glyph (static glyph when reduced).
             const lowHp = s.alive && frac <= 0.25;
             fg.setAlpha(lowHp && !this.reducedMotion ? 0.65 + 0.35 * Math.sin(tick / 4) : 1);
             const low = this.lowMark[i] as Phaser.GameObjects.Text;
-            low.setVisible(lowHp && plateOn).setPosition(cx + 27, cy - 28);
+            low.setVisible(lowHp && plateOn).setPosition(cx + 27, cy - 54);
             const slow = this.slowMark[i] as Phaser.GameObjects.Text;
-            slow.setVisible(visible && s.slowed && plateOn).setPosition(cx - 29, cy - 28);
+            slow.setVisible(visible && s.slowed && plateOn).setPosition(cx - 29, cy - 54);
             const band = frac > 0.5 ? 2 : frac > 0.25 ? 1 : 0;
             if (band !== this.barBand[i]) {
                 this.barBand[i] = band;
@@ -2315,13 +2315,13 @@ export class BattleScene extends Scene {
             // Results hide every name: the winner's label would bleed
             // through the 0.94-alpha panel as a ghost text line.
             const label = this.nameTexts[i] as Phaser.GameObjects.Text;
-            label.setVisible((s.alive || throes) && introAlpha > 0.5 && !this.resultsShown).setPosition(cx, cy - 40);
+            label.setVisible((s.alive || throes) && introAlpha > 0.5 && !this.resultsShown).setPosition(cx, cy - 78);
             // Cooldown readout under the chassis: sweep dials flank the icons
             // in dyn; the text keeps the D/E letters + seconds under 3 s.
             const dashReady = s.dashCd <= 0;
             const empReady = s.empCd <= 0;
             const pips = this.pipTexts[i] as Phaser.GameObjects.Text;
-            pips.setVisible(plateOn).setPosition(cx, cy + 44);
+            pips.setVisible(plateOn).setPosition(cx, cy + 58);
             if (visible) {
                 // Numeric gate first: skip the label build (strings + closures)
                 // entirely when neither cooldown moved since last frame.
@@ -2349,8 +2349,8 @@ export class BattleScene extends Scene {
             }
             this.prevDashReady[i] = dashReady;
             this.prevEmpReady[i] = empReady;
-            (this.iconDash[i] as Phaser.GameObjects.Image).setVisible(plateOn).setPosition(cx - 30, cy + 30);
-            (this.iconEmp[i] as Phaser.GameObjects.Image).setVisible(plateOn).setPosition(cx + 30, cy + 30);
+            (this.iconDash[i] as Phaser.GameObjects.Image).setVisible(plateOn).setPosition(cx - 30, cy + 56);
+            (this.iconEmp[i] as Phaser.GameObjects.Image).setVisible(plateOn).setPosition(cx + 30, cy + 56);
         }
         // Bullets from pool (tint only when the slot's team changes).
         // Cur/prev positions feed the dyn-Graphics hot-bullet tracers.
@@ -2592,20 +2592,20 @@ export class BattleScene extends Scene {
             g.lineStyle(1, 0x000000, 0.8);
             for (let v = 25; v < s.maxHealth; v += 25) {
                 const tx = cx - 22 + (44 * v) / s.maxHealth;
-                g.lineBetween(tx, cy - 30, tx, cy - 26);
+                g.lineBetween(tx, cy - 56, tx, cy - 52);
             }
             // Cooldown sweep dials: dash left, EMP right of the chassis.
-            this.coolDial(g, cx - 13, cy + 30, s.dashCd, DASH_COOLDOWN_TICKS, s.team);
-            this.coolDial(g, cx + 13, cy + 30, s.empCd, EMP_COOLDOWN_TICKS, s.team);
+            this.coolDial(g, cx - 13, cy + 56, s.dashCd, DASH_COOLDOWN_TICKS, s.team);
+            this.coolDial(g, cx + 13, cy + 56, s.empCd, EMP_COOLDOWN_TICKS, s.team);
             // Charge cast-bar (bar + white MAX frame, not color-only).
             if (s.charge > 0.05) {
                 g.fillStyle(0x000000, 0.7);
-                g.fillRect(cx - 15, cy - 52, 30, 4);
+                g.fillRect(cx - 15, cy - 64, 30, 4);
                 g.fillStyle(COLORS.gold, 0.95);
-                g.fillRect(cx - 15, cy - 52, 30 * Math.min(s.charge, 1), 4);
+                g.fillRect(cx - 15, cy - 64, 30 * Math.min(s.charge, 1), 4);
                 if (s.charge >= 1) {
                     g.lineStyle(1, COLORS.white, 0.9);
-                    g.strokeRect(cx - 15, cy - 52, 30, 4);
+                    g.strokeRect(cx - 15, cy - 64, 30, 4);
                 }
             }
             // EMP ring on the empCd edge: expands to EMP_RADIUS (static at
@@ -2625,15 +2625,15 @@ export class BattleScene extends Scene {
             if (fx.amp > 0) {
                 const ampA = this.reducedMotion ? 0.9 : 0.6 + 0.3 * Math.sin(tickNow * 0.15 + i * 1.7);
                 g.fillStyle(COLORS.gold, ampA);
-                this.diamondPath(g, cx, cy - 66, 6);
+                this.diamondPath(g, cx, cy - 108, 6);
                 g.fillPath();
             }
             if (fx.overdrive > 0) {
                 const odA = this.reducedMotion ? 0.8 : 0.55 + 0.25 * Math.sin(tickNow * 0.2 + i * 2.1);
                 g.lineStyle(2, COLORS.white, odA);
-                g.strokeCircle(cx, cy, 27);
+                g.strokeCircle(cx, cy, 51);
                 g.lineStyle(1, COLORS.white, odA * 0.7);
-                g.strokeCircle(cx, cy, 31);
+                g.strokeCircle(cx, cy, 55);
             }
             // Victim-centered threat arcs: one attacker = their team color
             // facing them; ≥2 = white contested ring + gold focus ▼.
@@ -2654,18 +2654,18 @@ export class BattleScene extends Scene {
                 const a = Math.atan2(foeY - s.y, foeX - s.x);
                 g.lineStyle(2, teamColor(foeTeam), 0.85);
                 g.beginPath();
-                g.arc(cx, cy, 22, a - 0.5, a + 0.5);
+                g.arc(cx, cy, 50, a - 0.5, a + 0.5);
                 g.strokePath();
             } else if (foes >= 2) {
                 g.lineStyle(2, COLORS.white, 0.9);
-                g.strokeCircle(cx, cy, 22);
+                g.strokeCircle(cx, cy, 50);
                 g.fillStyle(COLORS.gold, 0.95);
-                g.fillTriangle(cx - 6, cy - 58, cx + 6, cy - 58, cx, cy - 50);
+                g.fillTriangle(cx - 6, cy - 96, cx + 6, cy - 96, cx, cy - 88);
             }
             // SD outside blink pip (2 Hz triangle below the robot).
             if (circle && Math.hypot(s.x - circle.x, s.y - circle.y) > circle.r && tickNow % 30 < 15) {
                 g.fillStyle(COLORS.danger, 0.95);
-                g.fillTriangle(cx - 6, cy + 50, cx + 6, cy + 50, cx, cy + 42);
+                g.fillTriangle(cx - 6, cy + 72, cx + 6, cy + 72, cx, cy + 64);
             }
         }
         // Pilot aim reticle: faint sight line plus a crosshair at the cursor.

@@ -75,7 +75,7 @@ export interface ArtEntry {
  */
 export function artRegistry(): ArtEntry[] {
     const entries: ArtEntry[] = [];
-    for (const [id, map] of Object.entries(CHASSIS_V2)) entries.push({ key: `chassis_${id}`, map, w: 16, h: 16 });
+    for (const [id, map] of Object.entries(CHASSIS_V2)) entries.push({ key: `chassis_${id}`, map, w: 32, h: 32 });
     for (const [id, map] of Object.entries(WRECKS)) entries.push({ key: `wreck_${id}`, map, w: 16, h: 16 });
     for (const [id, map] of Object.entries(SKILL_ICONS)) entries.push({ key: `skill_${id}`, map: map as PixelMap, w: 8, h: 8 });
     for (const [id, map] of Object.entries(UI_ICONS)) entries.push({ key: `icon_${id}`, map: map as PixelMap, w: 8, h: 8 });
@@ -204,11 +204,14 @@ function bakeTinted(scene: Scene, key: string, map: PixelMap, recolor: Record<st
  * denser cracks, ember dots (y/o). Same dims, legal chars, no RNG.
  */
 export function damageStamp(map: PixelMap, stage: 1 | 2): PixelMap {
+    // 32px chassis regions: each 16px V3 bound doubled to its 2x2 block
+    // ([a,b] -> [2a,2b+1]), so the visual proportions and the ember
+    // guarantee carry over unchanged.
     const scorch =
         stage === 1
-            ? (x: number, y: number) => x >= 3 && x <= 8 && y >= 9 && y <= 12
-            : (x: number, y: number) => x >= 2 && x <= 9 && y >= 8 && y <= 13;
-    const core = (x: number, y: number) => x >= 4 && x <= 7 && y >= 9 && y <= 11;
+            ? (x: number, y: number) => x >= 6 && x <= 17 && y >= 18 && y <= 25
+            : (x: number, y: number) => x >= 4 && x <= 19 && y >= 16 && y <= 27;
+    const core = (x: number, y: number) => x >= 8 && x <= 15 && y >= 18 && y <= 23;
     const crackMod = stage === 1 ? 17 : 13;
     const out = map.map((row, y) =>
         row
@@ -250,8 +253,24 @@ export function damageStamp(map: PixelMap, stage: 1 | 2): PixelMap {
     return out;
 }
 
-/** Direction-frame canvas size: fits a 16px sprite at 45° (16√2 ≈ 22.6). */
+/**
+ * Legacy direction-frame canvas size (fits a 16px sprite at 45°,
+ * 16√2 ≈ 22.6). Kept as the floor: every sprite at most 16px across still
+ * bakes pixel-identical frames to before.
+ */
 export const DIR8_SIZE = 24;
+
+/**
+ * Direction-frame canvas size for a sprite map: fits the sprite at 45°
+ * (ceil(maxDim·√2)), floored at the legacy DIR8_SIZE so existing bakes
+ * (16px maps, 8px muzzles, 16x4 treads) are unchanged. Pure math —
+ * deterministic, no RNG.
+ */
+export function dir8SizeFor(map: PixelMap): number {
+    const h = map.length;
+    const w = map[0]?.length ?? 0;
+    return Math.max(DIR8_SIZE, Math.ceil(Math.max(w, h) * Math.SQRT2));
+}
 
 /**
  * Quantize a heading (radians, 0 = east, positive clockwise) to the
@@ -264,25 +283,27 @@ export function dir8ForHeading(heading: number): number {
 }
 
 /**
- * Nearest-neighbor rotation of a char map onto a DIR8_SIZE canvas.
- * Inverse-mapped (no holes); cardinals are pixel-exact. Diagonals get a
- * conservative orphan cleanup (fully-isolated ramp singles only; accent
- * chars are never touched). Deterministic: no RNG anywhere.
+ * Nearest-neighbor rotation of a char map onto a dir8SizeFor(map) canvas
+ * (24 for every legacy ≤16px sprite, 46 for 32px chassis). Inverse-mapped
+ * (no holes); cardinals are pixel-exact. Diagonals get a conservative
+ * orphan cleanup (fully-isolated ramp singles only; accent chars are
+ * never touched). Deterministic: no RNG anywhere.
  */
 function rotateMapDir8(map: PixelMap, dir: number): PixelMap {
     const sh = map.length;
     const sw = map[0]?.length ?? 0;
+    const size = dir8SizeFor(map);
     const cx = sw / 2;
     const cy = sh / 2;
     const theta = (dir * Math.PI) / 4;
     const cos = Math.cos(theta);
     const sin = Math.sin(theta);
     const out: string[] = [];
-    for (let y = 0; y < DIR8_SIZE; y += 1) {
+    for (let y = 0; y < size; y += 1) {
         let row = '';
-        for (let x = 0; x < DIR8_SIZE; x += 1) {
-            const vx = x + 0.5 - DIR8_SIZE / 2;
-            const vy = y + 0.5 - DIR8_SIZE / 2;
+        for (let x = 0; x < size; x += 1) {
+            const vx = x + 0.5 - size / 2;
+            const vy = y + 0.5 - size / 2;
             const sx = cx + cos * vx + sin * vy;
             const sy = cy - sin * vx + cos * vy;
             const ix = Math.floor(sx);
