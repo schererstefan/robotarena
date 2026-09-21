@@ -105,6 +105,8 @@ export const MENU = {
     modeLabels: ['1 v 1', '2 v 2', '3 v 3'],
     randomizeSkins: 'RANDOMIZE SKINS',
     startBattle: 'START BATTLE',
+    battleSetup: 'BATTLE SETUP',
+    back: '< BACK',
     pilot: 'PILOT 1V1',
     watchReplay: 'WATCH REPLAY',
     tourney: 'TOURNEY',
