@@ -51,22 +51,26 @@ export const WALL_CORNER: PixelMap = [
 ];
 
 // Obstacle cap: reads as solid machinery, NOT a wall (no hazard stripes).
-// Riveted plate with a top light-catch and a low-right shade step.
+// Riveted 4-plate housing: shaded 2x2 corner rivets (l glint + w core + m
+// mount), recessed cross seams (m lip + k slot), twin vent slits with lit
+// lips, top-left light stiles (l) against a low-right s shade, and an
+// ordered d/s dither melting into the solid s foot (d->s are adjacent ramp
+// steps). Tiling repeats whole plates, so barrier faces read as paneling.
 export const OBSTACLE_TOP: PixelMap = [
     'kkkkkkkkkkkkkkkk',
-    'kllllllllllllllk',
-    'klddddddddddddlk',
-    'kldwddddddddwdlk',
-    'klddddddddddddlk',
-    'klddddddddddddlk',
-    'klddddddddddddlk',
-    'klddddddddddddlk',
-    'klddddddddddddlk',
-    'klddddddddddddlk',
-    'klddddddddddddlk',
-    'kldwddddddddwdlk',
-    'klddddddddddddlk',
-    'kddddddddddddddk',
+    'kllllllllllllssk',
+    'kllwdddmkdddlwsk',
+    'klwmdddmkdddwmsk',
+    'klmmmddmkdddddsk',
+    'klkkkddmkdddddsk',
+    'kldddddmkdddddsk',
+    'klmmmmmmmmmmmmmk',
+    'kkkkkkkkkkkkkkkk',
+    'kldddddmkddmmmsk',
+    'kldddddmkddkkksk',
+    'kllwdddmkdddlwsk',
+    'klwmdddmkdddwmsk',
+    'kddssddssddssddk',
     'kssssssssssssssk',
     'kkkkkkkkkkkkkkkk',
 ];

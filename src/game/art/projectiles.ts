@@ -15,15 +15,16 @@ export const BULLET_V2: PixelMap = [
     '.ww.',
 ];
 
-// BULLET_CHARGED (6x6): brighter than BULLET_V2 — 12 white ring pixels
-// tint to team color around a hot amber 2x2 core; 8 amber edge pips
-// (top/bottom pairs + side pairs) signal the charge level.
+// BULLET_CHARGED (6x6): brighter than BULLET_V2 — 8 white ring pixels
+// tint to team color around a hot amber spine (full-height 2-wide core
+// plus top/bottom pairs + side pips); the unbroken vertical amber bar
+// reads as "charged" at speed where edge pips alone blur.
 export const BULLET_CHARGED: PixelMap = [
     '..yy..',
-    '.wwww.',
+    '.wyyw.',
     'ywyywy',
     'ywyywy',
-    '.wwww.',
+    '.wyyw.',
     '..yy..',
 ];
 
