@@ -2254,6 +2254,8 @@ export class BattleScene extends Scene {
         // information, not flair.
         for (const h of this.match.hazardSnapshots) {
             const frac = Math.max(h.ticksToImpact, 0) / HAZ_TELEGRAPH_TICKS;
+            g.fillStyle(COLORS.danger, 0.08 + (1 - frac) * 0.08);
+            g.fillCircle(AX + h.x, AY + h.y, h.radius);
             g.lineStyle(2, COLORS.danger, 0.9 - frac * 0.55);
             g.strokeCircle(AX + h.x, AY + h.y, h.radius);
             g.lineStyle(2, COLORS.gold, 0.8);
