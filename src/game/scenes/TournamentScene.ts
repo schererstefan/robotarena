@@ -86,9 +86,15 @@ export class TournamentScene extends Scene {
         this.input.on('pointerdown', this.onAnyPointer);
         this.input.keyboard?.on('keydown-M', this.onMuteKey);
         this.input.keyboard?.on('keydown-ESC', this.onEscapeKey);
+        this.input.keyboard?.on('keydown-ENTER', this.onPrimaryKey);
+        this.input.keyboard?.on('keydown-W', this.onWatchKey);
+        this.input.keyboard?.on('keydown-S', this.onSimKey);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown-ESC', this.onEscapeKey);
+            this.input.keyboard?.off('keydown-ENTER', this.onPrimaryKey);
+            this.input.keyboard?.off('keydown-W', this.onWatchKey);
+            this.input.keyboard?.off('keydown-S', this.onSimKey);
         });
     }
 
@@ -116,6 +122,22 @@ export class TournamentScene extends Scene {
         this.scene.start('Menu');
     };
 
+    /** Enter runs the contextual primary: RUN, WATCH NEXT, or RUN AGAIN. */
+    private onPrimaryKey = (): void => {
+        if (this.mode === 'setup') this.startTournament();
+        else if (this.mode === 'done') this.startTournament();
+        else this.watchPending();
+    };
+
+    /** W watches the next unsettled match; S sims the rest headless. */
+    private onWatchKey = (): void => {
+        if (this.mode === 'running') this.watchPending();
+    };
+
+    private onSimKey = (): void => {
+        if (this.mode === 'running') this.simRest();
+    };
+
     // ---- Setup ------------------------------------------------------------
     private trackSetup<T extends Phaser.GameObjects.GameObject>(obj: T): T {
         this.setupObjects.push(obj);
@@ -136,6 +158,7 @@ export class TournamentScene extends Scene {
 
         this.setupButton(CX - 160, 700, 260, 50, TOURNAMENT.run, () => this.startTournament());
         this.setupButton(CX + 160, 700, 260, 50, COMMON.menu, () => this.scene.start('Menu'));
+        this.trackSetup(this.add.text(CX, 655, TOURNAMENT.setupKeys, FONTS.monoSmall).setOrigin(0.5));
     }
 
     private trackSetupButton(x: number, y: number, onClick: () => void): { setLabel: (label: string) => void } {
@@ -498,6 +521,7 @@ export class TournamentScene extends Scene {
             );
             label.setColor(COLORS.goldCss);
             transition(this, [label]);
+            this.trackBracket(this.add.text(CX, 697, TOURNAMENT.doneKeys, FONTS.monoSmall).setOrigin(0.5));
             this.bracketButton(CX - 240, 726, 200, 36, TOURNAMENT.runAgain, () => this.startTournament());
             this.bracketButton(CX, 726, 200, 36, TOURNAMENT.lineup, () => {
                 for (const obj of this.bracketObjects) obj.destroy();
@@ -507,6 +531,7 @@ export class TournamentScene extends Scene {
             });
             this.bracketButton(CX + 240, 726, 200, 36, COMMON.menu, () => this.scene.start('Menu'));
         } else if (this.pendingSlot()) {
+            this.trackBracket(this.add.text(CX, 697, TOURNAMENT.bracketKeys, FONTS.monoSmall).setOrigin(0.5));
             this.bracketButton(CX - 240, 726, 200, 36, TOURNAMENT.watchNext, () => this.watchPending());
             this.bracketButton(CX, 726, 200, 36, TOURNAMENT.simRest, () => this.simRest());
             this.bracketButton(CX + 240, 726, 200, 36, COMMON.menu, () => this.scene.start('Menu'));
