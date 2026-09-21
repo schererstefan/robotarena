@@ -42,6 +42,7 @@ import {
     BATTLE_TUTORIAL_STEPS,
     COMMON,
     cooldownLabel,
+    dailyResultsLine,
     damageText,
     destroyedBanner,
     exhibitionResultsLine,
@@ -2926,6 +2927,14 @@ export class BattleScene extends Scene {
         } else if (this.request.replay === true) {
             tagObj = this.add
                 .text(512, 250, replayResultsLine(), {
+                    ...FONTS.monoSmall,
+                    color: COLORS.goldCss,
+                })
+                .setOrigin(0.5)
+                .setDepth(20);
+        } else if (this.request.daily !== undefined) {
+            tagObj = this.add
+                .text(512, 250, dailyResultsLine(), {
                     ...FONTS.monoSmall,
                     color: COLORS.goldCss,
                 })

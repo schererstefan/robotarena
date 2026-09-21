@@ -460,6 +460,11 @@ export function replayResultsLine(): string {
     return `${BATTLE.tagReplay} - NOT RECORDED`;
 }
 
+/** Results caption for daily battles (best result is kept on the daily board). */
+export function dailyResultsLine(): string {
+    return `${BATTLE.tagDaily} - BEST SAVED TO DAILY BOARD`;
+}
+
 /** Reel auto-advance countdown ("NEXT IN 3..."). */
 export function reelCountdown(secondsLeft: number): string {
     return `NEXT IN ${secondsLeft}...`;
