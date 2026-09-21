@@ -5,7 +5,7 @@ import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
 import { angleDiff, TAU } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SensedRobot, SenseState } from '../sim/types';
-import { aimed, aimTurret, steerTo } from './common';
+import { aimed, aimTurret, createUtilityMemory, steerTo, utilityDrive, type UtilityMemory } from './common';
 import type { Genome } from './genome';
 
 export const meta: RobotMeta = {
@@ -33,6 +33,9 @@ export interface OrbiterParams {
     aimTol: number;
     scanTurn: number;
     targetPolicy: TargetPolicy;
+    /** Powerup/turret/hazard awareness. Absent = off (frozen checkpoints
+     * and genome builds keep exact behavior); the active `create()` opts in. */
+    utility?: boolean;
 }
 
 export const ORBITER_DEFAULTS: OrbiterParams = {
@@ -47,6 +50,8 @@ export const ORBITER_DEFAULTS: OrbiterParams = {
     aimTol: 0.07,
     scanTurn: 0.8,
     targetPolicy: 'first',
+    // Shipped behavior includes utility sight (see hunter.ts).
+    utility: true,
 };
 
 const TARGET_POLICIES: ReadonlyArray<TargetPolicy> = ['first', 'nearest', 'weakest', 'strongest'];
@@ -71,6 +76,7 @@ export function orbiterParamsFromGenome(genome: Genome): OrbiterParams {
             typeof policy === 'string' && (TARGET_POLICIES as ReadonlyArray<string>).includes(policy)
                 ? (policy as TargetPolicy)
                 : ORBITER_DEFAULTS.targetPolicy,
+        utility: true,
     };
 }
 
@@ -91,6 +97,11 @@ function pickTarget(foes: SensedRobot[], policy: TargetPolicy): SensedRobot | un
 
 export function createWithParams(overrides?: Partial<OrbiterParams>): RobotController {
     const p: OrbiterParams = { ...ORBITER_DEFAULTS, ...overrides };
+    // Frozen PARAMS objects (pre-utility hillclimb champions) predate the
+    // flag and must behave exactly as tuned: only callers that declare
+    // `utility` opt in. DEFAULTS declare shipped behavior.
+    if (overrides !== undefined && overrides !== null && !('utility' in overrides)) p.utility = false;
+    const util: UtilityMemory | null = p.utility === true ? createUtilityMemory() : null;
     let lastX = ARENA_WIDTH / 2;
     let lastY = ARENA_HEIGHT / 2;
 
@@ -118,12 +129,13 @@ export function createWithParams(overrides?: Partial<OrbiterParams>): RobotContr
         const throttle = facing ? p.orbitThrottle : p.turnThrottle;
         const towerTurn = foe ? aimTurret(self.tower, foe.bearing, p.turretGain) : p.scanTurn;
         const fire = foe !== undefined && foe.distance < self.stats.gunRange && aimed(self.tower, foe.bearing, p.aimTol);
-        return { throttle, turn, towerTurn, fire, charge: false };
+        const sending = { throttle, turn, towerTurn, fire, charge: false };
+        return util !== null ? utilityDrive(sense, sending, util) : sending;
     }
 
     return { meta, loadout, update };
 }
 
 export function create(): RobotController {
-    return createWithParams();
+    return createWithParams({ utility: true });
 }

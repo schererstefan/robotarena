@@ -10,7 +10,7 @@ import { angleDiff, clamp } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 import { BRAIN_PRESETS, createBrain, pickTarget, type BrainParams, type BrainTargetPolicy } from './brain';
-import { aimed, aimTurret, steerTo, throttleFor } from './common';
+import { aimed, aimTurret, createUtilityMemory, steerTo, throttleFor, utilityDrive, type UtilityMemory } from './common';
 import { castFocusVote } from './comms';
 import type { Genome } from './genome';
 
@@ -41,6 +41,9 @@ export interface BrawlerParams {
     targetPolicy: BrainTargetPolicy;
     /** Brain mode utilities (brain.* genome group); absent = preset defaults. */
     brain?: Partial<BrainParams>;
+    /** Powerup/turret/hazard awareness. Absent = off (frozen checkpoints
+     * and genome builds keep exact behavior); the active `create()` opts in. */
+    utility?: boolean;
 }
 
 export const BRAWLER_DEFAULTS: BrawlerParams = {
@@ -57,6 +60,8 @@ export const BRAWLER_DEFAULTS: BrawlerParams = {
     dashMaxRange: 520,
     scanTurn: 0.9,
     targetPolicy: 'first',
+    // Shipped behavior includes utility sight (see hunter.ts).
+    utility: true,
 };
 
 const TARGET_POLICIES: ReadonlyArray<BrainTargetPolicy> = ['first', 'nearest', 'weakest', 'strongest'];
@@ -79,6 +84,7 @@ export function brawlerParamsFromGenome(genome: Genome): BrawlerParams {
         dashMinRange: num('dash.minRange', BRAWLER_DEFAULTS.dashMinRange),
         dashMaxRange: num('dash.maxRange', BRAWLER_DEFAULTS.dashMaxRange),
         scanTurn: num('search.scanTurn', BRAWLER_DEFAULTS.scanTurn),
+        utility: true,
         targetPolicy:
             typeof policy === 'string' && (TARGET_POLICIES as ReadonlyArray<string>).includes(policy)
                 ? (policy as BrainTargetPolicy)
@@ -163,6 +169,10 @@ export function createLegacyWithParams(overrides?: Partial<BrawlerParams>): Robo
  */
 export function createWithParams(overrides?: Partial<BrawlerParams>): RobotController {
     const p: BrawlerParams = { ...BRAWLER_DEFAULTS, ...overrides };
+    // Frozen PARAMS objects (pre-utility hillclimb champions) predate the
+    // flag and must behave exactly as tuned: only callers that declare
+    // `utility` opt in. DEFAULTS declare shipped behavior.
+    if (overrides !== undefined && overrides !== null && !('utility' in overrides)) p.utility = false;
     const preset = BRAIN_PRESETS['brawler'] as BrainParams;
     const brain = createBrain({
         steerGain: p.steerGain,
@@ -182,6 +192,7 @@ export function createWithParams(overrides?: Partial<BrawlerParams>): RobotContr
         orbitDir: preset.orbitDir,
         ...(p.brain ?? {}),
     });
+    const util: UtilityMemory | null = p.utility === true ? createUtilityMemory() : null;
 
     function update(sense: SenseState): Intent {
         const self = sense.self;
@@ -210,12 +221,12 @@ export function createWithParams(overrides?: Partial<BrawlerParams>): RobotContr
             intent.emp = false;
         }
         intent.radio = out.targetId !== null ? castFocusVote(out.targetId) : null;
-        return intent;
+        return util !== null ? utilityDrive(sense, intent, util) : intent;
     }
 
     return { meta, loadout, update };
 }
 
 export function create(): RobotController {
-    return createWithParams();
+    return createWithParams({ utility: true });
 }

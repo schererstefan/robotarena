@@ -114,8 +114,11 @@ units) to collect it; the pad goes dark for 15 s, then reactivates.
 - **OVERDRIVE** (`overdrive`, white rings): +35% move speed for 6 s.
 
 You get a `pickup` event (with `pad`) on the collecting tick; timed effects
-clear on death (no drops). Brains are unchanged by pads — seeking them is
-your strategy to write: read `sense.pickups`, steer with `moveMode`, and
+clear on death (no drops). The shipped brains seek pads opportunistically
+(`src/robots/common.ts`: repair when hurt, amp/overdrive when blind, nearest
+active pad with hysteresis — dark pads are never chased, and amp is skipped
+under double-damage since bonuses never stack); your strategy to write is
+when to overrule that: read `sense.pickups`, steer with `moveMode`, and
 remember every robot sees the same pads.
 
 ## Map turrets

@@ -6,7 +6,7 @@ import { dist } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 import { pickTarget, type BrainTargetPolicy } from './brain';
-import { aimed, aimTurret, leadAngle, steerTo } from './common';
+import { aimed, aimTurret, createUtilityMemory, hazardEscapeDrive, leadAngle, steerTo, utilityDivert, type UtilityMemory } from './common';
 import type { Genome } from './genome';
 
 export const meta: RobotMeta = {
@@ -34,6 +34,9 @@ export interface TurretParams {
     aimTol: number;
     turretGain: number;
     targetPolicy: BrainTargetPolicy;
+    /** Powerup/turret/hazard awareness. Absent = off (frozen checkpoints
+     * and genome builds keep exact behavior); the active `create()` opts in. */
+    utility?: boolean;
 }
 
 export const TURRET_DEFAULTS: TurretParams = {
@@ -50,6 +53,8 @@ export const TURRET_DEFAULTS: TurretParams = {
     aimTol: 0.05,
     turretGain: 3,
     targetPolicy: 'first',
+    // Shipped behavior includes utility sight (see hunter.ts).
+    utility: true,
 };
 
 const TARGET_POLICIES: ReadonlyArray<BrainTargetPolicy> = ['first', 'nearest', 'weakest', 'strongest'];
@@ -76,11 +81,17 @@ export function turretParamsFromGenome(genome: Genome): TurretParams {
             typeof policy === 'string' && (TARGET_POLICIES as ReadonlyArray<string>).includes(policy)
                 ? (policy as BrainTargetPolicy)
                 : TURRET_DEFAULTS.targetPolicy,
+        utility: true,
     };
 }
 
 export function createWithParams(overrides?: Partial<TurretParams>): RobotController {
     const p: TurretParams = { ...TURRET_DEFAULTS, ...overrides };
+    // Frozen PARAMS objects (pre-utility hillclimb champions) predate the
+    // flag and must behave exactly as tuned: only callers that declare
+    // `utility` opt in. DEFAULTS declare shipped behavior.
+    if (overrides !== undefined && overrides !== null && !('utility' in overrides)) p.utility = false;
+    const util: UtilityMemory | null = p.utility === true ? createUtilityMemory() : null;
     let anchorX = 0;
     let anchorY = 0;
     let anchored = false;
@@ -116,12 +127,18 @@ export function createWithParams(overrides?: Partial<TurretParams>): RobotContro
             towerTurn = aimTurret(self.tower, shot, p.turretGain);
             fire = foe.distance < self.stats.gunRange && aimed(self.tower, shot, p.aimTol);
         }
-        return { throttle, turn, towerTurn, fire, charge: false };
+        const sending = { throttle, turn, towerTurn, fire, charge: false };
+        if (util === null) return sending;
+        // Parked identity: hazard escape always; opportunist detours only
+        // en route to the anchor. Parked turret-bot holds (tested:
+        // anchored capture walks lose without completing).
+        const safe = hazardEscapeDrive(sense, sending) ?? sending;
+        return anchored ? safe : utilityDivert(sense, safe, util);
     }
 
     return { meta, loadout, onSpawn, update };
 }
 
 export function create(): RobotController {
-    return createWithParams();
+    return createWithParams({ utility: true });
 }

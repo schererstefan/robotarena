@@ -27,6 +27,10 @@ export const PARAMS: HunterParams = {
     steerGain: 2.5,
     targetPolicy: 'first',
     turretGain: 3,
+    // Active champion: opts into powerup/turret/hazard awareness, but
+    // keeps working a fresh trail (bank discipline over detours).
+    utility: true,
+    utilityCold: true,
 };
 
 export function create(): RobotController {

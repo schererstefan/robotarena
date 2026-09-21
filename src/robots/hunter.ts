@@ -9,7 +9,7 @@ import { clamp } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
 import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
 import { createBrain, pickTarget, type BrainParams } from './brain';
-import { aimed, aimTurret, leadAngle, manageCharge, rayClearance, steerTo, throttleFor } from './common';
+import { aimed, aimTurret, createUtilityMemory, hazardEscapeDrive, leadAngle, manageCharge, rayClearance, steerTo, throttleFor, utilityDivert, type UtilityMemory } from './common';
 import { castFocusVote, focusTarget } from './comms';
 import { createRoleTracker, roleGoal, type RoleState } from './roles';
 
@@ -42,6 +42,16 @@ export interface HunterParams {
     targetPolicy: TargetPolicy;
     /** Squad roles on/off; absent = on. False restores the pre-B3 brain+model hunter (role ablation gate). */
     roles?: boolean;
+    /** Powerup/turret/hazard awareness (complexity/powerup-brains). Absent
+     * = off, so frozen checkpoints and genome builds keep exact behavior;
+     * the active `create()` opts in. */
+    utility?: boolean;
+    /** Divert only with no fresh foe trail (bank-discipline brains keep
+     * working the lead). Absent = divert whenever blind. */
+    utilityCold?: boolean;
+    /** Also divert with a visible-but-distant foe (hit-and-run sustain).
+     * Absent = divert only when blind. */
+    utilityEager?: boolean;
     /** Brain mode utilities (brain.* genome group); absent = preset defaults. */
     brain?: Partial<BrainParams>;
     /** Opponent-model counter-lead (model.* genome group); absent = model defaults. */
@@ -58,6 +68,9 @@ export const HUNTER_DEFAULTS: HunterParams = {
     scanTurn: 0.9,
     targetPolicy: 'weakest',
     model: { ...MODEL_DEFAULTS },
+    // Shipped behavior includes utility sight; explicit overrides and
+    // genome builds inherit it (frozen checkpoints pin their own flags).
+    utility: true,
 };
 
 const TARGET_POLICIES: ReadonlyArray<TargetPolicy> = ['first', 'nearest', 'weakest', 'strongest'];
@@ -75,6 +88,7 @@ export function hunterParamsFromGenome(genome: Genome): HunterParams {
         closeRangeFrac: num('engage.closeRangeFrac', HUNTER_DEFAULTS.closeRangeFrac),
         closeThrottle: num('drive.closeThrottle', HUNTER_DEFAULTS.closeThrottle),
         scanTurn: num('search.scanTurn', HUNTER_DEFAULTS.scanTurn),
+        utility: true,
         targetPolicy:
             typeof policy === 'string' && (TARGET_POLICIES as ReadonlyArray<string>).includes(policy)
                 ? (policy as TargetPolicy)
@@ -151,6 +165,10 @@ export function createLegacyWithParams(overrides?: Partial<HunterParams>): Robot
 /** Brain hunter: the same execution, steered by the 6-mode scorer. */
 export function createWithParams(overrides?: Partial<HunterParams>): RobotController {
     const p: HunterParams = { ...HUNTER_DEFAULTS, ...overrides };
+    // Frozen PARAMS objects (pre-utility hillclimb champions) predate the
+    // flag and must behave exactly as tuned: only callers that declare
+    // `utility` opt in. DEFAULTS declare shipped behavior.
+    if (overrides !== undefined && overrides !== null && !('utility' in overrides)) p.utility = false;
     const brain = createBrain({
         steerGain: p.steerGain,
         turretGain: p.turretGain,
@@ -165,6 +183,7 @@ export function createWithParams(overrides?: Partial<HunterParams>): RobotContro
     const model = createOpponentModel(p.model ?? {});
     const roles = createRoleTracker();
     const rolesOn = p.roles !== false;
+    const util: UtilityMemory | null = p.utility === true ? createUtilityMemory() : null;
 
     function update(sense: SenseState): Intent {
         model.update(sense);
@@ -267,12 +286,19 @@ export function createWithParams(overrides?: Partial<HunterParams>): RobotContro
         }
         // Role mail (claims while unsettled, sparse slot heartbeats) takes
         // the radio when due; otherwise focus votes chain as before.
-        return { ...intent, radio: roleState.radio ?? (out.targetId !== null ? castFocusVote(out.targetId) : null) };
+        const sending: Intent = { ...intent, radio: roleState.radio ?? (out.targetId !== null ? castFocusVote(out.targetId) : null) };
+        // Utility sight: drive-only post-pass (hazard escape always wins).
+        if (util === null) return sending;
+        const safe = hazardEscapeDrive(sense, sending) ?? sending;
+        return utilityDivert(sense, safe, util, {
+            coldOnly: p.utilityCold === true,
+            eager: p.utilityEager === true,
+        });
     }
 
     return { meta, loadout, update };
 }
 
 export function create(): RobotController {
-    return createWithParams();
+    return createWithParams({ utility: true });
 }
