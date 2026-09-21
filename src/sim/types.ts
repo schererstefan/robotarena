@@ -107,7 +107,8 @@ export type SenseEventKind =
     | 'foe-down'
     | 'sudden-death-pulse'
     | 'wall-bump'
-    | 'ram';
+    | 'ram'
+    | 'pickup';
 
 export interface SenseEvent {
     /** Tick the event happened (the step just completed). */
@@ -119,6 +120,22 @@ export interface SenseEvent {
     bearing?: number;
     /** Other robot: shooter (`hit-by`), victim (`kill`, `*-down`), bumper (`ram`). */
     fromId?: number;
+    /** Pad kind collected, for `pickup`. */
+    pad?: SensePadKind;
+}
+
+/** Powerup pad kind: `amp` (2x bullet damage), `repair` (+HP), `overdrive` (+move speed). */
+export type SensePadKind = 'amp' | 'repair' | 'overdrive';
+
+/** One static powerup pad: public map knowledge, reported to every robot. */
+export interface SensePad {
+    x: number;
+    y: number;
+    kind: SensePadKind;
+    /** False while the pad is dark (cooldown after a pickup). */
+    active: boolean;
+    /** Ticks until reactivation (0 when active). */
+    respawnIn: number;
 }
 
 /** An incoming (foe-team) bullet inside your sensor cone. */
@@ -249,6 +266,11 @@ export interface SenseState {
     grid?: SenseGrid;
     /** Match-level state. Optional, engine-provided. */
     match?: SenseMatch;
+    /**
+     * All powerup pads in fixed pad order (public map knowledge, same for
+     * every robot). Optional, engine-provided.
+     */
+    pickups?: SensePad[];
     /**
      * Teammates' radio messages from exactly COMMS_DELAY ticks ago, sorted
      * (sent, from), capped at COMMS_INBOX_MAX. Never your own echo, never

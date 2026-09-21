@@ -1,11 +1,11 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
+import { AMP_MULT, AMP_TICKS, ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_MULT, OVERDRIVE_TICKS, PAD_RADIUS, PAD_RESPAWN_TICKS, REPAIR_HP, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
 import { angleDiff, assistSteer, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
-import { COMMS_KINDS, IDLE_INTENT, type CommsKind, type DamageSite, type InboxMessage, type Intent, type OutboxMessage, type RobotController, type SensedAlly, type SensedBullet, type SensedRobot, type SenseEvent, type SenseState, type TrackedFoe } from './types';
+import { COMMS_KINDS, IDLE_INTENT, type CommsKind, type DamageSite, type InboxMessage, type Intent, type OutboxMessage, type RobotController, type SensedAlly, type SensedBullet, type SensedRobot, type SenseEvent, type SensePad, type SensePadKind, type SenseState, type TrackedFoe } from './types';
 
 export interface RobotSnapshot {
     id: number;
@@ -84,6 +84,10 @@ interface Robot {
     dashUntil: number;
     /** Exclusive tick: slowed while `tick < slowUntil`. */
     slowUntil: number;
+    /** Exclusive tick: AMP bullet boost while `tick < ampUntil`. */
+    ampUntil: number;
+    /** Exclusive tick: OVERDRIVE speed boost while `tick < overdriveUntil`. */
+    overdriveUntil: number;
     alive: boolean;
     kills: number;
     damageDealt: number;
@@ -205,6 +209,10 @@ export class Match {
     /** Events of the last completed step (delivered) and the current step (building), per robot id. */
     private prevEvents: SenseEvent[][] = [];
     private curEvents: SenseEvent[][] = [];
+    /** Static powerup pads (seed-derived layout, per-tick state lives here). */
+    private pads: SensePad[] = [];
+    /** Pad pickup records in `tick:padIdx:robotId` order (fingerprint segment). */
+    private padLog: string[] = [];
 
     constructor(lineups: LineupEntry[], seed: number, options: MatchOptions = {}) {
         this.seed = seed;
@@ -241,6 +249,8 @@ export class Match {
                 empCd: 0,
                 dashUntil: -1,
                 slowUntil: -1,
+                ampUntil: -1,
+                overdriveUntil: -1,
                 alive: true,
                 kills: 0,
                 damageDealt: 0,
@@ -255,6 +265,9 @@ export class Match {
         const cells = SENSE_GRID_W * SENSE_GRID_H;
         this.gridFoes = [new Array<number>(cells).fill(0), new Array<number>(cells).fill(0)];
         this.gridDanger = [new Array<number>(cells).fill(0), new Array<number>(cells).fill(0)];
+        // Seed-derived pad layout (symmetric, public): ready before onSpawn
+        // so the first sense already carries the pads.
+        this.pads = Match.padLayout(seed);
         // Aim towers at the nearest foe and fire spawn hooks in fixed order.
         for (const robot of this.robots) {
             const foe = this.nearestFoe(robot);
@@ -293,6 +306,49 @@ export class Match {
     /** Sanitized exhibition modifiers for this match. */
     get modifiers(): MatchModifiers {
         return { ...this.mods };
+    }
+
+    /**
+     * Seed-derived powerup pad layout: 4 pads at fixed arena fractions
+     * (0.22/0.78 x by 0.30/0.70 y), mirrored through the arena center.
+     * Kinds cycle [amp, repair, overdrive] with a seed offset; each
+     * center-mirror pair shares a kind so neither team gains an edge.
+     * Pure function of the seed: no Math.random, no wall-clock.
+     */
+    static padLayout(seed: number): SensePad[] {
+        const fx = [0.22, 0.78, 0.22, 0.78];
+        const fy = [0.3, 0.3, 0.7, 0.7];
+        // Center-mirror pairs: 0 <-> 3, 1 <-> 2.
+        const pairOf = [0, 1, 1, 0];
+        const cycle: SensePadKind[] = ['amp', 'repair', 'overdrive'];
+        const offset = (seed >>> 0) % cycle.length;
+        return fx.map((x, i) => ({
+            x: (x as number) * ARENA_WIDTH,
+            y: (fy[i] as number) * ARENA_HEIGHT,
+            kind: cycle[(offset + (pairOf[i] as number)) % cycle.length] as SensePadKind,
+            active: true,
+            respawnIn: 0,
+        }));
+    }
+
+    /** Powerup pads in fixed pad order (fresh copies each read). */
+    get padSnapshots(): SensePad[] {
+        return this.pads.map((p) => ({ ...p }));
+    }
+
+    /** Pad pickup records (`tick:padIdx:robotId`), in pickup order. */
+    get pickupLog(): string[] {
+        return [...this.padLog];
+    }
+
+    /** Remaining pad-effect ticks for one robot (AMP, OVERDRIVE), clamped at 0. */
+    effectTicks(id: number): { amp: number; overdrive: number } {
+        const robot = this.robots[id] as unknown as Robot | undefined;
+        if (!robot) return { amp: 0, overdrive: 0 };
+        return {
+            amp: Math.max(0, robot.ampUntil - this.tick),
+            overdrive: Math.max(0, robot.overdriveUntil - this.tick),
+        };
     }
 
     get robotSnapshots(): RobotSnapshot[] {
@@ -409,7 +465,8 @@ export class Match {
             const slow = intent.charge && canCharge ? 0.75 : 1;
             const dashing = this.tick < robot.dashUntil;
             const slowed = this.tick < robot.slowUntil;
-            const top = robot.stats.maxSpeed * slow * (dashing ? DASH_SPEED_MULT : 1) * (slowed ? EMP_SLOW_MULT : 1);
+            const overdrive = this.tick < robot.overdriveUntil ? OVERDRIVE_MULT : 1;
+            const top = robot.stats.maxSpeed * slow * (dashing ? DASH_SPEED_MULT : 1) * (slowed ? EMP_SLOW_MULT : 1) * overdrive;
             let forward = throttle >= 0 ? throttle : throttle * REVERSE_FACTOR;
             let lateral = intent.strafe * STRAFE_FACTOR;
             const driveMag = Math.hypot(forward, lateral);
@@ -451,8 +508,11 @@ export class Match {
             if (shoot && robot.cooldown <= 0) {
                 robot.cooldown = robot.stats.cooldownTicks;
                 robot.shotsFired += 1;
+                // AMP does NOT stack with the doubleDamage modifier:
+                // the strongest multiplier wins.
                 const modMult = this.mods.doubleDamage === true ? 2 : 1;
-                const damage = robot.stats.damage * modMult * (1 + robot.charge * (robot.stats.chargeMult - 1));
+                const ampMult = this.tick < robot.ampUntil ? AMP_MULT : 1;
+                const damage = robot.stats.damage * Math.max(modMult, ampMult) * (1 + robot.charge * (robot.stats.chargeMult - 1));
                 robot.charge = 0;
                 this.bullets.push({
                     x: robot.x + Math.cos(robot.tower) * (ROBOT_RADIUS + 4),
@@ -470,6 +530,8 @@ export class Match {
         });
         // 5. Bullets.
         this.stepBullets();
+        // 5b. Powerup pads (P1 slot: right after bullets, before hazards).
+        this.stepPads();
         // 6. Sudden death: past the cap, robots outside the circle pulse damage.
         if (this.tick >= MAX_TICKS) this.suddenDeath();
         // 7. Sense channels: freeze this step's events for delivery and roll
@@ -489,6 +551,9 @@ export class Match {
     private slay(victim: Robot, killerId: number | null): void {
         victim.health = 0;
         victim.alive = false;
+        // Death clears timed pad effects (no drops).
+        victim.ampUntil = -1;
+        victim.overdriveUntil = -1;
         if (killerId !== null) {
             const killer = this.robots[killerId] as Robot | undefined;
             if (killer) {
@@ -873,6 +938,8 @@ export class Match {
                 killsTeam,
                 aliveFoes,
             },
+            // All pads, fixed order: public map knowledge. Fresh copies.
+            pickups: this.pads.map((p) => ({ ...p })),
             inbox: this.inboxFor(robot),
         };
     }
@@ -1037,6 +1104,42 @@ export class Match {
             if (!hit) survivors.push(bullet);
         }
         this.bullets = survivors;
+    }
+
+    /**
+     * Powerup pads: dark pads count down to reactivation; each active pad
+     * is collected by the first living robot in tick order within
+     * PAD_RADIUS. AMP arms a timed damage boost, REPAIR heals instantly
+     * (clamped to max), OVERDRIVE arms a timed speed boost. The pad then
+     * goes dark for PAD_RESPAWN_TICKS.
+     */
+    private stepPads(): void {
+        this.pads.forEach((pad, padIdx) => {
+            if (!pad.active) {
+                pad.respawnIn -= 1;
+                if (pad.respawnIn <= 0) {
+                    pad.active = true;
+                    pad.respawnIn = 0;
+                }
+                return;
+            }
+            for (const robot of this.robots) {
+                if (!robot.alive) continue;
+                if (dist(robot.x, robot.y, pad.x, pad.y) > PAD_RADIUS) continue;
+                if (pad.kind === 'amp') {
+                    robot.ampUntil = this.tick + AMP_TICKS;
+                } else if (pad.kind === 'overdrive') {
+                    robot.overdriveUntil = this.tick + OVERDRIVE_TICKS;
+                } else {
+                    robot.health = Math.min(robot.stats.maxHealth, robot.health + REPAIR_HP);
+                }
+                pad.active = false;
+                pad.respawnIn = PAD_RESPAWN_TICKS;
+                this.padLog.push(`${this.tick}:${padIdx}:${robot.id}`);
+                this.emit(robot.id, { kind: 'pickup', pad: pad.kind });
+                break;
+            }
+        });
     }
 
     private suddenDeath(): void {

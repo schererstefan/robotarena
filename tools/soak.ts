@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, sanitizeIntent, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
@@ -38,7 +38,7 @@ import { createWithParams as createSniperParams, SNIPER_DEFAULTS, sniperParamsFr
 import { createWithParams as createTurretParams, TURRET_DEFAULTS, turretParamsFromGenome } from '../src/robots/turret';
 import { createWithParams as createWandererParams, WANDERER_DEFAULTS, wandererParamsFromGenome } from '../src/robots/wanderer';
 import { computeStats, loadoutCode, loadoutCost, sanitizeLoadout, SKILL_DEFS, type SkillLoadout } from '../src/sim/skills';
-import { ROBOT_API_VERSION, type Intent, type RobotController, type SenseState } from '../src/sim/types';
+import { ROBOT_API_VERSION, type Intent, type RobotController, type SenseEvent, type SensePad, type SenseState } from '../src/sim/types';
 import { initialRound, nextRound, roundName, tiebreakWinner } from '../src/game/tournament';
 
 let failures = 0;
@@ -70,7 +70,8 @@ function fingerprint(match: Match): string {
         [s.code, s.maxHealth, s.alive ? 1 : 0, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired, s.cooldown, s.charge, s.dashCd, s.empCd, s.slowed ? 1 : 0].join(','),
     );
     const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team, b.hot ? 1 : 0].join(',')).join(';');
-    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}`;
+    const pads = match.pickupLog.join(';');
+    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${pads}`;
 }
 
 // --- 1. Determinism: same seed, same everything ------------------------------
@@ -1382,6 +1383,247 @@ console.log('modifiers');
     );
     leak.modifiers.doubleDamage = true;
     check('modifiers getter is a copy', !isExhibition(leak.modifiers));
+}
+
+// --- P1. Powerup pads: layout, pickup effects, respawn, expiry, stacking --
+console.log('powerups');
+{
+    const idle: RobotController = {
+        meta: { id: 'idle', name: 'Idle', author: 'test', version: '0', description: '' },
+        update: (): Intent => ({}),
+    };
+    let lastEvents: SenseEvent[] = [];
+    let lastPickups: SensePad[] | undefined;
+    const recorder: RobotController = {
+        meta: { id: 'recorder', name: 'Recorder', author: 'test', version: '0', description: '' },
+        update: (sense: SenseState): Intent => {
+            lastEvents = sense.events ?? [];
+            lastPickups = sense.pickups;
+            return {};
+        },
+    };
+    const idleMatch = (seed: number): Match =>
+        new Match(
+            [
+                { team: 0, controller: recorder },
+                { team: 1, controller: idle },
+            ],
+            seed,
+        );
+    // White-box placement: teleport a robot onto a pad (deterministic setup
+    // only; the pickup logic itself runs through the real stepPads path).
+    const place = (match: Match, id: number, x: number, y: number): void => {
+        const r = match.robots[id] as unknown as { x: number; y: number } | undefined;
+        if (r) {
+            r.x = x;
+            r.y = y;
+        }
+    };
+    const setHealth = (match: Match, id: number, hp: number): void => {
+        const r = match.robots[id] as unknown as { health: number } | undefined;
+        if (r) r.health = hp;
+    };
+
+    // Layout: fixed fractions, center-mirrored positions and kinds, seed offset.
+    const atFrac = (pads: SensePad[], i: number, fx: number, fy: number): boolean =>
+        Math.abs((pads[i] as SensePad).x - fx * ARENA_WIDTH) < 1e-9 &&
+        Math.abs((pads[i] as SensePad).y - fy * ARENA_HEIGHT) < 1e-9;
+    const mirrored = (pads: SensePad[], a: number, b: number): boolean =>
+        Math.abs((pads[a] as SensePad).x + (pads[b] as SensePad).x - ARENA_WIDTH) < 1e-9 &&
+        Math.abs((pads[a] as SensePad).y + (pads[b] as SensePad).y - ARENA_HEIGHT) < 1e-9 &&
+        (pads[a] as SensePad).kind === (pads[b] as SensePad).kind;
+    for (const seed of [0, 1, 2, 3, 7, 42, 12345]) {
+        const pads = Match.padLayout(seed);
+        check(
+            `seed ${seed} pads at fixed fractions`,
+            pads.length === 4 &&
+                atFrac(pads, 0, 0.22, 0.3) && atFrac(pads, 1, 0.78, 0.3) &&
+                atFrac(pads, 2, 0.22, 0.7) && atFrac(pads, 3, 0.78, 0.7),
+        );
+        check(`seed ${seed} pads mirror-symmetric`, mirrored(pads, 0, 3) && mirrored(pads, 1, 2));
+        check(
+            `seed ${seed} pads start active`,
+            pads.every((p) => p.active && p.respawnIn === 0),
+        );
+    }
+    check('pad layout is seed-derived (deterministic)', JSON.stringify(Match.padLayout(99)) === JSON.stringify(Match.padLayout(99)));
+    check(
+        'pad kinds cycle with a seed offset',
+        Match.padLayout(0)[0]?.kind === 'amp' &&
+            Match.padLayout(1)[0]?.kind === 'repair' &&
+            Match.padLayout(2)[0]?.kind === 'overdrive',
+    );
+
+    // Seed 3 lays out [amp, repair, repair, amp]; seed 4 has overdrive pair.
+    const ampPad = Match.padLayout(3)[0] as SensePad;
+    const repairPad = Match.padLayout(3)[1] as SensePad;
+    const odPad = Match.padLayout(4)[1] as SensePad;
+    check('seed 3 pads are amp/repair', ampPad.kind === 'amp' && repairPad.kind === 'repair');
+    check('seed 4 pad 1 is overdrive', odPad.kind === 'overdrive');
+
+    // AMP pickup: timed damage boost, dark pad, pickup event, sense channel.
+    {
+        const m = idleMatch(3);
+        place(m, 0, ampPad.x, ampPad.y);
+        m.step();
+        check('amp pickup logged as tick:padIdx:robotId', m.pickupLog.join(';') === '0:0:0', m.pickupLog.join(';'));
+        check('amp arms full effect ticks', m.effectTicks(0).amp === AMP_TICKS - 1, `${m.effectTicks(0).amp}`);
+        const pad = m.padSnapshots[0] as SensePad;
+        check('amp pad goes dark for respawn ticks', !pad.active && pad.respawnIn === PAD_RESPAWN_TICKS);
+        m.step(); // robot still on the dark pad: no re-pickup, events deliver
+        check('no re-pickup while dark', m.pickupLog.length === 1);
+        check(
+            'pickup event carries the pad kind',
+            lastEvents.some((e) => e.kind === 'pickup' && e.pad === 'amp'),
+            JSON.stringify(lastEvents),
+        );
+        check(
+            'sense reports all 4 pads in fixed order',
+            (lastPickups?.length ?? 0) === 4 &&
+                lastPickups !== undefined &&
+                lastPickups[0]?.kind === 'amp' &&
+                lastPickups.every((p) => typeof p.x === 'number' && typeof p.active === 'boolean'),
+        );
+    }
+
+    // Contested pickup: first robot in tick order wins.
+    {
+        const m = idleMatch(3);
+        place(m, 0, ampPad.x, ampPad.y);
+        place(m, 1, ampPad.x, ampPad.y);
+        m.step();
+        check('contested pad goes to tick-order first', m.pickupLog.join(';') === '0:0:0', m.pickupLog.join(';'));
+        check('loser gets no effect', m.effectTicks(1).amp === 0);
+    }
+
+    // REPAIR pickup: +HP now, clamped to max.
+    {
+        const m = idleMatch(3);
+        setHealth(m, 0, 20);
+        place(m, 0, repairPad.x, repairPad.y);
+        m.step();
+        check('repair heals exact HP', (m.robotSnapshots[0]?.health ?? -1) === 20 + REPAIR_HP);
+        const m2 = idleMatch(3);
+        setHealth(m2, 0, 70);
+        place(m2, 0, repairPad.x, repairPad.y);
+        m2.step();
+        check(
+            'repair clamps to max health',
+            (m2.robotSnapshots[0]?.health ?? -1) === (m2.robotSnapshots[0]?.maxHealth ?? -2),
+        );
+    }
+
+    // OVERDRIVE pickup: timed speed boost.
+    {
+        const m = idleMatch(4);
+        place(m, 0, odPad.x, odPad.y);
+        m.step();
+        check('overdrive pickup logged', m.pickupLog.join(';') === '0:1:0', m.pickupLog.join(';'));
+        check('overdrive arms full effect ticks', m.effectTicks(0).overdrive === OVERDRIVE_TICKS - 1);
+    }
+
+    // Respawn: dark for exactly PAD_RESPAWN_TICKS, then active (no same-tick collect).
+    {
+        const m = idleMatch(3);
+        place(m, 0, ampPad.x, ampPad.y);
+        m.step();
+        for (let i = 0; i < PAD_RESPAWN_TICKS - 1; i += 1) m.step();
+        const dark = m.padSnapshots[0] as SensePad;
+        check('pad still dark one tick early', !dark.active && dark.respawnIn === 1 && m.pickupLog.length === 1);
+        m.step();
+        const back = m.padSnapshots[0] as SensePad;
+        check('pad reactivates after respawn ticks', back.active && back.respawnIn === 0 && m.pickupLog.length === 1);
+        m.step();
+        check('reactivated pad collects again', m.pickupLog.length === 2 && !(m.padSnapshots[0] as SensePad).active);
+    }
+
+    // Expiry: timed effects run out.
+    {
+        const m = idleMatch(3);
+        place(m, 0, ampPad.x, ampPad.y);
+        m.step();
+        for (let i = 0; i < AMP_TICKS - 1; i += 1) m.step();
+        check('amp expires after AMP_TICKS', m.effectTicks(0).amp === 0);
+        const m2 = idleMatch(4);
+        place(m2, 0, odPad.x, odPad.y);
+        m2.step();
+        for (let i = 0; i < OVERDRIVE_TICKS - 1; i += 1) m2.step();
+        check('overdrive expires after OVERDRIVE_TICKS', m2.effectTicks(0).overdrive === 0);
+    }
+
+    // AMP vs doubleDamage: strongest multiplier wins (never 4x).
+    {
+        const shooter: RobotController = {
+            meta: { id: 'shooter', name: 'Shooter', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({ throttle: 1, turn: 0, towerTurn: 0, fire: true, charge: false }),
+        };
+        const victim: RobotController = {
+            meta: { id: 'victim', name: 'Victim', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({}),
+        };
+        const ampDuel = (modifiers: MatchModifiers): Match => {
+            const m = new Match(
+                [
+                    { team: 0, controller: shooter },
+                    { team: 1, controller: victim },
+                ],
+                3,
+                { modifiers },
+            );
+            place(m, 0, ampPad.x, ampPad.y);
+            m.step(); // tick-0 pickup (stray shot flies wide of the victim)
+            place(m, 0, 130, 320); // back to spawn: geometry matches a plain duel
+            return m;
+        };
+        const firstDealt = (m: Match): { dealt: number; ampLeft: number } => {
+            for (let i = 0; i < 2000; i += 1) {
+                m.step();
+                const dealt = m.robotSnapshots[0]?.damageDealt ?? 0;
+                if (dealt > 0) return { dealt, ampLeft: m.effectTicks(0).amp };
+            }
+            return { dealt: -1, ampLeft: -1 };
+        };
+        const amped = firstDealt(ampDuel({}));
+        check('amp doubles bullet damage', amped.dealt === BULLET_DAMAGE * 2 && amped.ampLeft > 0, JSON.stringify(amped));
+        const stacked = firstDealt(ampDuel({ doubleDamage: true }));
+        check('amp plus doubleDamage is still 2x (max wins)', stacked.dealt === BULLET_DAMAGE * 2, JSON.stringify(stacked));
+    }
+
+    // Death clears timed effects (no drops).
+    {
+        const killer: RobotController = {
+            meta: { id: 'killer', name: 'Killer', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({ throttle: 1, turn: 0, towerTurn: 0, fire: true, charge: false }),
+        };
+        const slayWith = (seed: number, pad: SensePad): Match | null => {
+            const m = new Match(
+                [
+                    { team: 0, controller: idle },
+                    { team: 1, controller: killer },
+                ],
+                seed,
+            );
+            place(m, 0, pad.x, pad.y);
+            m.step();
+            if (m.pickupLog.length !== 1) return null;
+            place(m, 0, 130, 320);
+            for (let i = 0; i < 4000; i += 1) {
+                m.step();
+                if (!(m.robotSnapshots[0]?.alive ?? true)) return m;
+            }
+            return null;
+        };
+        const deadAmp = slayWith(3, ampPad);
+        check('amped victim dies', deadAmp !== null);
+        if (deadAmp) {
+            check('death clears amp', deadAmp.effectTicks(0).amp === 0 && deadAmp.effectTicks(0).overdrive === 0);
+        }
+        const deadOd = slayWith(4, odPad);
+        check('overdriven victim dies', deadOd !== null);
+        if (deadOd) {
+            check('death clears overdrive', deadOd.effectTicks(0).overdrive === 0 && deadOd.effectTicks(0).amp === 0);
+        }
+    }
 }
 
 // --- Tutorial: first-run flag with guarded storage -------------------------
