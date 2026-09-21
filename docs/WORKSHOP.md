@@ -11,11 +11,14 @@ produces a downloadable `.ts` file.
    edit in the browser.
 2. **Static checks** — every keystroke re-runs plain string analysis:
    - structure: exported `meta` (id, name, author, version, description),
-     lowercase meta id, exported default `loadout`, exported `create()`
-     factory, and an Intent-shaped return (throttle/turn/towerTurn/fire/charge);
+     lowercase meta id (letters, digits, dashes), exported `loadout`
+     (default build), exported `create()` factory, and known Intent fields
+     only — every Intent field is optional, so a partial return like
+     `{ fire: true }` passes; an unknown key in an Intent-shaped return
+     fails (see `docs/ROBOT_API.md` for the full field list);
    - loadout: a statically readable build must fit the 6-point budget and use
      known skill ids (dynamic loadouts are skipped, not failed);
-   - safety: imports limited to `../sim/*` and `./common`; no random/time APIs
+   - safety: imports limited to `../sim/*`, `./common`, and `./comms`; no random/time APIs
      (use `sense.rand()`), no network/storage APIs, no DOM or code-escape APIs.
    - Mentions inside comments and string literals don't count — only real code
      is scanned.
