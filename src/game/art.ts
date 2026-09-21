@@ -25,7 +25,11 @@ import { CHASSIS_V2 } from './art/chassis';
 import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_LAMP_B, DECOR_VENT } from './art/decor';
 import { FLOOR_A, FLOOR_B, FLOOR_C, FLOOR_D, FLOOR_E, FLOOR_F, FLOOR_G } from './art/floor';
 import { BOOM_1, BOOM_2, BOOM_3, BOOM_4, CHARGE_AURA, RING_FX } from './art/fx';
+import { CRATE_A, CRATE_B, CRATE_C } from './art/crates';
 import { LOGO_BAR, PANEL_TILE, SKILL_ICONS, UI_ICONS } from './art/menu';
+import { PAD_AMP, PAD_OVERDRIVE, PAD_REPAIR, PAD_WARD } from './art/pads';
+import { ROCK_A, ROCK_B, ROCK_C } from './art/rocks';
+import { TURRET_A, TURRET_B, TURRET_C } from './art/turrets';
 import { validateArt } from './art/validate';
 import { BULLET_CHARGED, BULLET_V2, SPARK_V2, TRACER } from './art/projectiles';
 import { HUB_V2, MUZZLE_V2, TOWER_HEAVY, TOWER_LIGHT, TOWER_TWIN } from './art/towers';
@@ -81,6 +85,19 @@ export function artRegistry(): ArtEntry[] {
         ['tower_light', TOWER_LIGHT, 16, 16],
         ['tower_heavy', TOWER_HEAVY, 16, 16],
         ['tower_twin', TOWER_TWIN, 16, 16],
+        ['mapturret_a', TURRET_A, 32, 32],
+        ['mapturret_b', TURRET_B, 32, 32],
+        ['mapturret_c', TURRET_C, 32, 32],
+        ['pad_ward', PAD_WARD, 32, 32],
+        ['pad_amp', PAD_AMP, 32, 32],
+        ['pad_repair', PAD_REPAIR, 32, 32],
+        ['pad_overdrive', PAD_OVERDRIVE, 32, 32],
+        ['crate_a', CRATE_A, 16, 16],
+        ['crate_b', CRATE_B, 16, 16],
+        ['crate_c', CRATE_C, 16, 16],
+        ['rock_a', ROCK_A, 64, 64],
+        ['rock_b', ROCK_B, 64, 64],
+        ['rock_c', ROCK_C, 64, 64],
         ['hub', HUB_V2, 16, 16],
         ['muzzle', MUZZLE_V2, 8, 8],
         ['muzzle_big', BIG_MUZZLE, 8, 8],
@@ -832,6 +849,30 @@ export function auraDirKey(dir: number): string {
 
 export function skillIconKey(skillId: string): string {
     return `skill_${skillId}`;
+}
+
+/** Landed-sprite keys (sprite-landing track, converted from LOCKED sheets). */
+const MAP_TURRET_KEYS = ['mapturret_a', 'mapturret_b', 'mapturret_c'] as const;
+/** Map-turret body variant per turret index (ownership stays vector). */
+export function mapTurretKey(index: number): string {
+    return MAP_TURRET_KEYS[((index % 3) + 3) % 3] as string;
+}
+/** Powerup-pad sprite key: kind glyph while active, ward ring while dark. */
+export function padSpriteKey(kind: string, active: boolean): string {
+    if (!active) return 'pad_ward';
+    if (kind === 'amp') return 'pad_amp';
+    if (kind === 'repair') return 'pad_repair';
+    return 'pad_overdrive';
+}
+const CRATE_KEYS = ['crate_a', 'crate_b', 'crate_c'] as const;
+/** Obstacle face-plate variant (deterministic per obstacle index). */
+export function crateKey(index: number): string {
+    return CRATE_KEYS[((index % 3) + 3) % 3] as string;
+}
+const ROCK_KEYS = ['rock_a', 'rock_b', 'rock_c'] as const;
+/** Asteroid-telegraph rock variant (deterministic per telegraph slot). */
+export function rockKey(index: number): string {
+    return ROCK_KEYS[((index % 3) + 3) % 3] as string;
 }
 
 /** 8×8 UI icon key (dash/emp/trophy/skull/copy), always paired with text. */
