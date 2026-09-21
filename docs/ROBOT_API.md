@@ -372,8 +372,10 @@ own cone — votes and tracks steer, they never shoot.
 
 Personalities are presets (`BRAIN_PRESETS`), not forks: rusher is
 bloodthirsty, sniper kites long, brawler barely retreats. Hunter, rusher,
-and brawler run the brain by default; the other five presets are defined
-and validated, ready to wire. Brain knobs are the `brain.*` genome group
+and brawler run the full brain by default; ghost, sniper, turret, and
+wanderer reuse its shared target pick (`pickTarget` with the same four
+policies) inside their own logic; the orbiter preset is defined and
+validated, ready to wire. Brain knobs are the `brain.*` genome group
 (`retreatHp`, `kiteRange`, `flankRange`, `stayBonus`, `aggression`,
 `focusBonus`, `orbitDir`) and tune like any other param.
 
