@@ -378,7 +378,7 @@ export class MenuScene extends Scene {
     ): Array<{ cx: number; text: Phaser.GameObjects.Text }> {
         const gap = 34;
         const texts = defs.map((def) => {
-            const text = this.add.text(0, 0, def.label, FONTS.small).setOrigin(0.5).setAlpha(0.75);
+            const text = this.add.text(0, 0, def.label, { ...FONTS.small, fontSize: '18px' }).setOrigin(0.5).setAlpha(0.9);
             this.homeLayer.add(text);
             owned.push(text);
             return { def, text, w: text.width + 26 };
@@ -397,7 +397,7 @@ export class MenuScene extends Scene {
                 playHover();
             });
             hit.on('pointerout', () => {
-                t.text.setAlpha(0.75).setColor(COLORS.dim);
+                t.text.setAlpha(0.9).setColor(COLORS.dim);
             });
             hit.on('pointerdown', () => {
                 unlockAudio();

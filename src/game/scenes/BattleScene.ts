@@ -660,7 +660,7 @@ export class BattleScene extends Scene {
         const seedText = this.add.text(AX + ARENA_WIDTH - 12, 26, seedLabel(this.request.seed, tags), FONTS.monoSmall).setOrigin(1, 0.5).setDepth(10);
         if (this.exhibition) seedText.setColor(COLORS.goldCss);
         if (this.request.pilot === true) {
-            this.add.rectangle(AX + ARENA_WIDTH / 2, AY + 14, 560, 20, 0x000000, 0.6).setDepth(10);
+            this.add.rectangle(AX + ARENA_WIDTH / 2, AY + 14, 700, 20, 0x000000, 0.6).setDepth(10);
             this.add
                 .text(AX + ARENA_WIDTH / 2, AY + 14, BATTLE.pilotHelp, FONTS.monoSmall)
                 .setOrigin(0.5)

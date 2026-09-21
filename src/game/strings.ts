@@ -406,7 +406,7 @@ export const BATTLE = {
     tagShowcase: 'SHOWCASE',
     /** Short HUD tag appended to the seed readout on exhibition matches. */
     tagCustom: 'CUSTOM',
-    pilotHelp: 'WASD DRIVE - MOUSE AIM - SPACE TAP FIRE, HOLD CHARGE - P PAUSE',
+    pilotHelp: 'WASD/ARROWS DRIVE - Q/E STRAFE - MOUSE AIM - SPACE TAP FIRE, HOLD CHARGE - P PAUSE',
     bannerExhibition: 'EXHIBITION MATCH',
     bannerExhibitionCustom: 'EXHIBITION MATCH - CUSTOM ROBOT',
     bannerSuddenDeath: 'SUDDEN DEATH',
