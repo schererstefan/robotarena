@@ -369,20 +369,29 @@ function bakeDir8Variants(scene: Scene): void {
     bakeDir8(scene, 'charge_aura', CHARGE_AURA, EMPTY_RECOLOR);
 }
 
-/** Deterministic floor pattern: mostly plate, with vents, hazards, accents. */
+/** Deterministic 32-bit hash of tile coords -> [0, 1). Seeded per-coordinate;
+ * layout is pixel-identical every boot (seeded only, no nondeterminism). */
+function tileRand(tx: number, ty: number): number {
+    let h = (Math.imul(tx, 374761393) + Math.imul(ty, 668265263)) | 0;
+    h = (h ^ (h >>> 13)) | 0;
+    h = Math.imul(h, 1274126177);
+    h = (h ^ (h >>> 16)) >>> 0;
+    return h / 4294967296;
+}
+
+/** Deterministic floor pattern: mostly plate, with vents, hazards, accents.
+ * A/E/F/G are grain/wear variants mixed at bake time: A keeps ~93% share,
+ * E/F/G take ~7% as low-frequency wear so the floor does not read as flat. */
 function floorTileAt(tx: number, ty: number): PixelMap {
     if (tx % 9 === 4 && ty % 7 === 3) return FLOOR_B;
     const edge = tx < 2 || tx > 57 || ty < 2 || ty > 37;
     if (edge && (tx + ty) % 5 === 0) return FLOOR_C;
     if ((tx * 7 + ty * 13) % 29 === 0) return FLOOR_D;
-    // Low-frequency noise variants E/F/G mixed into the A field.
-    // Deterministic hash of tile coords (no RNG — floor must bake identically every run).
-    const h = (tx * 73856093) ^ (ty * 19349663);
-    const r = ((h % 100) + 100) % 100;
-    if (r < 2) return FLOOR_E;
-    if (r < 4) return FLOOR_F;
-    if (r < 6) return FLOOR_G;
-    return FLOOR_A;
+    const r = tileRand(tx, ty);
+    if (r < 0.93) return FLOOR_A;
+    if (r < 0.955) return FLOOR_E;
+    if (r < 0.98) return FLOOR_F;
+    return FLOOR_G;
 }
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -441,11 +450,10 @@ function bakeArenaFloor(scene: Scene): void {
 
 /**
  * Vector overlay pass on the baked floor (zero runtime cost): center-ring
- * emblem (the SD target mark), spawn pads at the nominal spawn columns
- * (x = 130 / 830, engine computeSpawns; y union for team sizes 1–3 —
- * actual spawns vary ±40px around the pads), a stronger rim-hazard band,
- * a dot-vs-dash per-half cue (NO color tint), the baked corner decals,
- * a radial vignette, and a 2 px inner border.
+ * emblem (the SD target mark), spawn pads at the verified spawn columns
+ * (x = 130 / 830, engine spawnFor; y union for team sizes 1–3), a stronger
+ * rim-hazard band, a dot-vs-dash per-half cue (NO color tint), the baked
+ * corner decals, a radial vignette, and a 2 px inner border.
  */
 function floorOverlay(context: CanvasRenderingContext2D, lut: Map<string, [number, number, number]>): void {
     // Spawn pads: shape-coded (triangle = team 0, square = team 1), no tint.

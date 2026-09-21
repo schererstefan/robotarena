@@ -1,66 +1,73 @@
 // Tower weaponry pixel-art drafts. All sprites face EAST (+x).
-// Hub center: pixel (8,8) (0-indexed). White/light areas tint to the
-// player's paint color at render time. Palette chars: . k d m l w r g y.
+// Hub center: pixel (8,8) (0-indexed).
+// Shading follows the chassis.ts language: 1px `k` outer outline, top-left
+// light (`l` up/left, `d` low/right), 1px warm `c` specular on top-left
+// edges, 1px `d` AO seams where barrel meets hub, `t` team trim accents
+// only (lens/bead/slit, <15% of fill). Palette chars: . k d l w t c.
 
 export type PixelMap = string[];
 
-// Slim 2px barrel: white body, light collar ring, dark tip + open bore.
+// LIGHT: slim recon mast. Tiny rounded hub, 1px-core needle barrel with
+// open k bore, thin wire antenna (k shaft + t bead) on top. Narrowest
+// silhouette of the three — reads as fast/fragile at game distance.
 export const TOWER_LIGHT: PixelMap = [
     '................',
-    '................',
-    '................',
-    '................',
-    '................',
-    '......kkkkk.....',
-    '.....kdwwwdkkkkk',
-    '....kwmdddmwwldd',
-    '....kwmlylmwwldd',
-    '....kwmdddmkkkkk',
-    '.....kdwwwdk....',
-    '......kkkkk.....',
+    '....k...........',
+    '....k...........',
+    '....k...........',
+    '....t...........',
+    '...kkkkk........',
+    '...kcllwk.......',
+    '...kllwwdkkkkkkk',
+    '...kltwwwwwwwwwk',
+    '...kwwdddkkkkkkk',
+    '...kwdddk.......',
+    '....kkkk........',
     '................',
     '................',
     '................',
     '................',
 ];
 
-// Fat 3px cannon: dark groove ring, steel muzzle brake with side
-// vent ports (k), tall 3px open bore at the east edge.
+// HEAVY: wide fortified block. Tall armored mantlet (7x10) with c
+// specular + t visor slit, thick 3px-core cannon with d brake groove
+// ring and tall 3px open bore. Biggest silhouette — reads as slow/tanky.
 export const TOWER_HEAVY: PixelMap = [
     '................',
     '................',
     '................',
-    '................',
-    '................',
-    '......kkkkk.....',
-    '.....kdwwwdkkkkk',
-    '....kwmdddmwdmkd',
-    '....kwmlylmwdmmd',
-    '....kwmdddmwdmkd',
-    '.....kdwwwdkkkkk',
-    '......kkkkk.....',
-    '................',
+    '..kkkkkkk.......',
+    '..kclllwk.......',
+    '..klttwdk.......',
+    '..klwwwwdkkkkkkk',
+    '..klwdwwdwwwdwwk',
+    '..kwwddwdwwwdwwk',
+    '..kwdddddddddddk',
+    '..kwdddddkkkkkkk',
+    '..kdddddk.......',
+    '..kkkkkkk.......',
     '................',
     '................',
     '................',
 ];
 
-// Twin over/under 1px barrels at rows 6/10, symmetric about row 8.
-// Amber hub core stays visible between the barrels.
+// TWIN: split dual barrels. Medium hub with t core pair, two slim 1px
+// barrels (upper/lower) with open k bores and a transparent slot between
+// them east of the hub. Fork silhouette — unmistakable vs light/heavy.
 export const TOWER_TWIN: PixelMap = [
     '................',
     '................',
     '................',
     '................',
-    '................',
-    '......kkkkkkkkkk',
-    '.....kdwwwdwwldd',
-    '....kwmdddmkkkkk',
-    '....kwmlylmwk...',
-    '....kwmdddmkkkkk',
-    '.....kdwwwdwwldd',
-    '......kkkkkkkkkk',
-    '................',
+    '.......kkkkkkkkk',
+    '...kkkkkwwwwwwwk',
+    '...kclwwdkkkkkkk',
+    '...klwwdk.......',
+    '...klttdk.......',
+    '...kwdddk.......',
+    '...kwddddkkkkkkk',
+    '...kkkkkwwwwwwwk',
+    '.......kkkkkkkkk',
     '................',
     '................',
     '................',
