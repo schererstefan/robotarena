@@ -236,7 +236,7 @@ export const BATTLE_TUTORIAL_STEPS: CopyStep[] = [
     },
     {
         title: 'CONTROLS',
-        body: 'Space pauses, N steps one tick while paused, 1X cycles speed, M mutes. The minimap tracks every robot.',
+        body: 'Space pauses, N steps one tick while paused, 1X cycles speed, M mutes. Enter steps this tour, X skips it. The minimap tracks every robot.',
     },
     {
         title: 'RECORDS',

@@ -771,6 +771,8 @@ export class BattleScene extends Scene {
         this.input.keyboard?.on('keydown-DOWN', this.onResultsRowDown);
         this.input.keyboard?.on('keydown-D', this.onResultsRowSave);
         this.input.keyboard?.on('keydown-C', this.onResultsReplayCopy);
+        this.input.keyboard?.on('keydown-ENTER', this.onTutorialNext);
+        this.input.keyboard?.on('keydown-X', this.onTutorialSkip);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-SPACE', this.onSpaceKey);
             this.input.keyboard?.off('keydown', this.onPilotKeyDown);
@@ -786,6 +788,8 @@ export class BattleScene extends Scene {
             this.input.keyboard?.off('keydown-DOWN', this.onResultsRowDown);
             this.input.keyboard?.off('keydown-D', this.onResultsRowSave);
             this.input.keyboard?.off('keydown-C', this.onResultsReplayCopy);
+            this.input.keyboard?.off('keydown-ENTER', this.onTutorialNext);
+            this.input.keyboard?.off('keydown-X', this.onTutorialSkip);
             stopMusic();
             this.clearFilters();
         });
@@ -849,6 +853,17 @@ export class BattleScene extends Scene {
         this.tutStep += 1;
         this.refreshTutorialStep();
     }
+
+    /** Tutorial keyboard: ENTER steps the tour, X skips it (battle phase only). */
+    private onTutorialNext = (): void => {
+        if (this.request.tutorial !== true || this.resultsShown || this.introActive) return;
+        this.nextTutorialStep();
+    };
+
+    private onTutorialSkip = (): void => {
+        if (this.request.tutorial !== true || this.resultsShown) return;
+        this.skipTutorial();
+    };
 
     private skipTutorial(): void {
         markTutorialSeen();
