@@ -2305,7 +2305,7 @@ export class BattleScene extends Scene {
             this.curBY[i] = b.y;
             this.hotSlot[i] = b.hot;
             if (b.hot) hot = true;
-            img.setVisible(true).setPosition(AX + b.x, AY + b.y);
+            img.setVisible(!this.resultsShown).setPosition(AX + b.x, AY + b.y);
             const want = b.hot ? 'bullet_hot' : 'bullet';
             if (this.bulletTeam[i] !== b.team || img.texture.key !== want) {
                 this.bulletTeam[i] = b.team;
