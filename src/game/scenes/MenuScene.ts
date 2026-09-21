@@ -7,7 +7,7 @@ import { modifierCodes, type ArenaId, type MatchModifiers } from '../../sim/cons
 import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { artRegistry, chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
-import { isMuted, playClick, playConfirm, playError, startMenuAmbience, stopMusic, toggleMuted, unlockAudio } from '../audio';
+import { isMuted, playClick, playConfirm, playError, playHover, startMenuAmbience, stopMusic, toggleMuted, unlockAudio } from '../audio';
 import {
     clearDailyBoard,
     clearHistory,
@@ -139,7 +139,15 @@ export class MenuScene extends Scene {
     private nav!: FocusNav;
     private navBase: NavTarget[] = [];
     private navSlots: NavTarget[] = [];
-    private showcaseButton: Button | null = null;
+    /** Two-screen menu: 'home' is the clean text list, 'setup' the battle config. */
+    private screen: 'home' | 'setup' = 'home';
+    private homeLayer!: Phaser.GameObjects.Container;
+    private setupLayer!: Phaser.GameObjects.Container;
+    private navHome: NavTarget[] = [];
+    private navFooterFlow: NavTarget[] = [];
+    private navFooterSettings: NavTarget[] = [];
+    private footerFlow: Phaser.GameObjects.GameObject[] = [];
+    private showcaseAvailable = false;
     private tickerTimer: ReturnType<typeof setInterval> | null = null;
     private statsTab: 'local' | 'online' = 'local';
     private onlineBoard: OnlineBoard | null = null;
@@ -168,97 +176,44 @@ export class MenuScene extends Scene {
 
     create(): void {
         ensureArtTextures(this);
-        // create() re-runs on every visit: drop references to destroyed objects.
-        this.modeButtons = [];
-        this.slotObjects = [];
-        this.editorObjects = [];
-        this.statsObjects = [];
-        this.modsObjects = [];
+        this.teamSize = 1;
+        this.lineupIds = [...this.lineupIds.slice(0, 2)];
+        this.loadouts = [...this.loadouts.slice(0, 2)];
+        this.skins = [...this.skins.slice(0, 2)];
+        this.arena = 'open';
+        this.mods = {};
         this.editorSlot = -1;
-        this.tourMode = 'none';
-        this.tourObjects = [];
-        this.tourButtons = [];
-        this.tourStep = 0;
-        this.tourNext = null;
-        this.artPreview = null;
+        this.modeButtons = [];
         this.navBase = [];
+        this.navHome = [];
         this.navSlots = [];
-        this.showcaseButton = null;
-        this.statsTab = 'local';
+        this.navFooterFlow = [];
+        this.navFooterSettings = [];
+        this.footerFlow = [];
+        this.showcaseAvailable = false;
+        this.tickerTimer = null;
         this.onlineBoard = null;
         this.onlineCached = false;
         this.onlineTried = false;
-        this.onlineToken += 1;
+        this.onlineToken = 0;
+        this.tourMode = 'none';
+        this.tourStep = 0;
+        const reduced = isReducedMotion();
         this.nav = new FocusNav(this);
         this.nav.onEscape = () => this.escapeOverlay();
-        // Menu hero: quantized backdrop art (menu_backdrop, 128x96 baked
-        // from docs/art-evidence/menu-backdrop-v1.webp) rendered at 8x for
-        // full-bleed 1024x768, under a scrim for text legibility. Static in
-        // all motion modes (no drift — the art carries the depth).
-        const reduced = isReducedMotion();
+
+        // Pixel-art menu backdrop, full-bleed behind every control. Each
+        // screen layer carries its own scrim so the art stays visible.
         this.add.image(CX, 384, 'menu_backdrop').setScale(8).setDepth(-10);
-        this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.62).setDepth(-5);
-        const titleObj = this.add.text(CX, 44, APP.title, FONTS.title).setOrigin(0.5);
-        const logoL = this.add.image(CX - 285, 44, 'logo_bar').setScale(2);
-        const logoR = this.add.image(CX + 285, 44, 'logo_bar').setScale(2);
-        this.add
-            .text(CX, 86, APP.tagline, FONTS.small)
-            .setOrigin(0.5);
-        // Staggered title pop, one-shot.
-        if (!reduced) {
-            for (const [obj, delay] of [[logoL, 0], [titleObj, 80], [logoR, 160]] as const) {
-                obj.setScale(obj === titleObj ? 0.8 : 1.6);
-                this.tweens.add({ targets: obj, scale: obj === titleObj ? 1 : 2, duration: 260, delay, ease: 'Back.easeOut' });
-            }
-        }
-        // Menu title glow (static: kept in both motion modes when supported).
-        try {
-            titleObj.filters?.internal?.addGlow(0xffd23f, 2, 0);
-        } catch {
-            // Canvas: no per-object filters; the gold title stands alone.
-        }
+        // TEMP experiment: lift the dark quantized backdrop with an ADD copy.
+        this.add.image(CX, 384, 'menu_backdrop').setScale(8).setDepth(-9).setBlendMode(BlendModes.ADD).setAlpha(0.35);
+        this.homeLayer = this.add.container(0, 0).setDepth(0);
+        this.setupLayer = this.add.container(0, 0).setDepth(0);
 
-        [1, 2, 3].forEach((size, i) => {
-            const btn = this.navButton(CX - 150 + i * 150, 136, 130, 42, '', () => this.setMode(size), 0, 44);
-            this.modeButtons.push(btn);
-        });
-        this.refreshModeLabels();
-        this.arenaButton = this.navButton(CX + 323, 136, 200, 42, '', () => this.cycleArena(), 0, 44);
-        this.refreshArenaLabel();
-        this.modsButton = this.navButton(CX - 350, 136, 200, 42, '', () => this.openMods(), 0, 44);
-        this.refreshModsLabel();
+        this.buildHome(reduced);
+        this.buildSetup();
+        this.showScreen('home');
 
-        this.add.text(92, 176, MENU.headers.slot, FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(208, 176, MENU.headers.callsign, FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(392, 176, MENU.headers.robot, FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(618, 176, MENU.headers.paint, FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(694, 176, MENU.headers.finish, FONTS.monoSmall).setOrigin(0, 0.5);
-        this.add.text(836, 176, MENU.headers.skills, FONTS.monoSmall).setOrigin(0, 0.5);
-        this.rebuildSlots();
-
-        makePanel(this, CX, 592, 880, 76);
-        this.descText = this.add.text(CX - 420, 562, '', FONTS.body).setWordWrapWidth(840);
-        this.showDescription(0);
-
-        // Single centered primary START; tertiary actions drop to ghost.
-        this.navButton(CX - 290, 684, 270, 50, MENU.randomizeSkins, () => this.randomizeSkins(), 0, 0, { tier: 'ghost' });
-        this.navButton(CX, 684, 270, 50, MENU.startBattle, () => this.startBattle(), 0, 0, { tier: 'primary' });
-        this.navButton(CX + 290, 684, 270, 50, MENU.pilot, () => this.startPilot(), 0, 0, { tier: 'ghost' });
-        // START shine sweep (Phaser 4.2 ships no Shine controller, so a
-        // tweened highlight bar stands in): 4 s cycle, static under reduced
-        // motion (hidden — the primary tier carries the emphasis instead).
-        if (!isReducedMotion()) {
-            const shine = this.add.rectangle(CX - 135, 684, 26, 46, 0xffffff, 0).setDepth(1).setBlendMode(BlendModes.ADD);
-            this.tweens.add({ targets: shine, x: CX + 135, duration: 900, delay: 1200, ease: 'Quad.easeInOut', repeat: -1, repeatDelay: 3100 });
-            this.tweens.add({ targets: shine, alpha: 0.22, duration: 450, delay: 1200, yoyo: true, repeat: -1, repeatDelay: 3550, ease: 'Sine.easeInOut' });
-        }
-        this.trailsButton = this.navButton(CX - 350, 728, 140, 26, '', () => this.toggleTrails());
-        this.muteButton = this.navButton(CX - 210, 728, 140, 26, '', () => this.toggleMute());
-        this.navButton(CX - 70, 728, 140, 26, MENU.watchReplay, () => this.openReplayDialog());
-        this.colorButton = this.navButton(CX + 70, 728, 140, 26, '', () => this.toggleColorblind());
-        this.motionButton = this.navButton(CX + 210, 728, 140, 26, '', () => this.toggleMotion());
-        // SHOWCASE lands in the last slot once the manifest resolves — and
-        // stays hidden (with the ticker silent) when no manifest shipped.
         void loadShowcase().then((manifest) => {
             if (!manifest || manifest.champions.length === 0) return;
             if (!this.scene.isActive('Menu')) return;
@@ -273,30 +228,7 @@ export class MenuScene extends Scene {
                 ),
             );
         });
-        this.dailyButton = this.navButton(CX - 362, 754, 130, 24, '', () => this.startDaily());
-        // DAILY gold dot: today's challenge is still unplayed.
-        this.dailyDot = this.add.circle(CX - 362 - 73, 754, 5, COLORS.gold);
-        this.navButton(CX - 218, 754, 130, 24, MENU.tourney, () => this.scene.start('Tournament'));
-        this.navButton(CX - 74, 754, 130, 24, MENU.stats, () => this.openStats());
-        this.navButton(CX + 74, 754, 130, 24, MENU.workshop, () => this.scene.start('Workshop'));
-        this.navButton(CX + 218, 754, 130, 24, MENU.import, () => this.openImportDialog());
-        this.navButton(CX + 362, 754, 130, 24, MENU.tutorial, () => this.startTutorial());
-        this.refreshTrailsLabel();
-        this.refreshMuteLabel();
-        this.refreshColorLabel();
-        this.refreshMotionLabel();
-        this.refreshDailyLabel();
-        this.restoreNav();
-        // Tutorial routing: the battle half hands off to the loadout tour;
-        // first-run visits get the prompt instead.
-        const startTour = this.tourRequested;
-        this.tourRequested = false;
-        if (startTour) {
-            this.openEditor(0);
-            this.startLoadoutTour();
-        } else if (shouldShowTutorial()) {
-            this.showTutorialPrompt();
-        }
+
         // First click creates/resumes the AudioContext (autoplay policy);
         // every click gets a UI blip.
         this.input.on('pointerdown', this.onAnyPointer);
@@ -313,6 +245,18 @@ export class MenuScene extends Scene {
             stopMusic();
         });
         startMenuAmbience();
+
+        // Return from a battle with the loadout tour requested: the tour
+        // needs the setup screen, so switch before opening the editor.
+        const startTour = this.tourRequested;
+        this.tourRequested = false;
+        if (startTour) {
+            this.showScreen('setup');
+            this.openEditor(0);
+            this.startLoadoutTour();
+        } else if (shouldShowTutorial()) {
+            this.showTutorialPrompt();
+        }
     }
 
     private onAnyPointer = (): void => {
@@ -373,18 +317,244 @@ export class MenuScene extends Scene {
         return makeButton(this, x, y, w, h, label, onClick, depth, minTouch, opts);
     }
 
+    /** navButton variant for setup-screen controls: same targets, inside the setup layer. */
+    private setupButton(
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        label: string,
+        onClick: () => void,
+        depth = 0,
+        minTouch = 0,
+        opts?: ButtonOpts,
+    ): Button {
+        return this.navButton(x, y, w, h, label, onClick, depth, minTouch, { ...opts, container: this.setupLayer });
+    }
+
+    /** Switch between the home list and the battle-setup screen. */
+    private showScreen(next: 'home' | 'setup'): void {
+        this.screen = next;
+        this.homeLayer.setVisible(next === 'home');
+        this.setupLayer.setVisible(next === 'setup');
+        this.restoreNav();
+    }
+
+    /**
+     * Text menu item in the style of the reference: no button box, just
+     * letterspaced text with a gold diamond marker on hover. Keyboard focus
+     * uses the shared nav ring.
+     */
+    private homeItem(x: number, y: number, label: string, onClick: () => void, primary = false): void {
+        const rest = primary ? COLORS.goldCss : COLORS.ink;
+        const text = this.add.text(x, y, label, { ...FONTS.heading, letterSpacing: 6, color: rest }).setOrigin(0, 0.5);
+        text.setShadow(0, 2, '#000', 5, true, true);
+        const marker = this.add.rectangle(x - 22, y, 9, 9, COLORS.gold).setRotation(Math.PI / 4).setAlpha(0);
+        const w = text.width + 56;
+        const hit = this.add.rectangle(x + text.width / 2, y, w, 48, 0xffffff, 0);
+        this.homeLayer.add([marker, text, hit]);
+        const setHover = (on: boolean): void => {
+            marker.setAlpha(on ? 1 : 0);
+            text.setColor(on ? COLORS.whiteCss : rest);
+            if (on) playHover();
+        };
+        hit.setInteractive({ useHandCursor: true });
+        hit.on('pointerover', () => setHover(true));
+        hit.on('pointerout', () => setHover(false));
+        hit.on('pointerdown', () => {
+            unlockAudio();
+            playClick();
+            onClick();
+        });
+        this.navHome.push({ x: x + w / 2 - 28, y, w, h: 42, activate: onClick });
+    }
+
+    /** Centered row of tiny footer text links. */
+    private linkRow(
+        y: number,
+        defs: Array<{ label: string; onClick: () => void; keep?: (h: { setLabel: (label: string) => void }) => void }>,
+        owned: Phaser.GameObjects.GameObject[],
+        targets: NavTarget[],
+    ): Array<{ cx: number; text: Phaser.GameObjects.Text }> {
+        const gap = 34;
+        const texts = defs.map((def) => {
+            const text = this.add.text(0, 0, def.label, FONTS.small).setOrigin(0.5).setAlpha(0.75);
+            this.homeLayer.add(text);
+            owned.push(text);
+            return { def, text, w: text.width + 26 };
+        });
+        const total = texts.reduce((sum, t) => sum + t.w, 0) + gap * (texts.length - 1);
+        let x = CX - total / 2;
+        const out: Array<{ cx: number; text: Phaser.GameObjects.Text }> = [];
+        for (const t of texts) {
+            const cx = x + t.w / 2;
+            t.text.setPosition(cx, y);
+            const hit = this.add.rectangle(cx, y, t.w, 30, 0xffffff, 0).setInteractive({ useHandCursor: true });
+            this.homeLayer.add(hit);
+            owned.push(hit);
+            hit.on('pointerover', () => {
+                t.text.setAlpha(1).setColor(COLORS.whiteCss);
+                playHover();
+            });
+            hit.on('pointerout', () => {
+                t.text.setAlpha(0.75).setColor(COLORS.dim);
+            });
+            hit.on('pointerdown', () => {
+                unlockAudio();
+                playClick();
+                t.def.onClick();
+            });
+            targets.push({ x: cx, y, w: t.w, h: 28, activate: t.def.onClick });
+            t.def.keep?.({ setLabel: (label: string) => t.text.setText(label) });
+            out.push({ cx, text: t.text });
+            x += t.w + gap;
+        }
+        return out;
+    }
+
+    /** Footer flow row; rebuilt when the showcase manifest arrives. */
+    private layoutFooterRow1(): void {
+        for (const obj of this.footerFlow) obj.destroy();
+        this.footerFlow = [];
+        this.navFooterFlow = [];
+        if (this.dailyDot) {
+            this.dailyDot.destroy();
+            this.dailyDot = null;
+        }
+        const done = loadDailyBoard().some((entry) => entry.date === dailyDateKey());
+        const defs: Array<{ label: string; onClick: () => void; keep?: (h: { setLabel: (label: string) => void }) => void }> = [
+            { label: dailyLabel(done), onClick: () => this.startDaily(), keep: (h) => { this.dailyButton = h; } },
+            { label: MENU.tourney, onClick: () => this.scene.start('Tournament') },
+            { label: MENU.stats, onClick: () => this.openStats() },
+            { label: MENU.workshop, onClick: () => this.scene.start('Workshop') },
+            { label: MENU.tutorial, onClick: () => this.startTutorial() },
+            { label: MENU.import, onClick: () => this.openImportDialog() },
+        ];
+        if (this.showcaseAvailable) defs.push({ label: MENU.showcase, onClick: () => this.scene.start('Showcase') });
+        const entries = this.linkRow(688, defs, this.footerFlow, this.navFooterFlow);
+        const first = entries[0];
+        if (first && !done) {
+            this.dailyDot = this.add.circle(first.cx + first.text.width / 2 + 12, 688, 5, COLORS.gold);
+            this.homeLayer.add(this.dailyDot);
+            this.footerFlow.push(this.dailyDot);
+        }
+        this.refreshDailyLabel();
+    }
+
+    /** Clean home screen: backdrop hero, letterspaced title, a few text options. */
+    private buildHome(reduced: boolean): void {
+        const L = this.homeLayer;
+        // Light scrim: the backdrop stays the hero of this screen.
+        L.add(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.18));
+
+        // Title lockup, letterspaced like the reference, tagline beneath.
+        const titleObj = this.add.text(CX, 104, APP.title, { ...FONTS.title, letterSpacing: 12 }).setOrigin(0.5);
+        titleObj.setColor(COLORS.goldCss).setShadow(0, 3, '#000', 6, true, true);
+        const logoL = this.add.image(CX - 310, 104, 'logo_bar').setScale(2);
+        const logoR = this.add.image(CX + 310, 104, 'logo_bar').setScale(2);
+        L.add([logoL, titleObj, logoR]);
+        L.add(this.add.text(CX, 154, APP.tagline, FONTS.small).setOrigin(0.5));
+        if (!reduced) {
+            titleObj.setScale(0.92);
+            logoL.setScale(1.84);
+            logoR.setScale(1.84);
+            this.tweens.add({ targets: titleObj, scale: 1, duration: 260, ease: 'Back.easeOut' });
+            this.tweens.add({ targets: [logoL, logoR], scale: 2, duration: 260, ease: 'Back.easeOut' });
+        }
+
+        // The few options, centered like the reference.
+        const mx = CX - 150;
+        this.homeItem(mx, 302, MENU.startBattle, () => this.startBattle(), true);
+        this.homeItem(mx, 360, MENU.battleSetup, () => this.showScreen('setup'));
+        this.homeItem(mx, 418, MENU.pilot, () => this.startPilot());
+        this.homeItem(mx, 476, MENU.watchReplay, () => this.openReplayDialog());
+
+        // Slim footer: flow links first, settings second.
+        this.layoutFooterRow1();
+        this.linkRow(
+            720,
+            [
+                { label: soundLabel(isMuted()), onClick: () => this.toggleMute(), keep: (h) => { this.muteButton = h; } },
+                { label: trailsLabel(this.trails), onClick: () => this.toggleTrails(), keep: (h) => { this.trailsButton = h; } },
+                { label: colorLabel(isColorblind()), onClick: () => this.toggleColorblind(), keep: (h) => { this.colorButton = h; } },
+                { label: motionLabel(isReducedMotion()), onClick: () => this.toggleMotion(), keep: (h) => { this.motionButton = h; } },
+            ],
+            [],
+            this.navFooterSettings,
+        );
+    }
+
+    /** Battle configuration screen: the old menu's working half, decluttered. */
+    private buildSetup(): void {
+        const L = this.setupLayer;
+        // Heavier scrim: dense controls need the legibility.
+        L.add(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.45));
+
+        this.setupButton(84, 40, 110, 34, MENU.back, () => this.showScreen('home'), 0, 0, { tier: 'ghost' });
+        L.add(this.add.text(CX, 40, MENU.battleSetup, FONTS.heading).setOrigin(0.5));
+
+        // Mode controls.
+        const modeDefs = [
+            { label: MENU.modeLabels[0] ?? '1 v 1', size: 1 },
+            { label: MENU.modeLabels[1] ?? '2 v 2', size: 2 },
+            { label: MENU.modeLabels[2] ?? '3 v 3', size: 3 },
+        ] as const;
+        modeDefs.forEach((def, i) => {
+            const btn = this.setupButton(CX - 220 + i * 220, 104, 200, 44, '', () => this.setMode(def.size));
+            this.modeButtons.push(btn);
+        });
+        this.refreshModeLabels();
+
+        // Arena + modifiers pickers.
+        this.arenaButton = this.setupButton(CX - 170, 164, 320, 44, '', () => this.cycleArena());
+        this.refreshArenaLabel();
+        this.modsButton = this.setupButton(CX + 170, 164, 320, 44, '', () => this.openMods());
+        this.refreshModsLabel();
+
+        // Column headers for the slot table.
+        const headers: Array<[number, string]> = [
+            [100, MENU.headers.slot],
+            [285, MENU.headers.callsign],
+            [490, MENU.headers.robot],
+            [646, MENU.headers.paint],
+            [748, MENU.headers.finish],
+            [885, MENU.headers.skills],
+        ];
+        for (const [x, label] of headers) L.add(this.add.text(x, 208, label, FONTS.monoSmall).setOrigin(0.5));
+
+        this.rebuildSlots();
+
+        // Robot description panel.
+        L.add(makePanel(this, CX, 596, 880, 76));
+        this.descText = this.add.text(CX - 424, 570, '', FONTS.small).setOrigin(0, 0);
+        this.descText.setWordWrapWidth(848);
+        L.add(this.descText);
+        this.showDescription(0);
+
+        // Bottom row: skins, battle, pilot.
+        this.setupButton(CX - 290, 692, 270, 50, MENU.randomizeSkins, () => this.randomizeSkins(), 0, 0, { tier: 'ghost' });
+        this.setupButton(CX, 692, 270, 50, MENU.startBattle, () => this.startBattle(), 0, 0, { tier: 'primary' });
+        this.setupButton(CX + 290, 692, 270, 50, MENU.pilot, () => this.startPilot(), 0, 0, { tier: 'ghost' });
+    }
+
     private overlayOpen(): boolean {
         return this.editorSlot >= 0 || this.statsObjects.length > 0 || this.modsObjects.length > 0 || this.tourMode !== 'none';
     }
 
     private restoreNav(): void {
-        if (!this.overlayOpen()) this.nav.replaceTargets([...this.navBase, ...this.navSlots]);
+        if (this.overlayOpen()) return;
+        this.nav.replaceTargets(
+            this.screen === 'home'
+                ? [...this.navHome, ...this.navFooterFlow, ...this.navFooterSettings]
+                : [...this.navBase, ...this.navSlots],
+        );
     }
 
     // ---- Champion showcase entry + marquee ticker --------------------------
     private maybeAddShowcase(): void {
-        if (this.showcaseButton) return;
-        this.showcaseButton = this.navButton(CX + 350, 728, 140, 26, MENU.showcase, () => this.scene.start('Showcase'));
+        if (this.showcaseAvailable) return;
+        this.showcaseAvailable = true;
+        this.layoutFooterRow1();
         this.restoreNav();
     }
 
@@ -434,7 +604,10 @@ export class MenuScene extends Scene {
         }
         if (this.modsObjects.length > 0) {
             this.closeMods();
+            return;
         }
+        // On the setup screen, Escape backs out to the home list.
+        if (this.screen === 'setup') this.showScreen('home');
     }
 
     private onMuteKey = (): void => {
@@ -547,6 +720,7 @@ export class MenuScene extends Scene {
 
     private track<T extends Phaser.GameObjects.GameObject>(obj: T): T {
         this.slotObjects.push(obj);
+        this.setupLayer.add(obj);
         return obj;
     }
 
