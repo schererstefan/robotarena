@@ -216,6 +216,13 @@ export class BattleScene extends Scene {
     private punchOn: boolean[] = [];
     private healAcc: number[] = [];
     private lastHealTick: number[] = [];
+    /**
+     * Zero-damage contact cue state (ram pushes, wall bumps): per-robot
+     * contact latches + last cue tick (rising-edge + 1 s cooldown).
+     */
+    private prevWallTouch: boolean[] = [];
+    private prevRamTouch: boolean[] = [];
+    private lastBumpTick: number[] = [];
     private firstBlood = false;
     private robotIds: string[] = [];
     private normalDamage = BULLET_DAMAGE;
@@ -234,6 +241,9 @@ export class BattleScene extends Scene {
     private speedButton!: { setLabel: (label: string) => void };
     private pauseButton!: { setLabel: (label: string) => void };
     private stepButton!: { setLabel: (label: string) => void; setEnabled: (enabled: boolean) => void };
+    /** Pause overlay: fullscreen dim + mid-screen label (visible only while paused). */
+    private pauseDim!: Phaser.GameObjects.Rectangle;
+    private pauseLabel!: Phaser.GameObjects.Text;
     private resultsShown = false;
     /** Results keyboard: set once the results buttons exist. */
     private resultsReady = false;
@@ -338,6 +348,9 @@ export class BattleScene extends Scene {
         this.punchOn = [];
         this.healAcc = [];
         this.lastHealTick = [];
+        this.prevWallTouch = [];
+        this.prevRamTouch = [];
+        this.lastBumpTick = [];
         this.robotIds = [];
         this.rings = [];
         this.prevPadActive = [];
@@ -513,6 +526,9 @@ export class BattleScene extends Scene {
             this.punchOn.push(false);
             this.healAcc.push(0);
             this.lastHealTick.push(-9999);
+            this.prevWallTouch.push(false);
+            this.prevRamTouch.push(false);
+            this.lastBumpTick.push(-9999);
             this.treads.push(this.add.image(0, 0, treadsDirKey(false, dir8ForHeading(snap.heading))).setScale(2).setDepth(3.5));
             // Contact shadow: dithered blob under the robot (depth 2.5 sits
             // above the dyn layer, below every robot part).
@@ -700,6 +716,16 @@ export class BattleScene extends Scene {
         // left, T0 plate, minimap, T1 plate, then PAUSE + SPEED right.
         this.stepButton = makeButton(this, 195, 740, 100, 36, BATTLE.step, () => this.stepOnce(), 0, 44);
         this.stepButton.setEnabled(false);
+        // Pause overlay: fullscreen dim + unmistakable mid-screen label.
+        // Depth 15/16 sits above sprites/HUD (<=10) but below results (20).
+        this.pauseDim = this.add.rectangle(512, 384, 1024, 768, 0x0b0e12, 0.55).setDepth(15).setVisible(false);
+        this.pauseLabel = this.add
+            .text(AX + ARENA_WIDTH / 2, AY + ARENA_HEIGHT / 2, 'PAUSED', FONTS.heading)
+            .setOrigin(0.5)
+            .setDepth(16)
+            .setVisible(false);
+        this.pauseLabel.setColor(COLORS.whiteCss);
+        this.pauseLabel.setStroke('#0b0e12', 4);
         if (this.request.tournament !== undefined) {
             // Abandon the battle: the unsettled slot stays open on the bracket.
             makeButton(this, 80, 740, 100, 36, TOURNAMENT.bracket, () => this.scene.start('Tournament'), 0, 44);
@@ -872,12 +898,14 @@ export class BattleScene extends Scene {
                 }
             });
         }
-        this.updateParticles(dt);
-        this.decayEffects(dt);
-        this.updateTrauma(dt);
-        if (!this.paused) this.tickThroes(dt);
+        if (!this.paused) {
+            this.updateParticles(dt);
+            this.decayEffects(dt);
+            this.updateTrauma(dt);
+            this.tickThroes(dt);
+            this.tickSkulls(dt);
+        }
         this.tickFlicker(dt);
-        this.tickSkulls(dt);
         this.syncSdRing();
         this.syncHazards();
         this.syncDangerVignette(snaps, dt);
@@ -1026,6 +1054,8 @@ export class BattleScene extends Scene {
         this.paused = !this.paused;
         this.pauseButton.setLabel(this.paused ? BATTLE.resume : BATTLE.pause);
         this.stepButton.setEnabled(this.paused);
+        this.pauseDim.setVisible(this.paused);
+        this.pauseLabel.setVisible(this.paused);
     }
 
     /** Replay viewer: advance exactly one sim tick while paused. */
@@ -1036,6 +1066,15 @@ export class BattleScene extends Scene {
         this.diffSnapshots(this.match.robotSnapshots);
         this.diffPads();
         this.diffTurrets();
+        if (this.match.result.over) {
+            // Stepped into game-over: drop the pause presentation so the
+            // results panel lands clean (togglePause is inert once over).
+            this.paused = false;
+            this.pauseButton.setLabel(BATTLE.pause);
+            this.stepButton.setEnabled(false);
+            this.pauseDim.setVisible(false);
+            this.pauseLabel.setVisible(false);
+        }
     }
 
     private cycleSpeed(): void {
@@ -1136,6 +1175,49 @@ export class BattleScene extends Scene {
             if (s.alive && p.empCd <= 0 && s.empCd > 0) {
                 playEmp(s.x);
                 this.empRingT[i] = 0.5;
+            }
+            // Zero-damage contacts (ram pushes, wall bumps): no health
+            // delta, so the hit branches above never fire and the sim's
+            // sense events never reach the renderer — without this they
+            // are silent/invisible. Detect contact edges from snapshots
+            // and answer with ONE minimal cue reusing the hit systems: a
+            // tiny gray burst (burst() no-ops under reduced motion) plus
+            // the softest hit tier as a low thud (playHit carries its own
+            // rate gate). Rising-edge + 1 s per-robot cooldown keeps
+            // sustained grinding quiet.
+            if (s.alive) {
+                const wallTouch =
+                    s.x <= ROBOT_RADIUS + 1 ||
+                    s.x >= ARENA_WIDTH - ROBOT_RADIUS - 1 ||
+                    s.y <= ROBOT_RADIUS + 1 ||
+                    s.y >= ARENA_HEIGHT - ROBOT_RADIUS - 1;
+                let ramTouch = false;
+                for (let j = 0; j < snaps.length; j += 1) {
+                    if (j === i) continue;
+                    const o = snaps[j] as RobotSnapshot;
+                    if (!o.alive) continue;
+                    const dx = s.x - o.x;
+                    const dy = s.y - o.y;
+                    const rr = ROBOT_RADIUS * 2 + 2;
+                    if (dx * dx + dy * dy <= rr * rr) {
+                        ramTouch = true;
+                        break;
+                    }
+                }
+                const moved = Math.hypot(s.x - p.x, s.y - p.y) > 0.25;
+                const entered =
+                    moved &&
+                    ((wallTouch && !this.prevWallTouch[i]) || (ramTouch && !this.prevRamTouch[i]));
+                this.prevWallTouch[i] = wallTouch;
+                this.prevRamTouch[i] = ramTouch;
+                if (entered && this.match.result.tick - (this.lastBumpTick[i] as number) >= 60) {
+                    this.lastBumpTick[i] = this.match.result.tick;
+                    this.burst(cx, cy, COLORS.faintNum, 3, 90, 160);
+                    playHit(1, s.x);
+                }
+            } else {
+                this.prevWallTouch[i] = false;
+                this.prevRamTouch[i] = false;
             }
             if (p.alive && !s.alive) {
                 // Death-throes staging (reduced motion: detonate at once).
