@@ -1578,12 +1578,12 @@ export class MenuScene extends Scene {
         });
 
         const done = this.trackMods(
-            this.add.rectangle(CX, 520, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50),
+            this.add.rectangle(CX, 550, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50),
         );
-        this.trackMods(this.add.text(CX, 520, COMMON.done, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        this.trackMods(this.add.text(CX, 550, COMMON.done, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
         done.setInteractive({ useHandCursor: true });
         done.on('pointerdown', () => this.closeMods());
-        targets.push({ x: CX, y: 520, w: 170, h: 40, activate: () => this.closeMods() });
+        targets.push({ x: CX, y: 550, w: 170, h: 40, activate: () => this.closeMods() });
         this.nav.replaceTargets(targets);
     }
 
