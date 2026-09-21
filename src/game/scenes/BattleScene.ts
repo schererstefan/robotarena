@@ -2156,9 +2156,25 @@ export class BattleScene extends Scene {
             const py = AY + pad.y;
             const color = padColor(pad.kind);
             if (!pad.active) {
-                g.lineStyle(2, color, 0.22);
-                this.diamondPath(g, px, py, 9);
-                g.strokePath();
+                // Dark (respawning) pads stay dim = "not ready", but keep the
+                // kind-specific glyph so the respawning kind stays readable.
+                if (pad.kind === 'amp') {
+                    g.fillStyle(color, 0.18);
+                    this.diamondPath(g, px, py, 9);
+                    g.fillPath();
+                } else {
+                    g.lineStyle(2, color, 0.22);
+                    this.diamondPath(g, px, py, 9);
+                    g.strokePath();
+                    if (pad.kind === 'repair') {
+                        g.fillStyle(color, 0.22);
+                        g.fillRect(px - 1, py - 4, 2, 8);
+                        g.fillRect(px - 4, py - 1, 8, 2);
+                    } else {
+                        g.lineStyle(1, color, 0.22);
+                        g.strokeCircle(px, py, 13);
+                    }
+                }
                 continue;
             }
             const pulse = this.reducedMotion ? 0.7 : 0.55 + 0.3 * Math.sin(this.match.result.tick * 0.15 + (pad.x + pad.y) * 0.01);

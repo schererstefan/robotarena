@@ -99,6 +99,10 @@ export class ShowcaseScene extends Scene {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown-ESC', this.onEscapeKey);
             this.input.keyboard?.off('keydown', this.onNavKey);
+            // Invalidate an in-flight board fetch: its token check then
+            // drops the stale renderTab() instead of adding orphan objects
+            // to this shut-down scene's display list.
+            this.boardToken += 1;
         });
     }
 
