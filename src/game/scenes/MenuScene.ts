@@ -1182,6 +1182,14 @@ export class MenuScene extends Scene {
         overlay.addEventListener('pointerdown', (event) => {
             if (event.target === overlay) this.closeReplayDialog();
         });
+        // Escape from anywhere in the dialog (WATCH/CANCEL buttons included —
+        // the input handler below stops propagation, so this never double-fires).
+        overlay.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.stopPropagation();
+                this.closeReplayDialog();
+            }
+        });
         input.addEventListener('keydown', (event) => {
             event.stopPropagation();
             if (event.key === 'Enter') submit();
@@ -1282,6 +1290,14 @@ export class MenuScene extends Scene {
         cancel.addEventListener('click', () => this.closeImportDialog());
         overlay.addEventListener('pointerdown', (event) => {
             if (event.target === overlay) this.closeImportDialog();
+        });
+        // Escape from anywhere in the dialog (file input, slot select, and
+        // buttons have no key handler of their own; keydown bubbles here).
+        overlay.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                event.stopPropagation();
+                this.closeImportDialog();
+            }
         });
         urlInput.addEventListener('keydown', (event) => {
             event.stopPropagation();
@@ -1438,10 +1454,13 @@ export class MenuScene extends Scene {
             const token = ++this.onlineToken;
             this.trackStats(this.add.text(CX, 220, ONLINE.loading, FONTS.small).setOrigin(0.5).setDepth(50));
             void fetchOnlineBoard().then((result) => {
-                if (!this.scene.isActive('Menu')) return;
-                if (token !== this.onlineToken || this.statsTab !== 'online' || this.statsObjects.length === 0) return;
+                // Keep the data even when the overlay closed mid-fetch; the
+                // guards below only skip the re-render, so reopening ONLINE
+                // shows the board instead of "unavailable" for the session.
                 this.onlineBoard = result.board;
                 this.onlineCached = result.cached;
+                if (!this.scene.isActive('Menu')) return;
+                if (token !== this.onlineToken || this.statsTab !== 'online' || this.statsObjects.length === 0) return;
                 this.refreshStatsRows();
             });
         } else if (!this.onlineBoard) {
