@@ -2542,9 +2542,10 @@ export class BattleScene extends Scene {
     }
 
     /**
-     * 96×64 minimap: obstacles, team dots + facing ticks, charged ■, dead
-     * ✕, bullet dots, EMP rings, and the SD circle echo. Shape-redundant:
-     * every state has a glyph, not just a color.
+     * 96×64 minimap: obstacles, pad diamonds, turret squares, team dots +
+     * facing ticks, charged ■, dead ✕, bullet dots, EMP rings, and the SD
+     * circle echo. Shape-redundant: every state has a glyph, not just a
+     * color.
      */
     private drawMinimap(snaps: RobotSnapshot[], bullets: BulletSnapshot[]): void {
         const g = this.mapG;
@@ -2557,6 +2558,27 @@ export class BattleScene extends Scene {
                 (o.w / ARENA_WIDTH) * MAP_W,
                 (o.h / ARENA_HEIGHT) * MAP_H,
             );
+        }
+        // Pads: team-neutral diamonds per kind (dim while dark), drawn under
+        // units so dots overlay. Squares stay reserved for turrets.
+        for (const pad of this.match.padSnapshots) {
+            const mx = MAP_X0 + (pad.x / ARENA_WIDTH) * MAP_W;
+            const my = MAP_Y0 + (pad.y / ARENA_HEIGHT) * MAP_H;
+            g.fillStyle(padColor(pad.kind), pad.active ? 1 : 0.25);
+            this.diamondPath(g, mx, my, 2.5);
+            g.fillPath();
+        }
+        // Turrets: 4px squares (never circles like robots, never diamonds
+        // like pads). Neutral = gray, owned = team color via teamColor.
+        for (const turret of this.match.turretSnapshots) {
+            const mx = MAP_X0 + (turret.x / ARENA_WIDTH) * MAP_W;
+            const my = MAP_Y0 + (turret.y / ARENA_HEIGHT) * MAP_H;
+            if (turret.owner === -1) {
+                g.fillStyle(COLORS.faintNum, 0.7);
+            } else {
+                g.fillStyle(teamColor(turret.owner), 1);
+            }
+            g.fillRect(mx - 2, my - 2, 4, 4);
         }
         if (this.match.result.suddenDeath) {
             const circle = this.match.safeCircle;
