@@ -2,10 +2,10 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BARRIER_COUNT, BARRIER_MIN_GAP, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_RADIUS, HAZ_SALT, HAZ_SCORCH_TICKS, HAZ_TELEGRAPH_TICKS, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_BAND, PAD_COUNT, PAD_MIN_GAP, PAD_MIN_SPAWN_DIST, PAD_MIN_TURRET_DIST, PAD_OBSTACLE_CLEAR, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, barriersForSeed, isExhibition, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BARRIER_COUNT, BARRIER_MIN_GAP, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_RADIUS, HAZ_SALT, HAZ_SCORCH_TICKS, HAZ_TELEGRAPH_TICKS, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_BAND, PAD_COUNT, PAD_MIN_GAP, PAD_MIN_SPAWN_DIST, PAD_MIN_TURRET_DIST, PAD_OBSTACLE_CLEAR, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, BARRIER_TURRET_CLEAR, CROSSFIRE_BARRIER_COUNT, FOUNDRY_BARRIER_COUNT, RUINS_BARRIER_COUNT, barriersForArena, barriersForSeed, isExhibition, sanitizeModifiers, turretSpotsForArena, type ArenaId, type ArenaObstacle, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, sanitizeIntent, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
-import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
+import { decodeReplay, encodeReplay, encodeReplayCompact, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
 import { checkRobotSource, suggestFilename, WORKSHOP_TEMPLATE, workshopPassed } from '../src/game/workshop';
 import { markTutorialSeen, resetTutorialFlag, shouldShowTutorial } from '../src/game/tutorial';
 import { bgThemeForSeed, coverScale, hashSeed01 } from '../src/game/art/background';
@@ -1234,6 +1234,154 @@ console.log('barriers');
     }
 }
 
+// --- 5b4. Asymmetric arenas: ruins / foundry / crossfire --------------------
+console.log('asymmetric-arenas');
+{
+    const NEW_ARENAS: ArenaId[] = ['ruins', 'foundry', 'crossfire'];
+    const expectedCount = (arena: ArenaId): number =>
+        arena === 'ruins' ? RUINS_BARRIER_COUNT : arena === 'foundry' ? FOUNDRY_BARRIER_COUNT : CROSSFIRE_BARRIER_COUNT;
+    const edgeGap = (a: ArenaObstacle, b: ArenaObstacle): number => {
+        const dx = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w));
+        const dy = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
+        if (dx <= 0 && dy <= 0) return 0;
+        if (dx <= 0) return dy;
+        if (dy <= 0) return dx;
+        return Math.hypot(dx, dy);
+    };
+    const rectDist = (x: number, y: number, o: ArenaObstacle): number => {
+        const cx = Math.max(o.x, Math.min(x, o.x + o.w));
+        const cy = Math.max(o.y, Math.min(y, o.y + o.h));
+        return Math.hypot(x - cx, y - cy);
+    };
+    const mirrorKey = (x: number, y: number, w: number, h: number): string =>
+        `${ARENA_WIDTH - x - w},${ARENA_HEIGHT - y - h},${w},${h}`;
+    for (const arena of NEW_ARENAS) {
+        const turrets = turretSpotsForArena(arena);
+        const [t0, t1] = turrets as [{ x: number; y: number }, { x: number; y: number }];
+        check(
+            `${arena} turret pair mirrors through the arena center`,
+            Math.abs(t0.x + t1.x - ARENA_WIDTH) < 1e-9 && Math.abs(t0.y + t1.y - ARENA_HEIGHT) < 1e-9,
+        );
+        let countOk = true;
+        let detOk = true;
+        let guardOk = true;
+        let asymmetric = true;
+        let fallbacks = 0;
+        const seen = new Set<string>();
+        const canon = JSON.stringify(
+            [...ARENA_OBSTACLES[arena]].sort((a, b) => a.x - b.x || a.y - b.y),
+        );
+        for (let seed = 0; seed < 200; seed += 1) {
+            const rects = barriersForArena(arena, seed);
+            if (rects.length !== expectedCount(arena)) countOk = false;
+            if (JSON.stringify(barriersForArena(arena, seed)) !== JSON.stringify(rects)) detOk = false;
+            seen.add(JSON.stringify(rects));
+            if (JSON.stringify(rects) === canon) fallbacks += 1;
+            const keys = new Set(rects.map((r) => `${r.x},${r.y},${r.w},${r.h}`));
+            if (rects.every((r) => keys.has(mirrorKey(r.x, r.y, r.w, r.h)))) asymmetric = false;
+            for (const r of rects) {
+                if (r.x < 248 || r.y < 88 || r.x + r.w > 712 || r.y + r.h > 552) guardOk = false;
+                if (r.w % 8 !== 0 || r.h % 8 !== 0) guardOk = false;
+                if (turrets.some((t) => rectDist(t.x, t.y, r) < BARRIER_TURRET_CLEAR - 1e-9)) guardOk = false;
+            }
+            for (let i = 0; i < rects.length; i += 1) {
+                for (let j = i + 1; j < rects.length; j += 1) {
+                    if (edgeGap(rects[i] as ArenaObstacle, rects[j] as ArenaObstacle) < BARRIER_MIN_GAP - 1e-9) {
+                        guardOk = false;
+                    }
+                }
+            }
+        }
+        check(`${arena} deals ${expectedCount(arena)} barriers on 200 seeds`, countOk);
+        check(`${arena} barrier layout is deterministic per seed`, detOk);
+        check(`${arena} band, sizes, gaps, and turret clearance hold on 200 seeds`, guardOk);
+        check(`${arena} layouts are asymmetric (never center-mirrored)`, asymmetric);
+        check(`${arena} canonical fallback never fires on 200 seeds`, fallbacks === 0, `${fallbacks} fallbacks`);
+        check(`${arena} layouts vary by seed`, seen.size > 100, `${seen.size} distinct / 200`);
+    }
+    // Turret spots differ per arena (real variety, not relabeled `blocks`).
+    const spotKey = (arena: ArenaId): string => JSON.stringify(turretSpotsForArena(arena));
+    check('turret spots vary across arenas', new Set(ARENA_IDS.map(spotKey)).size === 4, new Set(ARENA_IDS.map(spotKey)).size.toString());
+    // Engine wiring: obstacles, turret snapshots, and pads match the layout
+    // functions exactly on every new arena.
+    const quiet: RobotController = {
+        meta: { id: 'quiet', name: 'Quiet', author: 'test', version: '0', description: '' },
+        update: (): Intent => ({}),
+    };
+    for (const arena of NEW_ARENAS) {
+        const seed = 4242;
+        const m = new Match(
+            [
+                { team: 0, controller: quiet },
+                { team: 1, controller: quiet },
+            ],
+            seed,
+            { arena },
+        );
+        check(
+            `${arena} engine obstacles match barriersForArena`,
+            JSON.stringify(m.obstacles) === JSON.stringify(barriersForArena(arena, seed)),
+        );
+        const spots = turretSpotsForArena(arena);
+        check(
+            `${arena} engine turrets match the arena spots`,
+            JSON.stringify(m.turretSnapshots.map((t) => ({ x: t.x, y: t.y }))) === JSON.stringify(spots),
+        );
+        const pads = m.padSnapshots;
+        const obs = m.obstacles;
+        const padsOk =
+            pads.length === PAD_COUNT &&
+            pads.every((p) => obs.every((o) => rectDist(p.x, p.y, o) >= PAD_OBSTACLE_CLEAR)) &&
+            pads.every((p) => spots.every((t) => Math.hypot(p.x - t.x, p.y - t.y) >= PAD_MIN_TURRET_DIST));
+        check(`${arena} engine pads clear of live barriers and turrets`, padsOk);
+    }
+    // Replay: new arenas skip the RA2 compact form and round-trip via RA1.
+    for (const arena of NEW_ARENAS) {
+        const spec: ReplaySpec = {
+            seed: 7,
+            teamSize: 1,
+            lineupIds: ['hunter', 'orbiter'],
+            loadouts: [{}, {}],
+            arena,
+        };
+        check(`${arena} specs skip the RA2 compact form`, encodeReplayCompact(spec) === null);
+        check(`${arena} RA1 codes round-trip the arena`, decodeReplay(encodeReplayLegacy(spec))?.arena === arena);
+    }
+    // Playable: a small batch on each new arena resolves before the cap.
+    {
+        const botIds = ['hunter', 'orbiter', 'rusher', 'sniper'];
+        let resolved = 0;
+        let errors = 0;
+        let maxTick = 0;
+        const games = NEW_ARENAS.length * 4 * 3;
+        for (const arena of NEW_ARENAS) {
+            for (let seed = 101; seed <= 104; seed += 1) {
+                for (const teamSize of [1, 2, 3]) {
+                    const lineups: LineupEntry[] = [];
+                    for (let i = 0; i < teamSize * 2; i += 1) {
+                        const id = botIds[(i + seed) % botIds.length] as string;
+                        const entry = ROBOTS.find((r) => r.meta.id === id);
+                        if (!entry) throw new Error(`unknown robot ${id}`);
+                        lineups.push({
+                            team: (i < teamSize ? 0 : 1) as 0 | 1,
+                            controller: entry.create(),
+                            loadout: { ...entry.loadout },
+                        });
+                    }
+                    const m = new Match(lineups, seed * 1000 + teamSize, { arena });
+                    m.runToEnd();
+                    if (m.result.over) resolved += 1;
+                    maxTick = Math.max(maxTick, m.result.tick);
+                    for (const s of m.robotSnapshots) errors += s.errors;
+                }
+            }
+        }
+        check('asymmetric batch resolves every match', resolved === games, `${resolved}/${games}`);
+        check('asymmetric batch stays error-free', errors === 0, `${errors} errors`);
+        check('asymmetric batch ends before the defensive cap', maxTick < MAX_TICKS_TOTAL, `max tick ${maxTick}`);
+    }
+}
+
 // --- 5c. Sudden death: circle shrinks, outsiders pulse, draws vanish ------
 console.log('sudden-death');
 {
@@ -1871,12 +2019,8 @@ console.log('powerups');
         }
         return true;
     };
-    const turretClear = (pads: SensePad[]): boolean =>
-        pads.every(
-            (p) =>
-                Math.hypot(p.x - ARENA_WIDTH / 2, p.y - ARENA_HEIGHT * 0.3) >= PAD_MIN_TURRET_DIST &&
-                Math.hypot(p.x - ARENA_WIDTH / 2, p.y - ARENA_HEIGHT * 0.7) >= PAD_MIN_TURRET_DIST,
-        );
+    const turretClear = (pads: SensePad[], turrets: Array<{ x: number; y: number }> = turretSpotsForArena('open')): boolean =>
+        pads.every((p) => turrets.every((t) => Math.hypot(p.x - t.x, p.y - t.y) >= PAD_MIN_TURRET_DIST));
     // Point-to-rect distance (same clamp rule as the engine).
     const rectDist = (x: number, y: number, o: ArenaObstacle): number => {
         const cx = Math.max(o.x, Math.min(x, o.x + o.w));
@@ -1984,20 +2128,25 @@ console.log('powerups');
         );
     }
     {
-        // Sweep: hundreds of seeds satisfy every hard constraint on both
-        // arenas (proves the legacy fallback path stays cold).
+        // Sweep: hundreds of seeds satisfy every hard constraint on every
+        // arena — per-arena live barriers and turret spots, so moved
+        // turrets and asymmetric terrain are covered too (and the legacy
+        // fallback path stays cold everywhere).
         let bad = 0;
         for (let seed = 0; seed < 200; seed += 1) {
             for (const arena of ARENA_IDS) {
-                const obs = arena === 'blocks' ? barriersForSeed(seed) : [];
-                const pads = Match.padLayout(seed, obs);
+                const obs = barriersForArena(arena, seed);
+                // Mirror the engine wiring: live turret spots only where
+                // turrets moved, legacy sampler otherwise.
+                const turrets = arena === 'open' || arena === 'blocks' ? undefined : turretSpotsForArena(arena);
+                const pads = Match.padLayout(seed, obs, turrets);
                 if (
                     pads.length !== PAD_COUNT ||
                     !pads.every((_, i) => hasMirror(pads, i)) ||
                     !inBand(pads) ||
                     !canonicalOrder(pads) ||
                     !spaced(pads) ||
-                    !turretClear(pads) ||
+                    !turretClear(pads, turrets ?? turretSpotsForArena('open')) ||
                     !spawnClear(pads) ||
                     !obstacleClear(pads, obs)
                 ) {
@@ -2005,7 +2154,7 @@ console.log('powerups');
                 }
             }
         }
-        check('200-seed sweep: every layout legal on both arenas', bad === 0, `${bad} illegal`);
+        check('200-seed sweep: every layout legal on every arena', bad === 0, `${bad} illegal`);
     }
 
     // AMP pickup: timed damage boost, dark pad, pickup event, sense channel.
@@ -4214,7 +4363,11 @@ console.log('brain');
         for (const foe of foes) {
             const tally = (make: () => RobotController): number => {
                 let wins = 0;
-                for (const arena of ARENA_IDS) {
+                // Pinned to the two symmetric arenas: this guard targets the
+                // Phase 7 factory conversion, not new-terrain balance (which
+                // the round-robin and balance sweeps cover). New layouts
+                // would silently rewrite the 12-game tally this was tuned on.
+                for (const arena of ['open', 'blocks'] as const) {
                     for (const seed of [11, 22, 33]) {
                         for (const order of [0, 1]) {
                             const lineups: LineupEntry[] =

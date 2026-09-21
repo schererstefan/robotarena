@@ -10,7 +10,7 @@
 
 import { ROBOTS } from '../robots/registry';
 import { sanitizeLoadout, SKILL_DEFS, type SkillLoadout } from './skills';
-import { sanitizeModifiers, type ArenaId, type MatchModifiers } from './constants';
+import { ARENA_IDS, sanitizeModifiers, type ArenaId, type MatchModifiers } from './constants';
 
 export const REPLAY_FORMAT = 1;
 export const REPLAY_FORMAT_COMPACT = 2;
@@ -144,7 +144,7 @@ function decodeLegacy(trimmed: string): ReplayData | null {
         if (typeof teamSize !== 'number' || !Number.isInteger(teamSize) || teamSize < 1 || teamSize > 3) return null;
         if (!Array.isArray(lineupIds) || lineupIds.length !== teamSize * 2) return null;
         if (!Array.isArray(loadouts) || loadouts.length !== teamSize * 2) return null;
-        if (arena !== undefined && arena !== 'open' && arena !== 'blocks') return null;
+        if (arena !== undefined && !(ARENA_IDS as readonly unknown[]).includes(arena)) return null;
         if (modifiers !== undefined && (typeof modifiers !== 'string' || !/^[dfmn]*$/.test(modifiers))) return null;
         for (const id of lineupIds) {
             if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;
@@ -215,6 +215,9 @@ export function encodeReplayCompact(spec: ReplaySpec): string | null {
     if (!Array.isArray(spec.loadouts) || spec.loadouts.length !== spec.teamSize * 2) return null;
     if (SKILL_DEFS.length > 15) return null;
     const arena = spec.arena ?? 'open';
+    // The RA2 arena field stays 2 bits (open/blocks only): the asymmetric
+    // arenas fall back to legacy RA1 (which carries the arena id as a
+    // string) instead of growing a bit here — the noHazards precedent.
     if (arena !== 'open' && arena !== 'blocks') return null;
     const indices: number[] = [];
     for (const id of spec.lineupIds) {

@@ -90,9 +90,15 @@ export function modifierCodes(modifiers: MatchModifiers): string[] {
 export const ARENA_WIDTH = 960;
 export const ARENA_HEIGHT = 640;
 
-/** Arena layouts: `open` is empty, `blocks` adds mirrored center blocks. */
-export type ArenaId = 'open' | 'blocks';
-export const ARENA_IDS: readonly ArenaId[] = ['open', 'blocks'];
+/**
+ * Arena layouts: `open` is empty, `blocks` adds mirrored center blocks, and
+ * `ruins` / `foundry` / `crossfire` are seeded asymmetric terrain (barrier
+ * counts, sizes, and positions vary per match with no mirroring; turret
+ * pairs stay center-symmetric so neither side gains an edge — see
+ * ARENA_TURRETS).
+ */
+export type ArenaId = 'open' | 'blocks' | 'ruins' | 'foundry' | 'crossfire';
+export const ARENA_IDS: readonly ArenaId[] = ['open', 'blocks', 'ruins', 'foundry', 'crossfire'];
 
 export interface ArenaObstacle {
     /** Top-left corner in arena coordinates. */
@@ -116,6 +122,34 @@ export const ARENA_OBSTACLES: Record<ArenaId, ArenaObstacle[]> = {
         { x: 570, y: 130, w: 90, h: 90 },
         { x: 300, y: 420, w: 90, h: 90 },
         { x: 570, y: 420, w: 90, h: 90 },
+    ],
+    // Canonical fallbacks for the asymmetric arenas (cold path: used only
+    // when seed sampling exhausts). Deliberately asymmetric, hand-verified
+    // against the same legality guards as sampled layouts (midfield band,
+    // 8px sizes, 56px+ pair gaps, 32px+ turret clearance) and against the
+    // pad solver across hundreds of pad seeds. Each set carries an
+    // off-distribution size no sampler draws (ruins 88, foundry 120/128,
+    // crossfire 120 — the `blocks` 90px precedent), so tests can tell
+    // sampled layouts from fallback deals exactly.
+    ruins: [
+        { x: 280, y: 120, w: 64, h: 64 },
+        { x: 420, y: 100, w: 72, h: 56 },
+        { x: 560, y: 224, w: 80, h: 64 },
+        { x: 300, y: 360, w: 56, h: 88 },
+        { x: 480, y: 440, w: 72, h: 72 },
+    ],
+    foundry: [
+        { x: 272, y: 112, w: 120, h: 72 },
+        { x: 520, y: 200, w: 128, h: 80 },
+        { x: 336, y: 400, w: 112, h: 96 },
+    ],
+    crossfire: [
+        { x: 296, y: 296, w: 56, h: 64 },
+        { x: 360, y: 448, w: 104, h: 56 },
+        { x: 456, y: 272, w: 64, h: 64 },
+        { x: 544, y: 96, w: 120, h: 64 },
+        { x: 576, y: 488, w: 96, h: 64 },
+        { x: 624, y: 256, w: 72, h: 64 },
     ],
 };
 
@@ -195,6 +229,239 @@ export function barriersForSeed(seed: number): ArenaObstacle[] {
     // 90x90 fallback is symmetric and verified to fit — never random, never
     // empty. Tests accept its 90px size alongside drawn multiples of 8.
     return ARENA_OBSTACLES.blocks.map((o) => ({ ...o })).sort((a, b) => a.x - b.x || a.y - b.y);
+}
+
+/**
+ * Asymmetric arenas (gameplay/arena-variety): `ruins`, `foundry`, and
+ * `crossfire` deal fully asymmetric barrier layouts — no mirroring at all.
+ * Counts and size profiles differ per arena (rubble / slabs / lanes), and
+ * every rect is sampled independently, so same-arena layouts vary far more
+ * than `blocks` permits. Fairness is kept by what does NOT vary: spawns
+ * stay center-mirrored (engine), pads stay point-mirrored pairs (below),
+ * and each arena's turret pair stays center-symmetric (ARENA_TURRETS).
+ *
+ * Determinism: each arena draws from its own dedicated stream
+ * (`seed ^ ARENA_SALT`, brain RNG untouched), so same (arena, seed) =>
+ * identical layout with zero replay-codec bits. No Math.random, no clock.
+ *
+ * Legality guards (same family as `blocks`, checked at generation):
+ * - rects stay inside the midfield band (x 248..712, y 88..552), so spawn
+ *   columns and walls keep their clearance and nothing seals an edge;
+ * - every pair keeps a BARRIER_MIN_GAP edge gap, so no pocket can close;
+ * - sizes are multiples of 8px, far thicker than a drive step;
+ * - turret structures stay BARRIER_TURRET_CLEAR (edge-to-center) clear, so
+ *   no turret is ever buried inside a rect.
+ * Sampling exhausts to the canonical ARENA_OBSTACLES entry for that arena
+ * (asymmetric, verified legal) — never random, never empty.
+ */
+
+/** Dedicated-stream salts for the asymmetric arenas (distinct from BARRIER_SALT et al). */
+export const RUINS_SALT = 0x901e5;
+export const FOUNDRY_SALT = 0xf0d905;
+export const CROSSFIRE_SALT = 0xc205f1e;
+/** Barrier counts per asymmetric arena (distinct across layouts). */
+export const RUINS_BARRIER_COUNT = 5;
+export const FOUNDRY_BARRIER_COUNT = 3;
+export const CROSSFIRE_BARRIER_COUNT = 6;
+/** Minimum edge-to-turret-center clearance for sampled asymmetric barriers. */
+export const BARRIER_TURRET_CLEAR = 32;
+/** Midfield sampling band shared by the asymmetric arenas (the `blocks` band). */
+export const ASYMM_BAND = { x0: 248, x1: 712, y0: 88, y1: 552 };
+
+/** Pixel turret spot for clearance checks (engine maps ARENA_TURRETS fractions here). */
+export interface TurretSpot {
+    x: number;
+    y: number;
+}
+
+/** Edge-to-center distance from a rect to a turret spot (0 when covered). */
+function barrierTurretDist(r: ArenaObstacle, t: TurretSpot): number {
+    const cx = Math.max(r.x, Math.min(t.x, r.x + r.w));
+    const cy = Math.max(r.y, Math.min(t.y, r.y + r.h));
+    return Math.hypot(t.x - cx, t.y - cy);
+}
+
+/**
+ * Sequential asymmetric placement: draws rects one at a time (each against
+ * the band, the turret spots, and every already-placed rect), retrying a
+ * stuck rect without discarding the good ones. Restarts the whole layout a
+ * few times before dealing the canonical fallback. Pure function of
+ * (seed, salt, count, drawDims, turrets, fallback).
+ */
+function placeAsymmetricBarriers(
+    seed: number,
+    salt: number,
+    count: number,
+    drawDims: (rng: () => number, index: number) => { w: number; h: number },
+    turrets: TurretSpot[],
+    fallback: ArenaObstacle[],
+): ArenaObstacle[] {
+    for (let restart = 0; restart < 12; restart += 1) {
+        const rng = createRng((seed ^ salt ^ Math.imul(restart + 1, 0x9e3779b9)) >>> 0);
+        const placed: ArenaObstacle[] = [];
+        let stuck = false;
+        for (let n = 0; n < count; n += 1) {
+            let drew = false;
+            for (let attempt = 0; attempt < 500; attempt += 1) {
+                const { w, h } = drawDims(rng, n);
+                const x = ASYMM_BAND.x0 + Math.floor(rng() * ((ASYMM_BAND.x1 - w - ASYMM_BAND.x0) / 8 + 1)) * 8;
+                const y = ASYMM_BAND.y0 + Math.floor(rng() * ((ASYMM_BAND.y1 - h - ASYMM_BAND.y0) / 8 + 1)) * 8;
+                const rect = { x, y, w, h };
+                if (turrets.some((t) => barrierTurretDist(rect, t) < BARRIER_TURRET_CLEAR)) continue;
+                if (placed.some((p) => barrierGap(rect, p) < BARRIER_MIN_GAP)) continue;
+                placed.push(rect);
+                drew = true;
+                break;
+            }
+            if (!drew) {
+                stuck = true;
+                break;
+            }
+        }
+        if (!stuck) return placed.sort((a, b) => a.x - b.x || a.y - b.y);
+    }
+    return fallback.map((o) => ({ ...o })).sort((a, b) => a.x - b.x || a.y - b.y);
+}
+
+function pickSize(rng: () => number, sizes: number[]): number {
+    return sizes[Math.floor(rng() * sizes.length)] as number;
+}
+
+/**
+ * Pad-aware barrier deal: samples a legal barrier set, then keeps it only
+ * when the pad solver threads the remaining midfield (mirror-symmetric pad
+ * pairs need mirror-symmetric free pockets, which big asymmetric slabs can
+ * starve). Otherwise redraws with a new salt. After a few barren rounds it
+ * deals the canonical fallback — hand-verified pad-feasible — so matches
+ * always start valid: never random, never empty, never pad-starved.
+ */
+function dealPadAwareBarriers(
+    seed: number,
+    salt: number,
+    count: number,
+    drawDims: (rng: () => number, index: number) => { w: number; h: number },
+    arena: ArenaId,
+): ArenaObstacle[] {
+    const turrets = turretSpotsForArena(arena);
+    for (let round = 0; round < 8; round += 1) {
+        const roundSalt = (salt ^ Math.imul(round + 1, 0x85ebca6b)) >>> 0;
+        const rects = placeAsymmetricBarriers(seed, roundSalt, count, drawDims, turrets, ARENA_OBSTACLES[arena]);
+        if (samplePadPairsCovering(seed, rects, turrets) !== null) return rects;
+    }
+    return ARENA_OBSTACLES[arena].map((o) => ({ ...o })).sort((a, b) => a.x - b.x || a.y - b.y);
+}
+
+/**
+ * `ruins`: scattered asymmetric rubble — 5 small square-ish rects
+ * (56..80px). Busy midfield, many small gaps.
+ */
+export function ruinsBarriersForSeed(seed: number): ArenaObstacle[] {
+    const sizes = [56, 64, 72, 80];
+    return dealPadAwareBarriers(
+        seed >>> 0,
+        RUINS_SALT,
+        RUINS_BARRIER_COUNT,
+        (rng) => ({ w: pickSize(rng, sizes), h: pickSize(rng, sizes) }),
+        'ruins',
+    );
+}
+
+/**
+ * `foundry`: three large asymmetric slabs (88..112px). Few pieces, big
+ * cover — long lanes around heavy blocks. Sized so powerup pads still
+ * thread the midfield (larger slabs starve the pad solver — see
+ * samplePadPairsCovering).
+ */
+export function foundryBarriersForSeed(seed: number): ArenaObstacle[] {
+    const sizes = [88, 96, 104, 112];
+    return dealPadAwareBarriers(
+        seed >>> 0,
+        FOUNDRY_SALT,
+        FOUNDRY_BARRIER_COUNT,
+        (rng) => ({ w: pickSize(rng, sizes), h: pickSize(rng, sizes) }),
+        'foundry',
+    );
+}
+
+/**
+ * `crossfire`: six asymmetric pieces alternating long bars (96..112 x
+ * 56..64, random orientation) with small squares (56..72). Lane carving:
+ * bars channel movement while squares break sightlines. Bar length is
+ * capped so powerup pads still thread the lanes (see
+ * samplePadPairsCovering).
+ */
+export function crossfireBarriersForSeed(seed: number): ArenaObstacle[] {
+    const longs = [96, 104, 112];
+    const shorts = [56, 64];
+    const squares = [56, 64, 72];
+    return dealPadAwareBarriers(
+        seed >>> 0,
+        CROSSFIRE_SALT,
+        CROSSFIRE_BARRIER_COUNT,
+        (rng, index) => {
+            if (index % 2 === 0) {
+                const long = pickSize(rng, longs);
+                const short = pickSize(rng, shorts);
+                return rng() < 0.5 ? { w: long, h: short } : { w: short, h: long };
+            }
+            return { w: pickSize(rng, squares), h: pickSize(rng, squares) };
+        },
+        'crossfire',
+    );
+}
+
+/** Barrier layout for an arena + seed: `open` is empty, `blocks` keeps its untouched generator. */
+export function barriersForArena(arena: ArenaId, seed: number): ArenaObstacle[] {
+    if (arena === 'blocks') return barriersForSeed(seed);
+    if (arena === 'ruins') return ruinsBarriersForSeed(seed);
+    if (arena === 'foundry') return foundryBarriersForSeed(seed);
+    if (arena === 'crossfire') return crossfireBarriersForSeed(seed);
+    return [];
+}
+
+/**
+ * Map-turret structures per arena (fractional arena coords; the engine
+ * scales to pixels). `open`/`blocks` keep the classic center-column pair
+ * (0.50 x 0.30/0.70 y) exactly. Each asymmetric arena moves the pair while
+ * keeping it point-symmetric through the arena center (480, 320) — both
+ * teams contest identical turrets, so terrain variety never becomes a side
+ * edge. Positions are constant per arena (not seed-derived), so replays
+ * rebuild them with no codec change.
+ */
+export interface ArenaTurretSpot {
+    fx: number;
+    fy: number;
+}
+export const ARENA_TURRETS: Record<ArenaId, [ArenaTurretSpot, ArenaTurretSpot]> = {
+    open: [
+        { fx: 0.5, fy: 0.3 },
+        { fx: 0.5, fy: 0.7 },
+    ],
+    blocks: [
+        { fx: 0.5, fy: 0.3 },
+        { fx: 0.5, fy: 0.7 },
+    ],
+    // Midline pair: both turrets sit on the center lane, one per half.
+    ruins: [
+        { fx: 0.35, fy: 0.5 },
+        { fx: 0.65, fy: 0.5 },
+    ],
+    // Wide pair: turrets pull toward the top/bottom edges, opening the mid.
+    foundry: [
+        { fx: 0.5, fy: 0.22 },
+        { fx: 0.5, fy: 0.78 },
+    ],
+    // Diagonal pair: turrets watch opposite corners across the bar lanes.
+    crossfire: [
+        { fx: 0.32, fy: 0.32 },
+        { fx: 0.68, fy: 0.68 },
+    ],
+};
+
+/** Pixel turret spots for an arena (fresh array each call; engine + pads + tests). */
+export function turretSpotsForArena(arena: ArenaId): TurretSpot[] {
+    const spots = ARENA_TURRETS[arena] ?? ARENA_TURRETS.open;
+    return spots.map((s) => ({ x: s.fx * ARENA_WIDTH, y: s.fy * ARENA_HEIGHT }));
 }
 
 export const ROBOT_RADIUS = 14;
@@ -332,25 +599,137 @@ function padRectDist(x: number, y: number, o: ArenaObstacle): number {
     return Math.hypot(x - cx, y - cy);
 }
 
-/** Static per-spot checks: clear of turret structures and obstacles. */
-function padSpotStaticOk(x: number, y: number, obstacles: ArenaObstacle[]): boolean {
-    if (Math.hypot(x - ARENA_WIDTH / 2, y - ARENA_HEIGHT * 0.3) < PAD_MIN_TURRET_DIST) return false;
-    if (Math.hypot(x - ARENA_WIDTH / 2, y - ARENA_HEIGHT * 0.7) < PAD_MIN_TURRET_DIST) return false;
+/** Static per-spot checks: clear of the given turret structures and obstacles. */
+function padSpotStaticOk(x: number, y: number, obstacles: ArenaObstacle[], turrets: TurretSpot[]): boolean {
+    for (const t of turrets) {
+        if (Math.hypot(x - t.x, y - t.y) < PAD_MIN_TURRET_DIST) return false;
+    }
     for (const o of obstacles) {
         if (padRectDist(x, y, o) < PAD_OBSTACLE_CLEAR) return false;
     }
     return true;
 }
 
+/** Legacy fixed pad fractions (cold backstop: symmetric, same pair scheme — never random, never empty). */
+function legacyPadFallback(): PadSpot[] {
+    const fx = [0.22, 0.78, 0.22, 0.78];
+    const fy = [0.3, 0.3, 0.7, 0.7];
+    const pairOf: Array<0 | 1> = [0, 1, 1, 0];
+    return fx
+        .map((x, i) => ({
+            x: (x as number) * ARENA_WIDTH,
+            y: (fy[i] as number) * ARENA_HEIGHT,
+            pair: pairOf[i] as 0 | 1,
+        }))
+        .sort((p, q) => p.x - q.x || p.y - q.y);
+}
+
+/** One drawn candidate plus its center mirror, both statically legal and gap-clear of `placed`. */
+function tryPadPair(
+    c: { x: number; y: number },
+    obstacles: ArenaObstacle[],
+    turrets: TurretSpot[],
+    placed: PadSpot[],
+): PadSpot[] | null {
+    const m = mirrorPadSpot(c.x, c.y);
+    if (Math.hypot(c.x - m.x, c.y - m.y) < PAD_MIN_GAP) return null;
+    if (!padSpotStaticOk(c.x, c.y, obstacles, turrets) || !padSpotStaticOk(m.x, m.y, obstacles, turrets)) return null;
+    const pair = (placed.length === 0 ? 0 : 1) as 0 | 1;
+    for (const s of placed) {
+        if (Math.hypot(c.x - s.x, c.y - s.y) < PAD_MIN_GAP) return null;
+        if (Math.hypot(m.x - s.x, m.y - s.y) < PAD_MIN_GAP) return null;
+    }
+    return [
+        { ...c, pair },
+        { ...m, pair },
+    ];
+}
+
+/**
+ * Covering pair solver for crowded asymmetric terrain. Sequential draws
+ * let a stuck first pick poison the whole layout: big slabs plus turret
+ * discs leave few pockets, so the second pair threads almost nowhere after
+ * an easy first pick. Instead this enumerates the 8px contest lattice in a
+ * seeded shuffle order, keeps the statically legal mirror-pairs (self-gap
+ * plus turret/barrier clearance), and returns the first pair-1 candidate
+ * that leaves room for a pair 2 — backtracking over pair-1 picks instead
+ * of gambling on one. Complete over the lattice: a fitting configuration
+ * is found whenever one exists (the pair-1 scan is capped high enough that
+ * only provably cramped seeds fall through). Returns null when nothing
+ * fits, so the caller deals the legacy fallback. Pure function of
+ * (seed, obstacles, turrets).
+ */
+function samplePadPairsCovering(seed: number, obstacles: ArenaObstacle[], turrets: TurretSpot[]): PadSpot[] | null {
+    const rng = createRng((seed ^ PAD_SALT) >>> 0);
+    const nx = (PAD_BAND.x1 - PAD_BAND.x0) / 8 + 1;
+    const ny = (PAD_BAND.y1 - PAD_BAND.y0) / 8 + 1;
+    const cells: Array<{ x: number; y: number }> = [];
+    for (let ix = 0; ix < nx; ix += 1) {
+        for (let iy = 0; iy < ny; iy += 1) {
+            cells.push({ x: PAD_BAND.x0 + ix * 8, y: PAD_BAND.y0 + iy * 8 });
+        }
+    }
+    for (let i = cells.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(rng() * (i + 1));
+        const tmp = cells[i] as { x: number; y: number };
+        cells[i] = cells[j] as { x: number; y: number };
+        cells[j] = tmp;
+    }
+    const legal: Array<{ c: { x: number; y: number }; m: { x: number; y: number } }> = [];
+    for (const c of cells) {
+        const m = mirrorPadSpot(c.x, c.y);
+        if (Math.hypot(c.x - m.x, c.y - m.y) < PAD_MIN_GAP) continue;
+        if (!padSpotStaticOk(c.x, c.y, obstacles, turrets) || !padSpotStaticOk(m.x, m.y, obstacles, turrets)) continue;
+        legal.push({ c, m });
+    }
+    const crossOk = (
+        a: { c: { x: number; y: number }; m: { x: number; y: number } },
+        b: { c: { x: number; y: number }; m: { x: number; y: number } },
+    ): boolean =>
+        Math.hypot(a.c.x - b.c.x, a.c.y - b.c.y) >= PAD_MIN_GAP &&
+        Math.hypot(a.c.x - b.m.x, a.c.y - b.m.y) >= PAD_MIN_GAP &&
+        Math.hypot(a.m.x - b.c.x, a.m.y - b.c.y) >= PAD_MIN_GAP &&
+        Math.hypot(a.m.x - b.m.x, a.m.y - b.m.y) >= PAD_MIN_GAP;
+    const cap = Math.min(legal.length, 600);
+    for (let i = 0; i < cap; i += 1) {
+        const first = legal[i] as { c: { x: number; y: number }; m: { x: number; y: number } };
+        for (let j = 0; j < legal.length; j += 1) {
+            if (j === i) continue;
+            const second = legal[j] as { c: { x: number; y: number }; m: { x: number; y: number } };
+            if (!crossOk(first, second)) continue;
+            return [
+                { ...first.c, pair: 0 as const },
+                { ...first.m, pair: 0 as const },
+                { ...second.c, pair: 1 as const },
+                { ...second.m, pair: 1 as const },
+            ].sort((p, q) => p.x - q.x || p.y - q.y);
+        }
+    }
+    return null;
+}
+
 /**
  * Deterministic pad spots for a match seed: 2 drawn lattice cells in the
  * contest band plus their center mirrors, sorted by (x, y) for canonical
  * order. Takes the live obstacle list (`blocks` barriers, empty on `open`)
- * so pads never land inside terrain. Falls back to the legacy fixed
- * fractions when rejection sampling exhausts (still symmetric, same kind
- * scheme) — never random, never empty.
+ * so pads never land inside terrain. With explicit live turret spots (the
+ * asymmetric arenas, which move turrets) pads additionally stay off those
+ * structures via a covering lattice solver, so cramped terrain threads
+ * instead of dealing the legacy fallback (whose x = 211 spots sit outside
+ * the contest band). With turrets omitted the legacy sequential sampler
+ * runs verbatim —
+ * `open`/`blocks` layouts come out byte-for-byte identical, fallback seeds
+ * included. Rejection exhausts to the legacy fixed fractions (still
+ * symmetric, same kind scheme) — never random, never empty.
  */
-export function padSpotsForSeed(seed: number, obstacles: ArenaObstacle[] = []): PadSpot[] {
+export function padSpotsForSeed(seed: number, obstacles: ArenaObstacle[] = [], turrets?: TurretSpot[]): PadSpot[] {
+    if (turrets !== undefined) {
+        return samplePadPairsCovering(seed, obstacles, turrets) ?? legacyPadFallback();
+    }
+    const classic: TurretSpot[] = [
+        { x: ARENA_WIDTH / 2, y: ARENA_HEIGHT * 0.3 },
+        { x: ARENA_WIDTH / 2, y: ARENA_HEIGHT * 0.7 },
+    ];
     const rng = createRng((seed ^ PAD_SALT) >>> 0);
     const nx = (PAD_BAND.x1 - PAD_BAND.x0) / 8 + 1;
     const ny = (PAD_BAND.y1 - PAD_BAND.y0) / 8 + 1;
@@ -367,34 +746,17 @@ export function padSpotsForSeed(seed: number, obstacles: ArenaObstacle[] = []): 
     const placed: PadSpot[] = [];
     for (let attempt = 0; attempt < 1000 && placed.length < PAD_COUNT; attempt += 1) {
         const c = draw();
-        const m = mirrorPadSpot(c.x, c.y);
-        if (Math.hypot(c.x - m.x, c.y - m.y) < PAD_MIN_GAP) continue;
-        if (!padSpotStaticOk(c.x, c.y, obstacles) || !padSpotStaticOk(m.x, m.y, obstacles)) continue;
-        const pair = (placed.length === 0 ? 0 : 1) as 0 | 1;
-        let clash = false;
-        for (const s of placed) {
-            if (Math.hypot(c.x - s.x, c.y - s.y) < PAD_MIN_GAP) clash = true;
-            if (Math.hypot(m.x - s.x, m.y - s.y) < PAD_MIN_GAP) clash = true;
-        }
-        if (clash) continue;
-        placed.push({ ...c, pair }, { ...m, pair });
+        const fit = tryPadPair(c, obstacles, classic, placed);
+        if (!fit) continue;
+        placed.push(...fit);
     }
     if (placed.length === PAD_COUNT) {
         return placed.sort((p, q) => p.x - q.x || p.y - q.y);
     }
-    // Rejection exhausted (near-impossible on this band): the legacy fixed
-    // fractions are symmetric and carry the same pair scheme — never random,
-    // never empty. Tests sweep hundreds of seeds to prove this path is cold.
-    const fx = [0.22, 0.78, 0.22, 0.78];
-    const fy = [0.3, 0.3, 0.7, 0.7];
-    const pairOf: Array<0 | 1> = [0, 1, 1, 0];
-    return fx
-        .map((x, i) => ({
-            x: (x as number) * ARENA_WIDTH,
-            y: (fy[i] as number) * ARENA_HEIGHT,
-            pair: pairOf[i] as 0 | 1,
-        }))
-        .sort((p, q) => p.x - q.x || p.y - q.y);
+    // Rejection exhausted: the legacy fixed fractions are symmetric and
+    // carry the same pair scheme — never random, never empty. Tests sweep
+    // thousands of seeds to prove this path stays all but cold.
+    return legacyPadFallback();
 }
 
 // Map turrets (T1): static structures on the arena center column, always on.
