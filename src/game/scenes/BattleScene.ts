@@ -3,8 +3,9 @@
 // is sprite transforms plus one small dynamic Graphics (cones + trails).
 
 import { BlendModes, Scene } from 'phaser';
-import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DASH_COOLDOWN_TICKS, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, MAX_TICKS, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DASH_COOLDOWN_TICKS, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, MAX_TICKS, PAD_RADIUS, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
+import type { SensePadKind } from '../../sim/types';
 import { angleDiff, clamp, wrapAngle } from '../../sim/math';
 import { loadoutCode, type SkillLoadout } from '../../sim/skills';
 import { decodeReplay, encodeReplay } from '../../sim/replay';
@@ -105,6 +106,13 @@ const SD_WARN_TICK = MAX_TICKS - 600;
 /** Full-collapse radius (matches the engine's safeCircle at rest). */
 const SD_FULL_R = Math.hypot(ARENA_WIDTH / 2, ARENA_HEIGHT / 2);
 
+/** Team-neutral pad marker color per kind (never a team color). */
+function padColor(kind: SensePadKind): number {
+    if (kind === 'amp') return COLORS.gold;
+    if (kind === 'repair') return COLORS.accent;
+    return COLORS.white;
+}
+
 interface Particle {
     img: Phaser.GameObjects.Image;
     vx: number;
@@ -189,6 +197,8 @@ export class BattleScene extends Scene {
     private flickT = 0;
     private flickOn = false;
     private rings: Phaser.GameObjects.Image[] = [];
+    /** Pad active-edge latch per pad index (collect flash on active -> dark). */
+    private prevPadActive: boolean[] = [];
     private treads: Phaser.GameObjects.Image[] = [];
     private treadAcc: number[] = [];
     private treadLastX: number[] = [];
@@ -323,6 +333,7 @@ export class BattleScene extends Scene {
         this.lastHealTick = [];
         this.robotIds = [];
         this.rings = [];
+        this.prevPadActive = [];
         this.curBX = [];
         this.curBY = [];
         this.prevBX = [];
@@ -424,6 +435,7 @@ export class BattleScene extends Scene {
         });
         this.match = new Match(lineups, this.request.seed, { arena: this.request.arena, modifiers: this.request.modifiers });
         this.obstacles = this.match.obstacles;
+        this.prevPadActive = this.match.padSnapshots.map((p) => p.active);
         // Imported robots force exhibition: barred from every board, always.
         this.customMatch = this.request.lineupIds.some(isImportedId);
         this.exhibition = isExhibition(this.request.modifiers) || this.customMatch;
@@ -826,7 +838,10 @@ export class BattleScene extends Scene {
         // Snapshot once per frame; every helper below reuses these.
         const snaps = this.match.robotSnapshots;
         const bullets = this.match.bulletSnapshots;
-        if (stepped) this.diffSnapshots(snaps);
+        if (stepped) {
+            this.diffSnapshots(snaps);
+            this.diffPads();
+        }
         const tick = this.match.result.tick;
         if (this.request.trails && tick % 3 === 0 && tick !== this.lastTrailTick && !this.match.result.over) {
             this.lastTrailTick = tick;
@@ -1001,6 +1016,7 @@ export class BattleScene extends Scene {
         this.match.step();
         this.acc = 0;
         this.diffSnapshots(this.match.robotSnapshots);
+        this.diffPads();
     }
 
     private cycleSpeed(): void {
@@ -1478,6 +1494,31 @@ export class BattleScene extends Scene {
             return;
         }
         this.cameras.main.setScroll((Math.random() * 2 - 1) * mag, (Math.random() * 2 - 1) * mag);
+    }
+
+    /** Pad collect flash: active -> dark edge fires the pooled ring + burst. */
+    private diffPads(): void {
+        const pads = this.match.padSnapshots;
+        pads.forEach((pad, i) => {
+            const was = this.prevPadActive[i] ?? true;
+            if (was && !pad.active) {
+                const px = AX + pad.x;
+                const py = AY + pad.y;
+                this.fireRing(px, py, false);
+                this.burst(px, py, padColor(pad.kind), 6, 120, 0);
+            }
+            this.prevPadActive[i] = pad.active;
+        });
+    }
+
+    /** Diamond path (pad markers) on the dyn Graphics: caller strokes/fills. */
+    private diamondPath(g: Phaser.GameObjects.Graphics, px: number, py: number, r: number): void {
+        g.beginPath();
+        g.moveTo(px, py - r);
+        g.lineTo(px + r, py);
+        g.lineTo(px, py + r);
+        g.lineTo(px - r, py);
+        g.closePath();
     }
 
     /** Shockwave ring from the pool: scale-out + fade (motion-gated). */
@@ -2015,6 +2056,40 @@ export class BattleScene extends Scene {
                 g.lineStyle(2, teamColor(s.team), 0.85);
                 g.strokeCircle(AX + s.x, AY + s.y, 34 - 14 * t);
             });
+        }
+        // Powerup pads: team-neutral diamond/ring markers per kind. Active
+        // pads pulse (outer ring = pickup radius); dark pads render dim.
+        // Pixel-art: 2px strokes on dyn, zero new objects.
+        for (const pad of this.match.padSnapshots) {
+            const px = AX + pad.x;
+            const py = AY + pad.y;
+            const color = padColor(pad.kind);
+            if (!pad.active) {
+                g.lineStyle(2, color, 0.22);
+                this.diamondPath(g, px, py, 9);
+                g.strokePath();
+                continue;
+            }
+            const pulse = this.reducedMotion ? 0.7 : 0.55 + 0.3 * Math.sin(this.match.result.tick * 0.15 + (pad.x + pad.y) * 0.01);
+            g.lineStyle(2, color, pulse);
+            g.strokeCircle(px, py, PAD_RADIUS);
+            if (pad.kind === 'amp') {
+                g.fillStyle(color, pulse);
+                this.diamondPath(g, px, py, 9);
+                g.fillPath();
+            } else if (pad.kind === 'repair') {
+                g.lineStyle(2, color, pulse);
+                this.diamondPath(g, px, py, 9);
+                g.strokePath();
+                g.fillStyle(color, pulse);
+                g.fillRect(px - 2, py - 6, 4, 12);
+                g.fillRect(px - 6, py - 2, 12, 4);
+            } else {
+                g.lineStyle(2, color, pulse);
+                g.strokeCircle(px, py, 13);
+                this.diamondPath(g, px, py, 7);
+                g.strokePath();
+            }
         }
         for (const s of snaps) {
             if (!s.alive) continue;

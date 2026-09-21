@@ -144,3 +144,13 @@ export const EMP_COOLDOWN_TICKS = TICK_HZ * 12;
 export const EMP_RADIUS = 220;
 export const EMP_SLOW_TICKS = TICK_HZ * 3;
 export const EMP_SLOW_MULT = 0.45;
+
+// Powerup pads (P1): static map feature, always on. Positions are fixed
+// arena fractions (mirror-symmetric); kinds cycle with a seed offset.
+export const PAD_RADIUS = 26;
+export const PAD_RESPAWN_TICKS = 900; // 15 s dark after a pickup
+export const AMP_TICKS = 360; // 6 s of double bullet damage
+export const OVERDRIVE_TICKS = 360; // 6 s of boosted move speed
+export const REPAIR_HP = 60;
+export const AMP_MULT = 2;
+export const OVERDRIVE_MULT = 1.35;

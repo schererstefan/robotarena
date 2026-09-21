@@ -59,13 +59,14 @@ y grows downward). The sim ticks at 60 Hz.
 | `shared`       | Foe sightings shared by allies, delivered **30 ticks late**, nearest first. Position-only: `id`, `team`, `x`, `y`, `distance`, `bearing` are valid; `heading`, `speed`, `health` are always `0`. Never includes foes you see yourself, your own sightings echoed back, dead foes, or anything in 1v1 (no allies). |
 | `walls`        | Distance to each arena wall: `left`, `right`, `top`, `bottom`.           |
 | `rand()`       | Deterministic random draw in `[0, 1)`. Use this for any randomness.      |
-| `events`       | What happened during the step just completed (empty at tick 0): `hit-by`, `kill`, `ally-down`, `foe-down`, `sudden-death-pulse`, `wall-bump`, `ram`. Sorted kind-then-id, capped at 8. |
+| `events`       | What happened during the step just completed (empty at tick 0): `hit-by`, `kill`, `ally-down`, `foe-down`, `sudden-death-pulse`, `wall-bump`, `ram`, `pickup` (`pickup` carries `pad`: the pad kind collected). Sorted kind-then-id, capped at 8. |
 | `bullets`      | Incoming foe-team bullets inside your sensor cone, nearest first, capped at 12: `x`, `y`, `vx`, `vy`, `distance`, `bearing`, `closing` (positive = approaching), `damage`. |
 | `tracks`       | Engine-kept memory: one entry per living foe ever in your cone (`id`, `x`, `y`, `heading`, `speed`, `lastSeenTick`, `seenNow`), refreshed on every sighting, sorted by id. |
 | `arena`        | Static layout: `id` (`open`/`blocks`), `obstacles` (`{x,y,w,h}`), `centerX`, `centerY`. Symmetric public state. |
 | `zone`         | Safe circle: `phase` (`normal`/`shrinking`), `suddenDeathIn` (ticks), `circle` (`{x,y,r}`), `distToSafety`, `inside`. |
 | `grid`         | Your team's 12×8 heat-map (`cell` 80): `foes` (presence from cone sightings, decays 1/tick) and `danger` (recent damage) integer arrays. |
 | `match`        | Match state: `arena`, `modifiers`, `tickCap`, `killsYou`, `killsTeam`, `aliveFoes`. |
+| `pickups`      | All 4 powerup pads in fixed pad order (public map knowledge, same for every robot): `{x, y, kind, active, respawnIn}`. `kind` is `amp`, `repair`, or `overdrive`; `active` is false while the pad is dark; `respawnIn` counts down to reactivation (`0` when active). |
 | `inbox`        | Teammates' radio from exactly 6 ticks ago, sorted (`sent`, `from`), capped at 4. Never your own echo, never from the dead, never cross-team. Empty in 1v1. |
 
 Sensor cone: 540 units range, ~63° wide, centered on your `tower` angle. You only
@@ -89,9 +90,27 @@ available after the foe leaves the cone, flagged with `seenNow: false`.
 `blocked.ahead` whisker for steering; `zone` is the sudden-death circle with
 your distance to safety; `grid` is your team's coarse 12×8 heat-map of foe
 presence and recent damage; `match` carries kills and the living-foe count.
-All seven are fresh copies every tick — mutate them freely, nothing leaks
+All eight are fresh copies every tick — mutate them freely, nothing leaks
 back into the sim. They are typed optional (treat them as possibly absent),
 but the engine always provides them.
+
+## Powerup pads
+
+Four static pads sit at fixed arena fractions (0.22/0.78 × 0.30/0.70),
+mirrored through the arena center so neither team gains an edge. Pad kinds
+cycle `amp` → `repair` → `overdrive` with a per-match seed offset, so the
+layout varies per match but replays exactly. Blunder into one (within 26
+units) to collect it; the pad goes dark for 15 s, then reactivates.
+
+- **AMP** (`amp`, gold diamond): 2× bullet damage for 6 s. Does not stack
+  with the double-damage exhibition modifier — the strongest multiplier wins.
+- **REPAIR** (`repair`, green cross): +60 HP instantly, clamped to max health.
+- **OVERDRIVE** (`overdrive`, white rings): +35% move speed for 6 s.
+
+You get a `pickup` event (with `pad`) on the collecting tick; timed effects
+clear on death (no drops). Brains are unchanged by pads — seeking them is
+your strategy to write: read `sense.pickups`, steer with `moveMode`, and
+remember every robot sees the same pads.
 
 ## What you return: `Intent`
 
@@ -147,8 +166,8 @@ is no way to exceed your loadout's stats.
   is dropped). Your own messages are never echoed back.
 
 Application order each tick: brains → radio collect → dash/EMP → move
-assist → drive normalize → turret assist → fire gate → bullets → sudden
-death.
+assist → drive normalize → turret assist → fire gate → bullets → pads →
+sudden death.
 
 ## Team radio: the `comms.ts` helpers
 
