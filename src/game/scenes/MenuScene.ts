@@ -154,6 +154,8 @@ export class MenuScene extends Scene {
     private onlineCached = false;
     private onlineTried = false;
     private onlineToken = 0;
+    /** Two-step guard for the stats CLEAR button: first press arms, second wipes. */
+    private statsClearArmed = false;
     private replayOverlay: HTMLDivElement | null = null;
     private importOverlay: HTMLDivElement | null = null;
     private tourRequested = false;
@@ -1335,6 +1337,7 @@ export class MenuScene extends Scene {
     private openStats(): void {
         this.closeStats();
         this.statsTab = 'local';
+        this.statsClearArmed = false;
         // Backdrop swallows clicks so menu controls beneath can't fire.
         this.trackStats(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50).setInteractive());
         this.trackStats(this.add.rectangle(CX, 384, 560, 600, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
@@ -1346,6 +1349,7 @@ export class MenuScene extends Scene {
     private setStatsTab(tab: 'local' | 'online'): void {
         if (this.statsTab === tab) return;
         this.statsTab = tab;
+        this.statsClearArmed = false;
         this.refreshStatsRows();
     }
 
@@ -1372,6 +1376,19 @@ export class MenuScene extends Scene {
         if (this.statsTab === 'local') this.renderLocalStats(targets);
         else this.renderOnlineStats(targets);
         this.nav.replaceTargets(targets);
+    }
+
+    /** Stats CLEAR is two-step: first press arms the button, second press wipes. */
+    private activateStatsClear(): void {
+        if (!this.statsClearArmed) {
+            this.statsClearArmed = true;
+            this.refreshStatsRows();
+            return;
+        }
+        this.statsClearArmed = false;
+        clearHistory();
+        clearDailyBoard();
+        this.refreshStatsRows();
     }
 
     private renderLocalStats(targets: NavTarget[]): void {
@@ -1433,13 +1450,11 @@ export class MenuScene extends Scene {
         const clear = this.trackStats(
             this.add.rectangle(CX - 120, 630, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50),
         );
-        this.trackStats(this.add.text(CX - 120, 630, COMMON.clear, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
+        this.trackStats(
+            this.add.text(CX - 120, 630, this.statsClearArmed ? 'CONFIRM?' : COMMON.clear, FONTS.buttonSmall).setOrigin(0.5).setDepth(50),
+        );
         clear.setInteractive({ useHandCursor: true });
-        clear.on('pointerdown', () => {
-            clearHistory();
-            clearDailyBoard();
-            this.refreshStatsRows();
-        });
+        clear.on('pointerdown', () => this.activateStatsClear());
         const close = this.trackStats(
             this.add.rectangle(CX + 120, 630, 170, 40, COLORS.panel).setStrokeStyle(2, COLORS.team[0]).setDepth(50),
         );
@@ -1452,11 +1467,7 @@ export class MenuScene extends Scene {
                 y: 630,
                 w: 170,
                 h: 40,
-                activate: () => {
-                    clearHistory();
-                    clearDailyBoard();
-                    this.refreshStatsRows();
-                },
+                activate: () => this.activateStatsClear(),
             },
             { x: CX + 120, y: 630, w: 170, h: 40, activate: () => this.closeStats() },
         );
@@ -1553,6 +1564,7 @@ export class MenuScene extends Scene {
     private closeStats(): void {
         for (const obj of this.statsObjects) obj.destroy();
         this.statsObjects = [];
+        this.statsClearArmed = false;
         this.restoreNav();
     }
 
