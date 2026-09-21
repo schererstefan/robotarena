@@ -301,6 +301,8 @@ export const IMPORT_ERROR = {
     badIntent: 'update() must return an Intent (throttle/turn/towerTurn/fire/charge)',
     readFailed: 'could not read file',
     badUrl: 'invalid URL',
+    typescript:
+        'TypeScript annotations are not supported — strip types to plain JavaScript first (the workshop .ts download is for pull-request submission)',
     badProtocol: 'only http(s) URLs are allowed',
     fetchFailed: 'fetch failed (network or CORS)',
     unknown: 'unknown',

@@ -1272,7 +1272,7 @@ export class MenuScene extends Scene {
             `<div style="color:#e8edf2;font-size:20px;margin-bottom:4px;">${IMPORT_DIALOG.title}</div>` +
             `<div style="color:${COLORS.goldCss};font-size:18px;margin-bottom:12px;">${IMPORT_DIALOG.warning}</div>` +
             `<div style="color:#9aa7b4;font-size:18px;margin-bottom:8px;">${IMPORT_DIALOG.fileLabel}</div>` +
-            '<input type="file" accept=".js,.mjs" class="import-file" ' +
+            '<input type="file" accept=".js,.mjs,.ts" class="import-file" ' +
             'style="width:100%;box-sizing:border-box;color:#e8edf2;font-family:inherit;font-size:18px;margin-bottom:8px;" />' +
             `<div style="color:#9aa7b4;font-size:18px;margin-bottom:8px;">${IMPORT_DIALOG.urlLabel}</div>` +
             `<input type="text" spellcheck="false" placeholder="${IMPORT_DIALOG.urlPlaceholder}" class="import-url" ` +

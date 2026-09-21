@@ -223,6 +223,20 @@ export function validateAndRegister(module: unknown): ImportResult {
     return { ok: true, id, robot };
 }
 
+/**
+ * Leftover TypeScript after import-type stripping (annotations, interfaces,
+ * return types). Runs only on the blob-import failure path, so plain
+ * JavaScript never reaches it — a match upgrades a cryptic SyntaxError into
+ * an actionable message.
+ */
+export function looksLikeTypescript(code: string): boolean {
+    return (
+        /^\s*interface\s+\w+/m.test(code) ||
+        /:\s*[A-Z][\w$]*(<[\w\s,[\]<>|&?.]+>)?\s*[=;,)]/.test(code) ||
+        /\)\s*:\s*[\w$[\]<>|&?. ]+\s*\{/.test(code)
+    );
+}
+
 /** Guarded dynamic import of prepared source via a blob module URL. */
 async function importPrepared(code: string): Promise<ImportResult> {
     const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
@@ -230,6 +244,9 @@ async function importPrepared(code: string): Promise<ImportResult> {
         const module = (await import(/* @vite-ignore */ url)) as unknown;
         return validateAndRegister(module);
     } catch (error) {
+        if (error instanceof SyntaxError && looksLikeTypescript(code)) {
+            return { ok: false, error: IMPORT_ERROR.typescript };
+        }
         const message = error instanceof Error ? error.message : IMPORT_ERROR.unknown;
         return { ok: false, error: importLoadFailed(message) };
     } finally {

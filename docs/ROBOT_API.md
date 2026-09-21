@@ -343,8 +343,11 @@ Modded matches replay exactly via the same replay codes.
    internals — user robots cannot import them; the workshop rejects
    anything outside `../sim/*`, `./common.ts`, and `./comms.ts`.)
    Two refinements: (a) robots loaded through the in-game importer
-   (Menu → IMPORT, exhibition only) must be **single-file** — value imports
-   cannot be resolved from a blob module, so inline any helpers you need;
+   (Menu → IMPORT, exhibition only) must be **single-file plain JavaScript**
+   — value imports cannot be resolved from a blob module, so inline any
+   helpers you need, and strip type annotations (the importer runs the file
+   untranspiled; the workshop `.ts` download is for pull-request
+   submission);
    (b) `./brain.ts`, `./genome.ts`, and sibling-robot imports
    (`./hunter`, …) are internal-only: shipped robots are multi-file, user
    robots stay within `../sim/*` + `./common.ts` + `./comms.ts`.
