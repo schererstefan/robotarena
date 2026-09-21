@@ -2231,8 +2231,10 @@ export class BattleScene extends Scene {
                 fg.setFillStyle(band === 2 ? COLORS.accent : band === 1 ? COLORS.team[0] : COLORS.danger);
             }
             // Dead names stop persisting: the skull marker takes over.
+            // Results hide every name: the winner's label would bleed
+            // through the 0.94-alpha panel as a ghost text line.
             const label = this.nameTexts[i] as Phaser.GameObjects.Text;
-            label.setVisible((s.alive || throes) && introAlpha > 0.5).setPosition(cx, cy - 40);
+            label.setVisible((s.alive || throes) && introAlpha > 0.5 && !this.resultsShown).setPosition(cx, cy - 40);
             // Cooldown readout under the chassis: sweep dials flank the icons
             // in dyn; the text keeps the D/E letters + seconds under 3 s.
             const dashReady = s.dashCd <= 0;
