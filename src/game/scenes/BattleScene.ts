@@ -2216,7 +2216,7 @@ export class BattleScene extends Scene {
             const bg = this.barBg[i] as Phaser.GameObjects.Rectangle;
             const ghost = this.barGhost[i] as Phaser.GameObjects.Rectangle;
             const fg = this.barFg[i] as Phaser.GameObjects.Rectangle;
-            const plateOn = visible && introAlpha > 0.5;
+            const plateOn = visible && introAlpha > 0.5 && !this.resultsShown;
             bg.setVisible(plateOn).setPosition(cx, cy - 28);
             // White ghost lag bar: drains toward the live value, snaps up.
             let gfrac = this.ghostFrac[i] as number;
