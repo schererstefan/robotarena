@@ -128,14 +128,14 @@ mirrored so neither team gains an edge. They are structures, not robots:
 indestructible, with no cone, no loadout, and no foe-contract data. Both
 start `disabled` (neutral) and are captured by presence:
 
-- **Capture:** a robot within 80 units pushes progress toward its team;
-  180 ticks of uninterrupted, uncontested presence captures the turret.
+- **Capture:** a robot within 100 units pushes progress toward its team;
+  90 ticks of uninterrupted, uncontested presence captures the turret.
 - **Contest:** robots from both teams inside the radius freeze progress
   (it neither advances nor resets).
 - **Decay:** 300 ticks with no robot in radius starts decaying uncaptured
   progress back toward neutral. Owned turrets never decay.
 - **Ownership persists** until the other team pushes progress all the way
-  to its own pole (recapture takes 360 uninterrupted ticks from a held
+  to its own pole (recapture takes 180 uninterrupted ticks from a held
   pole, since the edge must cross the full span).
 
 A captured turret fires at its nearest living enemy within 260 units every

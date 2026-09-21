@@ -280,8 +280,8 @@ export const OVERDRIVE_MULT = 1.35;
 // starts decay of uncaptured progress back toward neutral. Owned turrets
 // never decay: recapture is the counterplay. Captured turrets fire at the
 // nearest enemy in TURRET_RANGE every TURRET_FIRE_INTERVAL ticks.
-export const TURRET_CAPTURE_RADIUS = 80;
-export const TURRET_CAPTURE_TICKS = 180;
+export const TURRET_CAPTURE_RADIUS = 100;
+export const TURRET_CAPTURE_TICKS = 90;
 export const TURRET_DECAY_TICKS = 300;
 export const TURRET_RANGE = 260;
 export const TURRET_FIRE_INTERVAL = 45;
