@@ -3015,7 +3015,10 @@ export class BattleScene extends Scene {
                 seed: (Math.random() * 0x7fffffff) | 0,
                 replay: false,
                 daily: undefined,
-                tutorial: undefined,
+                // Tutorial rematches stay tutorial: stripping the flag would
+                // silently kill the coach + tour (the big primary button
+                // must never end onboarding by accident).
+                tutorial: this.request.tutorial,
             });
         };
         // Two-line codes drop the buttons + footer 18px so nothing collides.
