@@ -745,8 +745,11 @@ export class MenuScene extends Scene {
         this.navSlots = [];
 
         const rows = this.teamSize * 2;
-        const startY = rows <= 2 ? 252 : rows <= 4 ? 228 : 210;
-        const step = rows <= 2 ? 84 : 64;
+        // Row 0 must clear the 16px headers at y=208 (bottom edge 216):
+        // sprites are 32px tall, cyclers 44px. The 6-row step shrinks so
+        // the last row still clears the description panel at y=558.
+        const startY = rows <= 2 ? 252 : 240;
+        const step = rows <= 2 ? 84 : rows <= 4 ? 64 : 58;
         for (let i = 0; i < rows; i += 1) {
             const y = startY + i * step;
             const team = (i < this.teamSize ? 0 : 1) as 0 | 1;
@@ -786,7 +789,7 @@ export class MenuScene extends Scene {
             this.navSlots.push({ x: 646, y, w: 56, h: 44, activate: () => this.cyclePaint(i) });
 
             this.cycler(748, 110, y, cyclerLabel(skin.finish), () => this.cycleFinish(i));
-            this.cycler(885, 100, y, skillsButtonLabel(loadoutCost(loadout)), () => this.openEditor(i), '#7de08a');
+            this.cycler(885, 100, y, `${skillsButtonLabel(loadoutCost(loadout))}/${SKILL_BUDGET}`, () => this.openEditor(i), '#7de08a');
         }
         this.restoreNav();
     }
