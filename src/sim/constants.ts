@@ -15,6 +15,31 @@ export const SUDDEN_DEATH_DAMAGE = 6;
 /** Absolute tick cap (defensive only: the collapsed circle eliminates everyone first). */
 export const MAX_TICKS_TOTAL = MAX_TICKS + SUDDEN_DEATH_TICKS + TICK_HZ * 10;
 
+// Asteroid strikes (complexity/W1): seed-scheduled world hazard, ON by
+// default (`noHazards` opts out). Each strike is a mirrored pair across the
+// center column (x=480), targeted at one living robot's announce-time
+// position plus its mirror — the spawn-column x=130/830 precedent. Strikes
+// only run pre-sudden-death; the collapse owns the endgame.
+// Balance (tuned against 1v1 medians ~390 ticks): the first pair lands ~5 s
+// in, then one pair per ~12.5 s, so short duels usually see 0-1 pairs and
+// long/team games see several. 25 damage (~2 bullets) punishes campers
+// without deciding healthy duels; 1.5 s telegraph vs 70 px radius lets any
+// moving robot escape (192 px reachable in the window from a standstill).
+/** First strike announcement tick. */
+export const HAZ_FIRST_TICK = 300;
+/** Ticks between strike-pair announcements. */
+export const HAZ_COOLDOWN_TICKS = 750;
+/** Telegraph lead: ticks from announcement to impact. */
+export const HAZ_TELEGRAPH_TICKS = 90;
+/** Blast radius in arena units (center-distance, exact). */
+export const HAZ_RADIUS = 70;
+/** Flat damage inside the radius (no double-damage interaction). */
+export const HAZ_DAMAGE = 25;
+/** Scorch decal lifetime in ticks (visual fade window). */
+export const HAZ_SCORCH_TICKS = 1200;
+/** Dedicated-stream salt (arbitrary, distinct from SPAWN_SALT). */
+export const HAZ_SALT = 0x8a2a2d;
+
 /**
  * Exhibition modifiers: toggleable rules twists, barred from stats.
  * `mirror` is lineup-level (both teams run identical robots); the sim reads
@@ -24,6 +49,15 @@ export interface MatchModifiers {
     doubleDamage?: boolean;
     hardcoreFog?: boolean;
     mirror?: boolean;
+    /**
+     * Opt-out of asteroid strikes (complexity/W1). Absent means ON: strikes
+     * are the default conditions, so default matches stay ranked. Setting
+     * this is a rules twist (exhibition). Zero-codec design: the flag rides
+     * the existing modifiers channel (fingerprinted via the mods segment and
+     * golden keys); RA1 encodes it as one letter, RA2-unsafe specs fall back
+     * to RA1, so the RA2 bit layout is untouched.
+     */
+    noHazards?: boolean;
 }
 
 /** Strict sanitize: only literal `true` survives. Key order is fixed. */
@@ -34,12 +68,13 @@ export function sanitizeModifiers(raw: unknown): MatchModifiers {
     if (r['doubleDamage'] === true) clean.doubleDamage = true;
     if (r['hardcoreFog'] === true) clean.hardcoreFog = true;
     if (r['mirror'] === true) clean.mirror = true;
+    if (r['noHazards'] === true) clean.noHazards = true;
     return clean;
 }
 
 /** True when any exhibition modifier is on (match is barred from stats). */
 export function isExhibition(modifiers: MatchModifiers): boolean {
-    return modifiers.doubleDamage === true || modifiers.hardcoreFog === true || modifiers.mirror === true;
+    return modifiers.doubleDamage === true || modifiers.hardcoreFog === true || modifiers.mirror === true || modifiers.noHazards === true;
 }
 
 /** Short HUD codes for the active modifiers, e.g. `['2X', 'FOG']`. */
@@ -48,6 +83,7 @@ export function modifierCodes(modifiers: MatchModifiers): string[] {
     if (modifiers.doubleDamage === true) codes.push('2X');
     if (modifiers.hardcoreFog === true) codes.push('FOG');
     if (modifiers.mirror === true) codes.push('MIR');
+    if (modifiers.noHazards === true) codes.push('CLR');
     return codes;
 }
 

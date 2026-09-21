@@ -59,7 +59,7 @@ y grows downward). The sim ticks at 60 Hz.
 | `shared`       | Foe sightings shared by allies, delivered **30 ticks late**, nearest first. Position-only: `id`, `team`, `x`, `y`, `distance`, `bearing` are valid; `heading`, `speed`, `health` are always `0`. Never includes foes you see yourself, your own sightings echoed back, dead foes, or anything in 1v1 (no allies). |
 | `walls`        | Distance to each arena wall: `left`, `right`, `top`, `bottom`.           |
 | `rand()`       | Deterministic random draw in `[0, 1)`. Use this for any randomness.      |
-| `events`       | What happened during the step just completed (empty at tick 0): `hit-by` (`fromId` is the shooter, `-1` = map turret), `kill`, `ally-down`, `foe-down`, `sudden-death-pulse`, `wall-bump`, `ram`, `pickup` (`pickup` carries `pad`: the pad kind collected), `turret-captured` / `turret-flipped` (`fromId` is the turret index, broadcast to every living robot). Sorted kind-then-id, capped at 8. |
+| `events`       | What happened during the step just completed (empty at tick 0): `hit-by` (`fromId` is the shooter, `-1` = map turret), `kill`, `ally-down`, `foe-down`, `sudden-death-pulse`, `wall-bump`, `ram`, `pickup` (`pickup` carries `pad`: the pad kind collected), `turret-captured` / `turret-flipped` (`fromId` is the turret index, broadcast to every living robot), `blast` (asteroid hit: `amount`, no `fromId` — the world did it). Sorted kind-then-id, capped at 8. |
 | `bullets`      | Incoming foe-team bullets inside your sensor cone, nearest first, capped at 12: `x`, `y`, `vx`, `vy`, `distance`, `bearing`, `closing` (positive = approaching), `damage`. |
 | `tracks`       | Engine-kept memory: one entry per living foe ever in your cone (`id`, `x`, `y`, `heading`, `speed`, `lastSeenTick`, `seenNow`), refreshed on every sighting, sorted by id. |
 | `arena`        | Layout: `id` (`open`/`blocks`), `obstacles` (`{x,y,w,h}` barrier rects, seed-derived on `blocks`), `centerX`, `centerY`. Symmetric public state. |
@@ -68,6 +68,7 @@ y grows downward). The sim ticks at 60 Hz.
 | `match`        | Match state: `arena`, `modifiers`, `tickCap`, `killsYou`, `killsTeam`, `aliveFoes`. |
 | `pickups`      | All 4 powerup pads in fixed pad order (public map knowledge, same for every robot): `{x, y, kind, active, respawnIn}`. `kind` is `amp`, `repair`, or `overdrive`; `active` is false while the pad is dark; `respawnIn` counts down to reactivation (`0` when active). |
 | `turrets`      | Both map turrets in fixed turret order (public map knowledge, same for every robot): `{x, y, state, owner, progress}`. `state` is `disabled` while neutral, `active` once owned; `owner` is the owning team (`-1` while neutral, persists until recaptured); `progress` is capture lean in `[-1, +1]` (`+` = team 0, `-` = team 1). |
+| `hazards`      | Announced asteroid strikes (empty when none, or all match with `noHazards`): live telegraphs counting down plus the impact-tick frame (`ticksToImpact` 0), sorted by countdown then position — `x`, `y`, `ticksToImpact`, `radius` (70), `damage` (25). World-public: every living robot sees every strike. |
 | `inbox`        | Teammates' radio from exactly 6 ticks ago, sorted (`sent`, `from`), capped at 4. Never your own echo, never from the dead, never cross-team. Empty in 1v1. |
 
 Sensor cone: 540 units range, ~63° wide, centered on your `tower` angle. You only
@@ -83,14 +84,18 @@ The second sense group is event and memory channels. `events` tells you what
 the last step did to you — being hit (`hit-by` carries `amount`/`bearing`/
 `fromId`, and `self.lastDamage` keeps the latest one all match), scoring
 (`kill`), deaths on either side (`ally-down`/`foe-down`), sudden-death ticks,
-and collisions (`wall-bump`, `ram`). `bullets` shows incoming rounds your
+and collisions (`wall-bump`, `ram`), plus asteroid hits (`blast`: `amount`,
+no `fromId`). `bullets` shows incoming rounds your
 tower currently covers, with closing speed for dodging. `tracks` is the
 engine's memory of every foe your cone has seen — stale positions stay
 available after the foe leaves the cone, flagged with `seenNow: false`.
 `arena` is the (symmetric, public) barrier map plus the
 `blocked.ahead` whisker for steering; `zone` is the sudden-death circle with
 your distance to safety; `grid` is your team's coarse 12×8 heat-map of foe
-presence and recent damage; `match` carries kills and the living-foe count.
+presence and recent damage; `match` carries kills and the living-foe count;
+`hazards` lists announced asteroid strikes (90-tick telegraph, 70-radius
+blast for 25 damage, mirrored across the center column) so you can dodge —
+empty when none are announced or the match runs `noHazards`.
 All of these channels are fresh copies every tick — mutate them freely,
 nothing leaks back into the sim. They are typed optional (treat them as
 possibly absent), but the engine always provides them.
@@ -190,10 +195,14 @@ is no way to exceed your loadout's stats.
   `fire: false`. The cooldown gate is unchanged.
 - **Radio** (`radio`): one `{kind, x, y, foe, role, slot, bid}` message per
   tick to your team, delivered 6 ticks late via `sense.inbox`. Kinds:
-  `ping`, `contact`, `claim`, `slot`, `focus`, `ack`. Unknown kinds are
-  dropped, `foe` ids are liveness-checked at send (`-1` = none), and dead
-  robots neither send nor receive (in-flight mail from a robot that dies
-  is dropped). Your own messages are never echoed back.
+  `ping`, `contact`, `claim`, `slot`, `focus`, `ack`. Payloads:
+  `focus{foe}` votes your target, `contact{x,y,foe}` shares a foe
+  position, `claim{role,bid}` bids for a squad role (highest bid wins,
+  ties to the lowest id), `slot{role,slot}` heartbeats a held formation
+  slot; `ping`/`ack` are free-form. Unused fields are `0` (`foe: -1` =
+  none). Unknown kinds are dropped, `foe` ids are liveness-checked at
+  send, and dead robots neither send nor receive (in-flight mail from a
+  robot that dies is dropped). Your own messages are never echoed back.
 
 Application order each tick: brains → radio collect → dash/EMP → move
 assist → drive normalize → turret assist → fire gate → bullets → pads →
@@ -210,6 +219,18 @@ chase. `resolveRoles` settles `claim{role,bid}` mail by sealed-bid
 auction (highest bid wins, ties to the lowest id), and `formationSlot`
 maps a slot index onto ring geometry around an anchor. Hunter votes
 focus, ghost reports contact — read them before rolling your own.
+
+`src/robots/roles.ts` builds squad roles on top: `castClaim` /
+`castSlotHold` send sealed role bids and slot heartbeats,
+`collectClaims` + `myRole` settle the auction from your inbox plus your
+own bid, `latestSlotHold` reads mates' heartbeats, and
+`createRoleTracker` runs the whole loop — claim, incumbency stickiness,
+sparse heartbeats, re-resolve when the live set changes — with
+`roleGoal` mapping a settled role onto a formation slot around the
+target. The one radio slot per tick is shared with focus votes, so
+claims go out only while unsettled and holds every 12 ticks; with no
+allies the tracker idles (1v1 behavior unchanged). Hunter is the
+reference implementation: role drive in the flank band, B2 aim intact.
 
 ## Skills: symmetric loadouts
 
@@ -300,7 +321,8 @@ elimination draws — stalling the clock no longer saves you.
 **Exhibition modifiers** (menu MODS panel; barred from stats, tagged in the
 HUD): double damage (every shot ×2, all bullets render hot), hardcore fog
 (your `sense.self.stats.sensorRange` and scan cone halve — read stats, never
-hardcode 540), mirror mode (both teams run identical robots and builds).
+hardcode 540), mirror mode (both teams run identical robots and builds),
+clear skies (`noHazards`: no asteroid strikes — strikes are on by default).
 Modded matches replay exactly via the same replay codes.
 
 ## Rules for robot code
@@ -312,15 +334,18 @@ Modded matches replay exactly via the same replay codes.
 3. **Self-contained.** Import only from `../sim/*`, `./common.ts` (optional
    steering helpers: `aimTurret`, `steerTo`, `throttleFor`, `aimed`,
    `leadAngle`/`leadShot`, `dodgeVector`, `rayClearance`, `toGrid`,
-   `manageCharge`, `createStallTracker`), and `./comms.ts` (team radio:
+   `manageCharge`, `createStallTracker`), `./comms.ts` (team radio:
    `castFocusVote`, `focusTarget`, `castContact`, `latestContact`,
-   `resolveRoles`, `formationSlot`). No Phaser, no DOM, no Node APIs.
+   `resolveRoles`, `formationSlot`), and `./roles.ts` (squad roles:
+   `castClaim`, `castSlotHold`, `collectClaims`, `myRole`,
+   `latestSlotHold`, `createRoleTracker`, `roleGoal`). No Phaser, no DOM,
+   no Node APIs.
    Two refinements: (a) robots loaded through the in-game importer
    (Menu → IMPORT, exhibition only) must be **single-file** — value imports
    cannot be resolved from a blob module, so inline any helpers you need;
    (b) `./brain.ts`, `./genome.ts`, and sibling-robot imports
    (`./hunter`, …) are internal-only: shipped robots are multi-file, user
-   robots stay within `../sim/*` + `./common.ts` + `./comms.ts`.
+   robots stay within `../sim/*` + `./common.ts` + `./comms.ts` + `./roles.ts`.
 4. **No throwing.** Exceptions are caught and your robot idles that tick — but a
    robot that throws constantly is just parked scrap. Guard your math.
 5. **State in closures.** Module-level mutable state is shared across matches;

@@ -394,6 +394,7 @@ export const MOD_ROWS: ModRow[] = [
     { key: 'doubleDamage', name: 'DOUBLE DAMAGE', desc: 'every shot deals double damage' },
     { key: 'hardcoreFog', name: 'HARDCORE FOG', desc: 'sensor range halved for every robot' },
     { key: 'mirror', name: 'MIRROR MODE', desc: 'team 2 mirrors team 1 robots + builds' },
+    { key: 'noHazards', name: 'CLEAR SKIES', desc: 'no asteroid strikes (default: strikes on)' },
 ];
 
 // ---- Battle HUD, banners, and results -------------------------------------
