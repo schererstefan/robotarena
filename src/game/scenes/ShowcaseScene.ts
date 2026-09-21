@@ -277,10 +277,22 @@ export class ShowcaseScene extends Scene {
         // Featured replays.
         const overlayNav: NavTarget[] = [];
         track(this.add.text(CX, 272, SHOWCASE.replaysTitle, FONTS.buttonSmall).setOrigin(0.5).setDepth(50));
-        champ.featuredReplays.slice(0, OVERLAY_REPLAYS).forEach((rep, i) => {
+        const reps = champ.featuredReplays.slice(0, OVERLAY_REPLAYS);
+        // Same seed/matchup can repeat with a different code: number the
+        // repeats so identical rows (and keyboard stops) stay distinct.
+        const labelTotal = new Map<string, number>();
+        for (const rep of reps) labelTotal.set(rep.label, (labelTotal.get(rep.label) ?? 0) + 1);
+        const labelSeen = new Map<string, number>();
+        reps.forEach((rep, i) => {
             const y = 300 + i * 30;
             const bg = track(this.add.rectangle(CX, y, 680, 26, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(50));
-            track(this.add.text(CX - 325, y, showcaseReplayLine(rep.label, rep.outcome), FONTS.monoSmall).setOrigin(0, 0.5).setDepth(50));
+            let label = rep.label;
+            if ((labelTotal.get(rep.label) ?? 0) > 1) {
+                const n = (labelSeen.get(rep.label) ?? 0) + 1;
+                labelSeen.set(rep.label, n);
+                label = `${rep.label} #${n}`;
+            }
+            track(this.add.text(CX - 325, y, showcaseReplayLine(label, rep.outcome), FONTS.monoSmall).setOrigin(0, 0.5).setDepth(50));
             bg.setInteractive({ useHandCursor: true });
             bg.on('pointerover', () => {
                 bg.setStrokeStyle(1, COLORS.team[0]);
