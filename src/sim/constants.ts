@@ -2,6 +2,8 @@
 // Fairness rule: robot code may read these but the engine is the only
 // writer of state, and all intents are clamped to these limits.
 
+import { createRng } from './rng';
+
 export const TICK_HZ = 60;
 export const DT = 1 / TICK_HZ;
 export const MAX_TICKS = TICK_HZ * 150; // 2.5 minutes, then sudden death
@@ -65,10 +67,11 @@ export interface ArenaObstacle {
 }
 
 /**
- * Obstacle rects per arena. The blocks layout mirrors every rect through the
- * arena center (480, 320) so neither team gains cover or a shorter path.
- * All blocks sit clear of the spawn zones (x = 130±40 / 830±40): the nearest
- * block face is 116px from the zone edge, minus the robot radius.
+ * Obstacle rects per arena. `open` is empty; the `blocks` entry below is the
+ * canonical fallback layout (mirrored through the arena center (480, 320) so
+ * neither team gains cover or a shorter path, clear of the spawn zones at
+ * x = 130±40 / 830±40). Live `blocks` matches use the seed-derived
+ * `barriersForSeed(seed)` layout instead — see BARRIER_SALT.
  */
 export const ARENA_OBSTACLES: Record<ArenaId, ArenaObstacle[]> = {
     open: [],
@@ -79,6 +82,84 @@ export const ARENA_OBSTACLES: Record<ArenaId, ArenaObstacle[]> = {
         { x: 570, y: 420, w: 90, h: 90 },
     ],
 };
+
+/**
+ * Seed-derived barrier layout (complexity/barriers): the `blocks` arena no
+ * longer uses one fixed setup — each match seed deals its own 4-segment
+ * layout (2 drawn rects + their center mirrors). Symmetric through the
+ * arena center (480, 320), so both teams face identical terrain; same seed
+ * => identical layout, zero replay-codec bits (same approach as spawn
+ * variation: a dedicated `seed ^ BARRIER_SALT` stream, brain RNG untouched).
+ *
+ * Playability guards (checked at generation, asserted in the soak):
+ * - every rect stays inside the midfield band (x 248..712, y 88..552), so
+ *   spawn columns (x 90..170 / 790..870) keep 60px+ clearance and the
+ *   nearest wall is 88px away — nothing seals against an edge;
+ * - every pair of the 4 final rects keeps a 56px+ edge gap (wider than one
+ *   robot diameter), so no pocket can close and every gap stays passable;
+ * - sizes are multiples of 8px in 56..104, far thicker than one bullet or
+ *   dash step (~7px), so nothing tunnels.
+ */
+export const BARRIER_SALT = 0xb4a91e5;
+/** Barrier rects per `blocks` match: 2 drawn + 2 center mirrors. */
+export const BARRIER_COUNT = 4;
+/** Minimum edge-to-edge gap between any two barrier rects. */
+export const BARRIER_MIN_GAP = 56;
+
+function mirrorBarrier(o: ArenaObstacle): ArenaObstacle {
+    return { x: ARENA_WIDTH - o.x - o.w, y: ARENA_HEIGHT - o.y - o.h, w: o.w, h: o.h };
+}
+
+/** Edge-to-edge separation of two rects (0 when they touch/overlap). */
+function barrierGap(a: ArenaObstacle, b: ArenaObstacle): number {
+    const dx = Math.max(b.x - (a.x + a.w), a.x - (b.x + b.w));
+    const dy = Math.max(b.y - (a.y + a.h), a.y - (b.y + b.h));
+    if (dx <= 0 && dy <= 0) return 0;
+    if (dx <= 0) return dy;
+    if (dy <= 0) return dx;
+    return Math.hypot(dx, dy);
+}
+
+function barriersFit(rects: ArenaObstacle[]): boolean {
+    for (let i = 0; i < rects.length; i += 1) {
+        for (let j = i + 1; j < rects.length; j += 1) {
+            if (barrierGap(rects[i] as ArenaObstacle, rects[j] as ArenaObstacle) < BARRIER_MIN_GAP) return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Deterministic barrier layout for a match seed. Always exactly
+ * BARRIER_COUNT rects, sorted by (x, y) for canonical order. Falls back to
+ * the canonical ARENA_OBSTACLES.blocks setup when rejection sampling
+ * exhausts (still symmetric, still legal) — never random, never empty.
+ */
+export function barriersForSeed(seed: number): ArenaObstacle[] {
+    const rng = createRng((seed ^ BARRIER_SALT) >>> 0);
+    const sizes = [56, 64, 72, 80, 88, 96, 104];
+    const drawOne = (): ArenaObstacle => {
+        const w = sizes[Math.floor(rng() * sizes.length)] as number;
+        const h = sizes[Math.floor(rng() * sizes.length)] as number;
+        // Midfield band, multiples of 8px: x + w <= 712, y + h <= 552.
+        const x = 248 + Math.floor(rng() * ((712 - w - 248) / 8 + 1)) * 8;
+        const y = 88 + Math.floor(rng() * ((552 - h - 88) / 8 + 1)) * 8;
+        return { x, y, w, h };
+    };
+    // Joint pair sampling: both rects plus both mirrors must fit together,
+    // including each rect against its own mirror (center-hugging draws fail
+    // fast and cost one attempt, they never poison the stream).
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+        const first = drawOne();
+        const second = drawOne();
+        const rects = [first, second, mirrorBarrier(first), mirrorBarrier(second)];
+        if (barriersFit(rects)) return rects.sort((a, b) => a.x - b.x || a.y - b.y);
+    }
+    // Rejection exhausted (near-impossible on this band): the canonical
+    // 90x90 fallback is symmetric and verified to fit — never random, never
+    // empty. Tests accept its 90px size alongside drawn multiples of 8.
+    return ARENA_OBSTACLES.blocks.map((o) => ({ ...o })).sort((a, b) => a.x - b.x || a.y - b.y);
+}
 
 export const ROBOT_RADIUS = 14;
 export const START_HEALTH = 100;
@@ -154,3 +235,18 @@ export const OVERDRIVE_TICKS = 360; // 6 s of boosted move speed
 export const REPAIR_HP = 60;
 export const AMP_MULT = 2;
 export const OVERDRIVE_MULT = 1.35;
+
+// Map turrets (T1): static structures on the arena center column, always on.
+// Two turrets at fixed arena fractions (0.50 x by 0.30/0.70 y), starting
+// DISABLED (neutral). Presence captures: a robot inside TURRET_CAPTURE_RADIUS
+// pushes progress toward its team at 1/TURRET_CAPTURE_TICKS per tick; both
+// teams present freezes progress; TURRET_DECAY_TICKS with no robot in radius
+// starts decay of uncaptured progress back toward neutral. Owned turrets
+// never decay: recapture is the counterplay. Captured turrets fire at the
+// nearest enemy in TURRET_RANGE every TURRET_FIRE_INTERVAL ticks.
+export const TURRET_CAPTURE_RADIUS = 80;
+export const TURRET_CAPTURE_TICKS = 180;
+export const TURRET_DECAY_TICKS = 300;
+export const TURRET_RANGE = 260;
+export const TURRET_FIRE_INTERVAL = 45;
+export const TURRET_DAMAGE = 6;

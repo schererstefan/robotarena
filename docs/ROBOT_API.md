@@ -59,14 +59,15 @@ y grows downward). The sim ticks at 60 Hz.
 | `shared`       | Foe sightings shared by allies, delivered **30 ticks late**, nearest first. Position-only: `id`, `team`, `x`, `y`, `distance`, `bearing` are valid; `heading`, `speed`, `health` are always `0`. Never includes foes you see yourself, your own sightings echoed back, dead foes, or anything in 1v1 (no allies). |
 | `walls`        | Distance to each arena wall: `left`, `right`, `top`, `bottom`.           |
 | `rand()`       | Deterministic random draw in `[0, 1)`. Use this for any randomness.      |
-| `events`       | What happened during the step just completed (empty at tick 0): `hit-by`, `kill`, `ally-down`, `foe-down`, `sudden-death-pulse`, `wall-bump`, `ram`, `pickup` (`pickup` carries `pad`: the pad kind collected). Sorted kind-then-id, capped at 8. |
+| `events`       | What happened during the step just completed (empty at tick 0): `hit-by` (`fromId` is the shooter, `-1` = map turret), `kill`, `ally-down`, `foe-down`, `sudden-death-pulse`, `wall-bump`, `ram`, `pickup` (`pickup` carries `pad`: the pad kind collected), `turret-captured` / `turret-flipped` (`fromId` is the turret index, broadcast to every living robot). Sorted kind-then-id, capped at 8. |
 | `bullets`      | Incoming foe-team bullets inside your sensor cone, nearest first, capped at 12: `x`, `y`, `vx`, `vy`, `distance`, `bearing`, `closing` (positive = approaching), `damage`. |
 | `tracks`       | Engine-kept memory: one entry per living foe ever in your cone (`id`, `x`, `y`, `heading`, `speed`, `lastSeenTick`, `seenNow`), refreshed on every sighting, sorted by id. |
-| `arena`        | Static layout: `id` (`open`/`blocks`), `obstacles` (`{x,y,w,h}`), `centerX`, `centerY`. Symmetric public state. |
+| `arena`        | Layout: `id` (`open`/`blocks`), `obstacles` (`{x,y,w,h}` barrier rects, seed-derived on `blocks`), `centerX`, `centerY`. Symmetric public state. |
 | `zone`         | Safe circle: `phase` (`normal`/`shrinking`), `suddenDeathIn` (ticks), `circle` (`{x,y,r}`), `distToSafety`, `inside`. |
 | `grid`         | Your team's 12×8 heat-map (`cell` 80): `foes` (presence from cone sightings, decays 1/tick) and `danger` (recent damage) integer arrays. |
 | `match`        | Match state: `arena`, `modifiers`, `tickCap`, `killsYou`, `killsTeam`, `aliveFoes`. |
 | `pickups`      | All 4 powerup pads in fixed pad order (public map knowledge, same for every robot): `{x, y, kind, active, respawnIn}`. `kind` is `amp`, `repair`, or `overdrive`; `active` is false while the pad is dark; `respawnIn` counts down to reactivation (`0` when active). |
+| `turrets`      | Both map turrets in fixed turret order (public map knowledge, same for every robot): `{x, y, state, owner, progress}`. `state` is `disabled` while neutral, `active` once owned; `owner` is the owning team (`-1` while neutral, persists until recaptured); `progress` is capture lean in `[-1, +1]` (`+` = team 0, `-` = team 1). |
 | `inbox`        | Teammates' radio from exactly 6 ticks ago, sorted (`sent`, `from`), capped at 4. Never your own echo, never from the dead, never cross-team. Empty in 1v1. |
 
 Sensor cone: 540 units range, ~63° wide, centered on your `tower` angle. You only
@@ -86,13 +87,13 @@ and collisions (`wall-bump`, `ram`). `bullets` shows incoming rounds your
 tower currently covers, with closing speed for dodging. `tracks` is the
 engine's memory of every foe your cone has seen — stale positions stay
 available after the foe leaves the cone, flagged with `seenNow: false`.
-`arena` is the static (symmetric, public) obstacle map plus the
+`arena` is the (symmetric, public) barrier map plus the
 `blocked.ahead` whisker for steering; `zone` is the sudden-death circle with
 your distance to safety; `grid` is your team's coarse 12×8 heat-map of foe
 presence and recent damage; `match` carries kills and the living-foe count.
-All eight are fresh copies every tick — mutate them freely, nothing leaks
-back into the sim. They are typed optional (treat them as possibly absent),
-but the engine always provides them.
+All of these channels are fresh copies every tick — mutate them freely,
+nothing leaks back into the sim. They are typed optional (treat them as
+possibly absent), but the engine always provides them.
 
 ## Powerup pads
 
@@ -111,6 +112,35 @@ You get a `pickup` event (with `pad`) on the collecting tick; timed effects
 clear on death (no drops). Brains are unchanged by pads — seeking them is
 your strategy to write: read `sense.pickups`, steer with `moveMode`, and
 remember every robot sees the same pads.
+
+## Map turrets
+
+Two turret structures sit on the arena center column (0.50 × 0.30/0.70),
+mirrored so neither team gains an edge. They are structures, not robots:
+indestructible, with no cone, no loadout, and no foe-contract data. Both
+start `disabled` (neutral) and are captured by presence:
+
+- **Capture:** a robot within 80 units pushes progress toward its team;
+  180 ticks of uninterrupted, uncontested presence captures the turret.
+- **Contest:** robots from both teams inside the radius freeze progress
+  (it neither advances nor resets).
+- **Decay:** 300 ticks with no robot in radius starts decaying uncaptured
+  progress back toward neutral. Owned turrets never decay.
+- **Ownership persists** until the other team pushes progress all the way
+  to its own pole (recapture takes 360 uninterrupted ticks from a held
+  pole, since the edge must cross the full span).
+
+A captured turret fires at its nearest living enemy within 260 units every
+45 ticks: 6 damage per shot at robot bullet speed. Turret rounds are real
+bullets — walls, blocks, range, and no-friendly-fire apply exactly as for
+robot bullets, and they show up in `sense.bullets` like any incoming round.
+A turret hit reports `hit-by` with `fromId: -1` (also in
+`self.lastDamage.fromId`); turret kills credit no robot. First capture
+broadcasts `turret-captured` to every living robot, ownership changes
+broadcast `turret-flipped` (both carry the turret index in `fromId`).
+Read `sense.turrets` and contest early: a captured turret keeps firing for
+its owner even while you push the lean back, so recapture under fire is
+costly.
 
 ## What you return: `Intent`
 
@@ -167,7 +197,7 @@ is no way to exceed your loadout's stats.
 
 Application order each tick: brains → radio collect → dash/EMP → move
 assist → drive normalize → turret assist → fire gate → bullets → pads →
-sudden death.
+map turrets (capture, then fire) → sudden death.
 
 ## Team radio: the `comms.ts` helpers
 
@@ -249,9 +279,19 @@ the moment they come ready, so pulse them. Like every Intent field, a missing
 From `src/sim/constants.ts`: top speed 150 u/s (reverse ×0.6), turn 2.7 rad/s,
 tower 3.6 rad/s, gun range 470, 0.4 s cooldown, 12 damage, 100 health, no
 friendly fire. Arena is 960×640 with mirrored spawns. The BLOCKS layout adds
-four center blocks (mirrored through the arena center); robots and bullets
-collide with them, but your sensors don't report them — walls sense still
-measures the outer walls only. Matches run 2.5 minutes, then sudden death:
+four barrier segments, dealt from the match seed (2 drawn rects + their
+center mirrors, so both teams face identical terrain; same seed + loadouts
+⇒ identical layout, and replay codes are unchanged — the layout is derived,
+not stored). Robots collide with barriers (stop/slide push-out, no
+tunneling: segments are far thicker than one drive step) and bullets die on
+impact. Barriers are public: `sense.arena.obstacles` lists the rects,
+`self.blocked.ahead` measures to the nearest wall *or barrier* along your
+heading, and `common.ts` `rayClearance(x, y, angle, obstacles)` tests a
+firing lane against them. No new sense fields or events were added —
+`walls` still measures the outer walls only. Barriers stay in the midfield
+band with 56px+ gaps between every pair, so every gap fits a robot and no
+pocket ever seals; sudden death still breaks any stall. Matches run
+2.5 minutes, then sudden death:
 a safe circle centered on the arena shrinks from full cover to zero over
 30 seconds, pulsing 6 damage every 6 ticks to robots outside it (staggered
 per robot, so both sides never pulse together). Only simultaneous

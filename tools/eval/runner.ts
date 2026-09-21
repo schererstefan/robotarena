@@ -42,8 +42,13 @@ export function fingerprintMatch(match: Match): string {
         [s.code, s.maxHealth, s.alive ? 1 : 0, s.health, s.x, s.y, s.heading, s.tower, s.kills, s.damageDealt, s.shotsFired, s.cooldown, s.charge, s.dashCd, s.empCd, s.slowed ? 1 : 0].join(','),
     );
     const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team, b.hot ? 1 : 0].join(',')).join(';');
+    // Barrier segment: pins the seed-derived layout so a resimulated match
+    // must reproduce the same terrain (empty on `open`).
+    const barriers = match.obstacles.map((o) => [o.x, o.y, o.w, o.h].join(',')).join(';');
     const pads = match.pickupLog.join(';');
-    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${pads}`;
+    const turrets = match.turretSnapshots.map((t) => [t.owner, t.progress, t.cooldown, t.shotsFired].join(',')).join(';');
+    const turretLog = match.turretCaptureLog.join(';');
+    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${barriers}|${pads}|${turrets}|${turretLog}`;
 }
 
 export function runJob(job: MatchJob): EvalRow {
