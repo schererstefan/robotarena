@@ -90,6 +90,8 @@ export class TournamentScene extends Scene {
         this.input.keyboard?.on('keydown-W', this.onWatchKey);
         this.input.keyboard?.on('keydown-S', this.onSimKey);
         this.input.keyboard?.on('keydown-L', this.onLineupKey);
+        this.input.keyboard?.on('keydown-LEFT', this.onSizeLeft);
+        this.input.keyboard?.on('keydown-RIGHT', this.onSizeRight);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown-ESC', this.onEscapeKey);
@@ -97,6 +99,8 @@ export class TournamentScene extends Scene {
             this.input.keyboard?.off('keydown-W', this.onWatchKey);
             this.input.keyboard?.off('keydown-S', this.onSimKey);
             this.input.keyboard?.off('keydown-L', this.onLineupKey);
+            this.input.keyboard?.off('keydown-LEFT', this.onSizeLeft);
+            this.input.keyboard?.off('keydown-RIGHT', this.onSizeRight);
         });
     }
 
@@ -134,6 +138,19 @@ export class TournamentScene extends Scene {
     /** W watches the next unsettled match; S sims the rest headless. */
     private onWatchKey = (): void => {
         if (this.mode === 'running') this.watchPending();
+    };
+
+    /** Left/Right picks the bracket size on the setup screen. */
+    private onSizeKey = (size: 4 | 8): void => {
+        if (this.mode === 'setup') this.setSize(size);
+    };
+
+    private onSizeLeft = (): void => {
+        this.onSizeKey(4);
+    };
+
+    private onSizeRight = (): void => {
+        this.onSizeKey(8);
     };
 
     private onSimKey = (): void => {

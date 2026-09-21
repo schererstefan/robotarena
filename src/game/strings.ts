@@ -602,7 +602,7 @@ export const TOURNAMENT = {
     lineup: 'LINEUP',
     watchNext: 'WATCH NEXT',
     simRest: 'SIM REST',
-    setupKeys: 'ENTER: RUN TOURNAMENT - ESC: MENU',
+    setupKeys: 'ENTER: RUN TOURNAMENT - LEFT/RIGHT: 4/8 BOTS - ESC: MENU',
     bracketKeys: 'ENTER/W: WATCH NEXT - S: SIM REST - ESC: MENU',
     doneKeys: 'ENTER: RUN AGAIN - L: LINEUP - ESC: MENU',
     bracket: 'BRACKET',
