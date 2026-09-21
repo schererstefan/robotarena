@@ -304,8 +304,8 @@ export interface SenseState {
     /** Match-level state. Optional, engine-provided. */
     match?: SenseMatch;
     /**
-     * All powerup pads in fixed pad order (public map knowledge, same for
-     * every robot). Optional, engine-provided.
+     * All powerup pads in canonical pad order (public map knowledge, same
+     * for every robot). Optional, engine-provided.
      */
     pickups?: SensePad[];
     /**
