@@ -1427,6 +1427,14 @@ export class BattleScene extends Scene {
      * release their decal. Pool-exhaustion steal keeps objects bounded.
      */
     private syncHazards(): void {
+        // Results clear the hazard record with the plates/bullets/dials:
+        // sim time freezes at match end, so a mid-fade scorch would stick
+        // behind the panel instead of draining away.
+        if (this.resultsShown) {
+            for (const [, decal] of this.hazSeen) decal.setVisible(false);
+            this.hazSeen.clear();
+            return;
+        }
         const live = this.match.scorchSnapshots;
         // Allocation-free liveness: both sides are tiny and bounded, so a
         // linear id scan beats a per-frame Set + map-array + spread.
