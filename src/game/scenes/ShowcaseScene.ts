@@ -58,6 +58,8 @@ export class ShowcaseScene extends Scene {
     private overlayObjects: Phaser.GameObjects.GameObject[] = [];
     private tabButtons: Button[] = [];
     private compareId: string | null = null;
+    /** Board list page: the "+N MORE" marker advances it, wrapping around. */
+    private boardPage = 0;
     private nav!: FocusNav;
     private navFrame: NavTarget[] = [];
     private navContent: NavTarget[] = [];
@@ -80,6 +82,7 @@ export class ShowcaseScene extends Scene {
         this.overlayObjects = [];
         this.tabButtons = [];
         this.compareId = null;
+        this.boardPage = 0;
         this.navFrame = [];
         this.navContent = [];
         this.nav = new FocusNav(this);
@@ -174,6 +177,7 @@ export class ShowcaseScene extends Scene {
     private setTab(tab: 'gallery' | 'board'): void {
         if (this.tab === tab) return;
         this.tab = tab;
+        this.boardPage = 0;
         this.closeCompare();
         this.refreshTabLabels();
         this.renderTab();
@@ -343,11 +347,13 @@ export class ShowcaseScene extends Scene {
             this.trackTab(this.add.text(CX, 400, ONLINE.empty, FONTS.body).setOrigin(0.5));
             return;
         }
-        const shown = rows.slice(0, BOARD_ROWS);
+        const pages = Math.max(1, Math.ceil(rows.length / BOARD_ROWS));
+        this.boardPage %= pages;
+        const shown = rows.slice(this.boardPage * BOARD_ROWS, this.boardPage * BOARD_ROWS + BOARD_ROWS);
         shown.forEach((row, i) => {
             const y = 216 + i * 26;
             const name = (getRobot(row.botId)?.meta.name ?? row.botId).toUpperCase();
-            const rank = `${i + 1}. ${name}`;
+            const rank = `${this.boardPage * BOARD_ROWS + i + 1}. ${name}`;
             const nameText = this.trackTab(this.add.text(CX - 330, y, rank, FONTS.buttonSmall).setOrigin(0, 0.5));
             nameText.setColor(COLORS.ink);
             this.trackTab(this.add.text(CX + 180, y, onlineRow(row.elo, row.wins, row.losses, row.draws), FONTS.mono).setOrigin(1, 0.5));
@@ -364,9 +370,26 @@ export class ShowcaseScene extends Scene {
                 this.navContentTarget(CX + 250, y, 110, 22, () => this.watchCode(row.showcaseCode, row.botId));
             }
         });
-        if (rows.length > shown.length) {
-            this.trackTab(this.add.text(CX, 216 + shown.length * 26, statsAndMore(rows.length - shown.length), FONTS.monoSmall).setOrigin(0.5));
+        const remainingBoard = rows.length - (this.boardPage * BOARD_ROWS + shown.length);
+        if (remainingBoard > 0) {
+            const moreY = 216 + shown.length * 26;
+            const more = this.trackTab(this.add.rectangle(CX, moreY, 200, 24, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge));
+            this.trackTab(this.add.text(CX, moreY, statsAndMore(remainingBoard), FONTS.monoSmall).setOrigin(0.5));
+            more.setInteractive({ useHandCursor: true });
+            more.on('pointerover', () => {
+                more.setStrokeStyle(1, COLORS.team[0]);
+                playHover();
+            });
+            more.on('pointerout', () => more.setStrokeStyle(1, COLORS.panelEdge));
+            more.on('pointerdown', () => this.nextBoardPage());
+            this.navContentTarget(CX, moreY, 200, 24, () => this.nextBoardPage());
         }
+    }
+
+    /** Board "+N MORE" pager: next page, wrapping to the first. */
+    private nextBoardPage(): void {
+        this.boardPage += 1;
+        this.renderTab();
     }
 
     // ---- Launchers --------------------------------------------------------

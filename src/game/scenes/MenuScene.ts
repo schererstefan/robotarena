@@ -168,6 +168,8 @@ export class MenuScene extends Scene {
     private onlineToken = 0;
     /** Two-step guard for the stats CLEAR button: first press arms, second wipes. */
     private statsClearArmed = false;
+    /** Stats list page: the "+N MORE" marker advances it, wrapping around. */
+    private statsPage = 0;
     private replayOverlay: HTMLDivElement | null = null;
     private importOverlay: HTMLDivElement | null = null;
     private tourRequested = false;
@@ -1368,6 +1370,7 @@ export class MenuScene extends Scene {
         this.closeStats();
         this.statsTab = 'local';
         this.statsClearArmed = false;
+        this.statsPage = 0;
         // Backdrop swallows clicks so menu controls beneath can't fire.
         this.trackStats(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(50).setInteractive());
         this.trackStats(this.add.rectangle(CX, 384, 560, 600, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(50));
@@ -1380,6 +1383,7 @@ export class MenuScene extends Scene {
         if (this.statsTab === tab) return;
         this.statsTab = tab;
         this.statsClearArmed = false;
+        this.statsPage = 0;
         this.refreshStatsRows();
     }
 
@@ -1421,6 +1425,12 @@ export class MenuScene extends Scene {
         this.refreshStatsRows();
     }
 
+    /** Stats "+N MORE" pager: next page, wrapping to the first. */
+    private nextStatsPage(): void {
+        this.statsPage += 1;
+        this.refreshStatsRows();
+    }
+
     private renderLocalStats(targets: NavTarget[]): void {
         const history = loadHistory();
         const draws = history.filter((r) => r.winner === -1).length;
@@ -1435,7 +1445,9 @@ export class MenuScene extends Scene {
                 this.add.text(CX, 220, STATS.empty, FONTS.small).setOrigin(0.5).setDepth(50),
             );
         } else {
-            const shown = rows.slice(0, STATS_ROWS);
+            const pages = Math.max(1, Math.ceil(rows.length / STATS_ROWS));
+            this.statsPage %= pages;
+            const shown = rows.slice(this.statsPage * STATS_ROWS, this.statsPage * STATS_ROWS + STATS_ROWS);
             shown.forEach((row, i) => {
                 const y = 206 + i * 26;
                 const entry = ROBOTS.find((r) => r.meta.id === row.id) ?? ROBOTS[0]!;
@@ -1447,14 +1459,27 @@ export class MenuScene extends Scene {
                     this.add.text(CX + 220, y, statsRow(row.games, row.wins, row.draws, statsPct(row.games, row.rate)), FONTS.mono).setOrigin(1, 0.5).setDepth(50),
                 );
             });
-            if (rows.length > shown.length) {
-                this.trackStats(
-                    this.add.text(CX, 206 + shown.length * 26, statsAndMore(rows.length - shown.length), FONTS.monoSmall).setOrigin(0.5).setDepth(50),
+            const remainingLocal = rows.length - (this.statsPage * STATS_ROWS + shown.length);
+            if (remainingLocal > 0) {
+                const moreY = 206 + shown.length * 26;
+                const more = this.trackStats(
+                    this.add.rectangle(CX, moreY, 200, 24, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(50),
                 );
+                this.trackStats(
+                    this.add.text(CX, moreY, statsAndMore(remainingLocal), FONTS.monoSmall).setOrigin(0.5).setDepth(50),
+                );
+                more.setInteractive({ useHandCursor: true });
+                more.on('pointerover', () => {
+                    more.setStrokeStyle(1, COLORS.team[0]);
+                    playHover();
+                });
+                more.on('pointerout', () => more.setStrokeStyle(1, COLORS.panelEdge));
+                more.on('pointerdown', () => this.nextStatsPage());
+                targets.push({ x: CX, y: moreY, w: 200, h: 24, activate: () => this.nextStatsPage() });
             }
         }
 
-        const rowCount = history.length === 0 ? 1 : Math.min(rows.length, STATS_ROWS) + (rows.length > STATS_ROWS ? 1 : 0);
+        const rowCount = history.length === 0 ? 1 : Math.min(rows.length, STATS_ROWS) + (rows.length - Math.min(rows.length, (this.statsPage + 1) * STATS_ROWS) > 0 ? 1 : 0);
         const dailyY = 206 + rowCount * 26 + 22;
         this.trackStats(
             this.add.text(CX, dailyY, STATS.dailyTitle, FONTS.buttonSmall).setOrigin(0.5).setDepth(50),
@@ -1533,7 +1558,9 @@ export class MenuScene extends Scene {
             if (rows.length === 0) {
                 this.trackStats(this.add.text(CX, y0 + 14, ONLINE.empty, FONTS.small).setOrigin(0.5).setDepth(50));
             } else {
-                const shown = rows.slice(0, STATS_ROWS);
+                const pages = Math.max(1, Math.ceil(rows.length / STATS_ROWS));
+                this.statsPage %= pages;
+                const shown = rows.slice(this.statsPage * STATS_ROWS, this.statsPage * STATS_ROWS + STATS_ROWS);
                 shown.forEach((row, i) => {
                     const y = y0 + i * 26;
                     const name = (ROBOTS.find((r) => r.meta.id === row.botId)?.meta.name ?? row.botId).toUpperCase();
@@ -1554,10 +1581,23 @@ export class MenuScene extends Scene {
                         targets.push({ x: CX + 185, y, w: 100, h: 22, activate: () => this.watchOnlineCode(row.showcaseCode) });
                     }
                 });
-                if (rows.length > shown.length) {
-                    this.trackStats(
-                        this.add.text(CX, y0 + shown.length * 26, statsAndMore(rows.length - shown.length), FONTS.monoSmall).setOrigin(0.5).setDepth(50),
+                const remainingOnline = rows.length - (this.statsPage * STATS_ROWS + shown.length);
+            if (remainingOnline > 0) {
+                    const moreY = y0 + shown.length * 26;
+                    const more = this.trackStats(
+                        this.add.rectangle(CX, moreY, 200, 24, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(50),
                     );
+                    this.trackStats(
+                        this.add.text(CX, moreY, statsAndMore(remainingOnline), FONTS.monoSmall).setOrigin(0.5).setDepth(50),
+                    );
+                    more.setInteractive({ useHandCursor: true });
+                    more.on('pointerover', () => {
+                        more.setStrokeStyle(1, COLORS.team[0]);
+                        playHover();
+                    });
+                    more.on('pointerout', () => more.setStrokeStyle(1, COLORS.panelEdge));
+                    more.on('pointerdown', () => this.nextStatsPage());
+                    targets.push({ x: CX, y: moreY, w: 200, h: 24, activate: () => this.nextStatsPage() });
                 }
             }
         }
