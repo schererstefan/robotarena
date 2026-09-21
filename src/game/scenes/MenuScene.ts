@@ -536,14 +536,8 @@ export class MenuScene extends Scene {
         L.add(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.18));
 
         // Animated banner: extruded gold title, light sweep, glow pulse,
-        // ember sparks — worthy of the night-arena vista. Tagline kept,
-        // restyled to match (letterspaced warm gold).
+        // ember sparks — worthy of the night-arena vista.
         this.banner = new MenuBanner(this, L, CX, 104, reduced);
-        const tagline = this.add
-            .text(CX, 158, APP.tagline, { ...FONTS.small, fontSize: '18px', letterSpacing: 3, color: '#d9b45c' })
-            .setOrigin(0.5);
-        tagline.setShadow(0, 2, '#000', 4, true, true);
-        L.add(tagline);
 
         // The few options, centered like the reference.
         const mx = CX - 150;
