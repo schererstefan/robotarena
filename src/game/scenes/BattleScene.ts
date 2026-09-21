@@ -95,7 +95,7 @@ const IND_TTL = 0.8;
 const MAP_W = 96;
 const MAP_H = 64;
 const MAP_CX = 440;
-const MAP_CY = 738;
+const MAP_CY = 724;
 const MAP_X0 = MAP_CX - MAP_W / 2;
 const MAP_Y0 = MAP_CY - MAP_H / 2;
 /** Scorch-decal pool: oldest recycled, never grown mid-fight. */
@@ -2392,13 +2392,13 @@ export class BattleScene extends Scene {
         this.plateG = this.add.graphics().setDepth(11);
         for (const team of [0, 1] as const) {
             const cxp = team === 0 ? 315 : 565;
-            this.add.rectangle(cxp, 738, 130, 60, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(10);
-            const head = this.add.text(cxp, 712, '', FONTS.monoSmall).setOrigin(0.5).setDepth(10);
+            this.add.rectangle(cxp, 724, 130, 60, COLORS.panel).setStrokeStyle(1, COLORS.panelEdge).setDepth(10);
+            const head = this.add.text(cxp, 698, '', FONTS.monoSmall).setOrigin(0.5).setDepth(10);
             head.setColor(teamCss(team));
             this.plateHead.push(head);
             const rows: Phaser.GameObjects.Text[] = [];
             for (let r = 0; r < 3; r += 1) {
-                rows.push(this.add.text(cxp - 61, 726 + r * 14, '', FONTS.plate).setOrigin(0, 0.5).setDepth(10));
+                rows.push(this.add.text(cxp - 61, 712 + r * 14, '', FONTS.plate).setOrigin(0, 0.5).setDepth(10));
             }
             this.plateRows.push(rows);
         }
@@ -2434,7 +2434,7 @@ export class BattleScene extends Scene {
                     row.setText(plateDeadRow(skin.callsign));
                     row.setColor(COLORS.faint);
                     // Struck-through dead: a drawn line (Text has no strike).
-                    const y = 726 + r * 14;
+                    const y = 712 + r * 14;
                     this.plateG.lineStyle(1, COLORS.faintNum, 0.9);
                     this.plateG.lineBetween(cxp - 61, y, cxp + 61, y);
                 }
