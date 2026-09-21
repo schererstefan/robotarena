@@ -2878,6 +2878,8 @@ export class BattleScene extends Scene {
             }
             const hit = this.add.rectangle(512, y, 560, step - 4).setDepth(20);
             hit.setInteractive({ useHandCursor: true });
+            hit.on('pointerover', () => text.setColor(COLORS.whiteCss));
+            hit.on('pointerout', () => text.setColor(s.alive ? teamCss(s.team) : COLORS.faint));
             hit.on('pointerdown', () => this.exportRobot(s.id));
         });
         const hintY = 274 + snaps.length * step;
@@ -3098,6 +3100,8 @@ export class BattleScene extends Scene {
             .setDepth(20);
         codeText.setWordWrapWidth(560);
         codeText.setInteractive({ useHandCursor: true });
+        codeText.on('pointerover', () => codeText.setColor(COLORS.whiteCss));
+        codeText.on('pointerout', () => codeText.setColor(COLORS.goldCss));
         codeText.on('pointerdown', () => {
             void copyText(code).then((ok) => {
                 copyLabel.setText(ok ? BATTLE.replayCopied : BATTLE.replayCopyFailed);
