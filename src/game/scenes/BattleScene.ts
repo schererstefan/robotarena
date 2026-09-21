@@ -613,10 +613,12 @@ export class BattleScene extends Scene {
             this.introDur = Math.min(1.2, 0.55 + n * 0.12);
             this.introElapsed = 0;
             this.introActive = true;
-            // Depth 12: above the bottom-strip panels/plate art (10/11)
-            // drawn later at the same y, so the hint stays visible.
+            // Depth 12 keeps the hint above arena art; y=638 clears the
+            // bottom strip (minimap top 687, plate tops 694, rows at
+            // 712/726/740) in every team size, plus the tutorial
+            // coach box (654-710) when it is showing.
             this.introSkipHint = this.add
-                .text(AX + ARENA_WIDTH / 2, 712, BATTLE.introSkip, FONTS.monoSmall)
+                .text(AX + ARENA_WIDTH / 2, 638, BATTLE.introSkip, FONTS.monoSmall)
                 .setOrigin(0.5)
                 .setDepth(12)
                 .setAlpha(0.8);
