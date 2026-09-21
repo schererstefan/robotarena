@@ -139,8 +139,9 @@ export const CHASSIS_V2: Record<string, string[]> = {
         '................',
     ],
     // Scope predator: angular hunter with team 2x2 scope sight amid dark panels.
+    // Dorsal scope mast (row 0) keeps its silhouette distinct from sniper.
     hunter: [
-        '................',
+        '......kkk.......',
         '...kkkkkkkk.....',
         '.kkwwwwwwwkk....',
         '.kclllllwwddk...',
