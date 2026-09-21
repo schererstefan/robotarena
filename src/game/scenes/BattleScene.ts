@@ -3,7 +3,7 @@
 // is sprite transforms plus one small dynamic Graphics (cones + trails).
 
 import { BlendModes, Scene } from 'phaser';
-import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DASH_COOLDOWN_TICKS, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, MAX_TICKS, PAD_RADIUS, ROBOT_RADIUS, TURRET_CAPTURE_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DASH_COOLDOWN_TICKS, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, HAZ_SCORCH_TICKS, HAZ_TELEGRAPH_TICKS, MAX_TICKS, PAD_RADIUS, ROBOT_RADIUS, TURRET_CAPTURE_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import type { SensePadKind } from '../../sim/types';
 import { angleDiff, clamp, wrapAngle } from '../../sim/math';
@@ -100,6 +100,8 @@ const MAP_X0 = MAP_CX - MAP_W / 2;
 const MAP_Y0 = MAP_CY - MAP_H / 2;
 /** Scorch-decal pool: oldest recycled, never grown mid-fight. */
 const SCORCH_POOL = 24;
+/** Strike-scorch pool (W1): one decal per live impact mark, oldest recycled. */
+const HAZ_POOL = 8;
 const SKULL_POOL = 6;
 /** SD pre-warning fires 10 s before the collapse starts. */
 const SD_WARN_TICK = MAX_TICKS - 600;
@@ -190,6 +192,9 @@ export class BattleScene extends Scene {
     /** Impact scorch decals (pool) + death skull markers (pool). */
     private scorches: Phaser.GameObjects.Image[] = [];
     private scorchCursor = 0;
+    /** Strike scorch decals (pool) keyed by engine scorch id. */
+    private hazPool: Phaser.GameObjects.Image[] = [];
+    private hazSeen = new Map<number, Phaser.GameObjects.Image>();
     private skulls: Array<{ text: Phaser.GameObjects.Text; ttl: number }> = [];
     /** Flicker variants: gate A/B swap + lamp B overlay on 1 s timers. */
     private gateImgs: Phaser.GameObjects.Image[] = [];
@@ -370,6 +375,8 @@ export class BattleScene extends Scene {
         this.sdWarned = false;
         this.scorches = [];
         this.scorchCursor = 0;
+        this.hazPool = [];
+        this.hazSeen = new Map<number, Phaser.GameObjects.Image>();
         this.skulls = [];
         this.gateImgs = [];
         this.lampB = null;
@@ -620,6 +627,11 @@ export class BattleScene extends Scene {
         for (let i = 0; i < SCORCH_POOL; i += 1) {
             this.scorches.push(this.add.image(-50, -50, 'scorch').setDepth(1).setVisible(false).setAlpha(0.75));
         }
+        // Strike scorch decals (W1): same texture, dedicated pool so strike
+        // fades never fight bullet-impact stamps for slots.
+        for (let i = 0; i < HAZ_POOL; i += 1) {
+            this.hazPool.push(this.add.image(-50, -50, 'scorch').setDepth(1).setVisible(false).setAlpha(0.75));
+        }
         for (let i = 0; i < SKULL_POOL; i += 1) {
             const text = this.add.text(-50, -50, BATTLE.markSkull, FONTS.mono).setOrigin(0.5).setDepth(9).setVisible(false);
             text.setColor(COLORS.ink);
@@ -867,6 +879,7 @@ export class BattleScene extends Scene {
         this.tickFlicker(dt);
         this.tickSkulls(dt);
         this.syncSdRing();
+        this.syncHazards();
         this.syncDangerVignette(snaps, dt);
         if (this.dmgAcc > 0) this.dmgAcc *= Math.exp(-dt * 0.8);
         this.syncSprites(snaps, bullets, dt);
@@ -1214,6 +1227,58 @@ export class BattleScene extends Scene {
         if (bucket !== this.lastGradeFrac) {
             this.lastGradeFrac = bucket;
             this.applyGrade(frac);
+        }
+    }
+
+    /**
+     * Asteroid strike sync (W1): per-frame state sync from the engine, the
+     * same pattern as syncSdRing. New scorch ids take a recycled pool decal
+     * plus impact FX; live decals fade by tick age; pruned engine marks
+     * release their decal. Pool-exhaustion steal keeps objects bounded.
+     */
+    private syncHazards(): void {
+        const live = this.match.scorchSnapshots;
+        const liveIds = new Set(live.map((s) => s.id));
+        for (const [id, decal] of [...this.hazSeen]) {
+            if (!liveIds.has(id)) {
+                decal.setVisible(false);
+                this.hazSeen.delete(id);
+            }
+        }
+        for (const sc of live) {
+            let decal = this.hazSeen.get(sc.id);
+            if (!decal) {
+                const free = this.hazPool.find((img) => !img.visible);
+                if (free) {
+                    decal = free;
+                } else {
+                    let oldest = -1;
+                    let oldestImg: Phaser.GameObjects.Image | null = null;
+                    for (const [id, img] of this.hazSeen) {
+                        if (oldest < 0 || id < oldest) {
+                            oldest = id;
+                            oldestImg = img;
+                        }
+                    }
+                    if (!oldestImg) continue;
+                    this.hazSeen.delete(oldest);
+                    decal = oldestImg;
+                }
+                this.hazSeen.set(sc.id, decal);
+                decal
+                    .setPosition(AX + sc.x, AY + sc.y)
+                    .setRotation((sc.id * 2.39996) % (Math.PI * 2))
+                    .setScale(3.5)
+                    .setVisible(true);
+                if (!this.reducedMotion) {
+                    this.burst(AX + sc.x, AY + sc.y, COLORS.danger, 10, 220, 300);
+                    this.burst(AX + sc.x, AY + sc.y, COLORS.gold, 6, 150, 200);
+                    this.fireRing(AX + sc.x, AY + sc.y, false);
+                    this.addTrauma(0.3);
+                }
+                playExplosion(sc.x);
+            }
+            decal.setAlpha(0.75 * Math.max(0, 1 - sc.age / HAZ_SCORCH_TICKS));
         }
     }
 
@@ -2159,6 +2224,17 @@ export class BattleScene extends Scene {
                 g.arc(tx, ty, 19, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
                 g.strokePath();
             }
+        }
+        // Asteroid telegraphs (W1): danger ring at the blast radius plus a
+        // shrinking gold countdown ring, drawn in dyn (zero new objects).
+        // Always drawn, even under reduced motion: the telegraph is dodge
+        // information, not flair.
+        for (const h of this.match.hazardSnapshots) {
+            const frac = Math.max(h.ticksToImpact, 0) / HAZ_TELEGRAPH_TICKS;
+            g.lineStyle(2, COLORS.danger, 0.9 - frac * 0.55);
+            g.strokeCircle(AX + h.x, AY + h.y, h.radius);
+            g.lineStyle(2, COLORS.gold, 0.8);
+            g.strokeCircle(AX + h.x, AY + h.y, Math.max(h.radius * frac, 2));
         }
         for (const s of snaps) {
             if (!s.alive) continue;

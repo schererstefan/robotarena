@@ -61,18 +61,19 @@ function loadoutFromCompact(text: unknown): SkillLoadout {
     return sanitizeLoadout(raw);
 }
 
-/** Modifiers compress to flag letters: d = double damage, f = fog, m = mirror. */
+/** Modifiers compress to flag letters: d = double damage, f = fog, m = mirror, n = no asteroid strikes. */
 function modifiersToCompact(modifiers: MatchModifiers): string {
     const clean = sanitizeModifiers(modifiers);
-    return `${clean.doubleDamage === true ? 'd' : ''}${clean.hardcoreFog === true ? 'f' : ''}${clean.mirror === true ? 'm' : ''}`;
+    return `${clean.doubleDamage === true ? 'd' : ''}${clean.hardcoreFog === true ? 'f' : ''}${clean.mirror === true ? 'm' : ''}${clean.noHazards === true ? 'n' : ''}`;
 }
 
 function modifiersFromCompact(text: unknown): MatchModifiers {
-    if (typeof text !== 'string' || !/^[dfm]*$/.test(text)) throw new Error('bad modifiers');
+    if (typeof text !== 'string' || !/^[dfmn]*$/.test(text)) throw new Error('bad modifiers');
     return sanitizeModifiers({
         doubleDamage: text.includes('d'),
         hardcoreFog: text.includes('f'),
         mirror: text.includes('m'),
+        noHazards: text.includes('n'),
     });
 }
 
@@ -144,7 +145,7 @@ function decodeLegacy(trimmed: string): ReplayData | null {
         if (!Array.isArray(lineupIds) || lineupIds.length !== teamSize * 2) return null;
         if (!Array.isArray(loadouts) || loadouts.length !== teamSize * 2) return null;
         if (arena !== undefined && arena !== 'open' && arena !== 'blocks') return null;
-        if (modifiers !== undefined && (typeof modifiers !== 'string' || !/^[dfm]*$/.test(modifiers))) return null;
+        if (modifiers !== undefined && (typeof modifiers !== 'string' || !/^[dfmn]*$/.test(modifiers))) return null;
         for (const id of lineupIds) {
             if (typeof id !== 'string' || id.length === 0 || id.length > 64) return null;
         }
@@ -222,6 +223,10 @@ export function encodeReplayCompact(spec: ReplaySpec): string | null {
         indices.push(index);
     }
     const mods = sanitizeModifiers(spec.modifiers ?? {});
+    // Zero-layout-change rule (complexity/OQ3): the RA2 modifiers field is a
+    // full 3-bit (dfm) field, so a hazards-off spec falls back to legacy RA1
+    // (which carries the `n` letter) instead of growing a bit here.
+    if (mods.noHazards === true) return null;
     const bits: number[] = [];
     writeBits(bits, REPLAY_FORMAT_COMPACT, 4);
     writeBits(bits, spec.seed >>> 0, 32);

@@ -1550,7 +1550,7 @@ export class MenuScene extends Scene {
         this.modsObjects = frame;
 
         const targets: NavTarget[] = [];
-        const toggle = (key: 'doubleDamage' | 'hardcoreFog' | 'mirror', on: boolean): void => {
+        const toggle = (key: keyof MatchModifiers, on: boolean): void => {
             const next = { ...this.mods };
             if (on) delete next[key];
             else next[key] = true;
