@@ -69,9 +69,11 @@ to seek pads is follow-up work, not this unit.
 turret stays owned until recaptured.
 
 - **Capture:** single progress value p in [-1, +1] (+ = team 0, - = team 1).
-  A robot within capture radius R=70 pushes p toward its team at 1/240 per tick
-  (4s of uncontested presence). Both teams present = contested = frozen.
-  No robot in radius for 300 ticks = p decays toward 0.
+  A robot within capture radius R=80 pushes p toward its team at 1/180 per tick
+  (3s of uncontested presence; tuned from 70/240 in T1 pass 2 — spec
+  defaults left the feature near-inert at ~0.6% contest rate). Both teams
+  present = contested = frozen. No robot in radius for 300 ticks = p
+  decays toward 0.
   |p| >= 1 -> ACTIVE, owner = sign(p). From ACTIVE, enemy presence pushes p
   back; reaching the opposite pole flips ownership (recapture).
 - This implements the approved mechanic: **disabled to start; a robot that

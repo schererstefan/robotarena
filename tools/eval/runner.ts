@@ -43,7 +43,9 @@ export function fingerprintMatch(match: Match): string {
     );
     const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team, b.hot ? 1 : 0].join(',')).join(';');
     const pads = match.pickupLog.join(';');
-    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${pads}`;
+    const turrets = match.turretSnapshots.map((t) => [t.owner, t.progress, t.cooldown, t.shotsFired].join(',')).join(';');
+    const turretLog = match.turretCaptureLog.join(';');
+    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${pads}|${turrets}|${turretLog}`;
 }
 
 export function runJob(job: MatchJob): EvalRow {

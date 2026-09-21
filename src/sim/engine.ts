@@ -1,11 +1,11 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { AMP_MULT, AMP_TICKS, ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_MULT, OVERDRIVE_TICKS, PAD_RADIUS, PAD_RESPAWN_TICKS, REPAIR_HP, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SPAWN_HEADING_JITTER, SPAWN_SALT, SPAWN_X, SPAWN_X_JITTER, SPAWN_Y_JITTER, SPAWN_Y_SHIFT, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
+import { AMP_MULT, AMP_TICKS, ARENA_HEIGHT, ARENA_OBSTACLES, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_MULT, OVERDRIVE_TICKS, PAD_RADIUS, PAD_RESPAWN_TICKS, REPAIR_HP, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SPAWN_HEADING_JITTER, SPAWN_SALT, SPAWN_X, SPAWN_X_JITTER, SPAWN_Y_JITTER, SPAWN_Y_SHIFT, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
 import { angleDiff, assistSteer, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
-import { COMMS_KINDS, IDLE_INTENT, type CommsKind, type DamageSite, type InboxMessage, type Intent, type OutboxMessage, type RobotController, type SensedAlly, type SensedBullet, type SensedRobot, type SenseEvent, type SensePad, type SensePadKind, type SenseState, type TrackedFoe } from './types';
+import { COMMS_KINDS, IDLE_INTENT, type CommsKind, type DamageSite, type InboxMessage, type Intent, type OutboxMessage, type RobotController, type SensedAlly, type SensedBullet, type SensedRobot, type SenseEvent, type SensePad, type SensePadKind, type SenseState, type SenseTurret, type TrackedFoe } from './types';
 
 export interface RobotSnapshot {
     id: number;
@@ -38,6 +38,18 @@ export interface BulletSnapshot {
     y: number;
     team: 0 | 1;
     hot: boolean;
+}
+
+/** Public per-turret state (renderer + tests + fingerprint). */
+export interface TurretSnapshot {
+    x: number;
+    y: number;
+    owner: -1 | 0 | 1;
+    /** Capture progress in [-1, +1] (+ = team 0, - = team 1). */
+    progress: number;
+    /** Ticks until the turret can fire again. 0 means ready. */
+    cooldown: number;
+    shotsFired: number;
 }
 
 export interface MatchResult {
@@ -105,10 +117,29 @@ interface Bullet {
     vy: number;
     team: 0 | 1;
     owner: number;
+    /** Map-turret index that fired this round, or -1 for robot-owned rounds. */
+    turret: number;
     travelled: number;
     range: number;
     damage: number;
     speed: number;
+}
+
+/** One static map turret (T1). Integer `edge` keeps capture exact: progress
+ * is edge / TURRET_CAPTURE_TICKS, so uncontested capture lands on exactly
+ * TURRET_CAPTURE_TICKS ticks and recapture from the opposite pole is exact
+ * too. No Math.random, no wall-clock: all transitions derive from sim state.
+ */
+interface MapTurret {
+    x: number;
+    y: number;
+    /** Net presence ticks in [-CAPTURE_TICKS, +CAPTURE_TICKS] (+ = team 0). */
+    edge: number;
+    owner: -1 | 0 | 1;
+    cooldown: number;
+    shotsFired: number;
+    /** Consecutive ticks with no robot inside the capture radius. */
+    absentTicks: number;
 }
 
 /** One radio message in flight: delivered to living teammates COMMS_DELAY ticks later. */
@@ -213,6 +244,12 @@ export class Match {
     private pads: SensePad[] = [];
     /** Pad pickup records in `tick:padIdx:robotId` order (fingerprint segment). */
     private padLog: string[] = [];
+    /** Static map turrets (fixed layout, per-tick capture/combat state here). */
+    private turrets: MapTurret[] = [];
+    /** Turret ownership transitions in `tick:turretIdx:team` order (fingerprint segment). */
+    private turretLog: string[] = [];
+    /** Total damage dealt by map-turret rounds this match. */
+    private turretDamage = 0;
 
     constructor(lineups: LineupEntry[], seed: number, options: MatchOptions = {}) {
         this.seed = seed;
@@ -269,6 +306,8 @@ export class Match {
         // Seed-derived pad layout (symmetric, public): ready before onSpawn
         // so the first sense already carries the pads.
         this.pads = Match.padLayout(seed);
+        // Fixed turret layout (public map knowledge): disabled until captured.
+        this.turrets = Match.turretLayout();
         // Aim towers at the nearest foe and fire spawn hooks in fixed order.
         for (const robot of this.robots) {
             const foe = this.nearestFoe(robot);
@@ -340,6 +379,48 @@ export class Match {
     /** Pad pickup records (`tick:padIdx:robotId`), in pickup order. */
     get pickupLog(): string[] {
         return [...this.padLog];
+    }
+
+    /**
+     * Fixed map-turret layout: 2 turrets mirrored on the arena center
+     * column (0.50w x 0.30/0.70h), hotly contested by design. Positions are
+     * constant (not seed-derived), so replays rebuild them with no codec
+     * change; capture/combat state still enters the fingerprint.
+     */
+    static turretLayout(): MapTurret[] {
+        const fx = [0.5, 0.5];
+        const fy = [0.3, 0.7];
+        return fx.map((x, i) => ({
+            x: (x as number) * ARENA_WIDTH,
+            y: (fy[i] as number) * ARENA_HEIGHT,
+            edge: 0,
+            owner: -1 as -1 | 0 | 1,
+            cooldown: 0,
+            shotsFired: 0,
+            absentTicks: 0,
+        }));
+    }
+
+    /** Map turrets in fixed turret order (fresh copies each read). */
+    get turretSnapshots(): TurretSnapshot[] {
+        return this.turrets.map((t) => ({
+            x: t.x,
+            y: t.y,
+            owner: t.owner,
+            progress: t.edge / TURRET_CAPTURE_TICKS,
+            cooldown: t.cooldown,
+            shotsFired: t.shotsFired,
+        }));
+    }
+
+    /** Turret ownership transitions (`tick:turretIdx:team`), in order. */
+    get turretCaptureLog(): string[] {
+        return [...this.turretLog];
+    }
+
+    /** Total damage dealt by map-turret rounds this match. */
+    get turretDamageDealt(): number {
+        return this.turretDamage;
     }
 
     /** Remaining pad-effect ticks for one robot (AMP, OVERDRIVE), clamped at 0. */
@@ -522,6 +603,7 @@ export class Match {
                     vy: Math.sin(robot.tower) * robot.stats.bulletSpeed,
                     team: robot.team,
                     owner: robot.id,
+                    turret: -1,
                     travelled: ROBOT_RADIUS + 4, // muzzle starts ahead of center
                     range: robot.stats.gunRange,
                     damage,
@@ -533,6 +615,8 @@ export class Match {
         this.stepBullets();
         // 5b. Powerup pads (P1 slot: right after bullets, before hazards).
         this.stepPads();
+        // 5c. Map turrets (T1 hazards slot: capture, then fire).
+        this.stepTurrets();
         // 6. Sudden death: past the cap, robots outside the circle pulse damage.
         if (this.tick >= MAX_TICKS) this.suddenDeath();
         // 7. Sense channels: freeze this step's events for delivery and roll
@@ -941,6 +1025,16 @@ export class Match {
             },
             // All pads, fixed order: public map knowledge. Fresh copies.
             pickups: this.pads.map((p) => ({ ...p })),
+            // Both turrets, fixed order: public map knowledge. Fresh copies.
+            turrets: this.turrets.map(
+                (t): SenseTurret => ({
+                    x: t.x,
+                    y: t.y,
+                    state: t.owner === -1 ? 'disabled' : 'active',
+                    owner: t.owner,
+                    progress: t.edge / TURRET_CAPTURE_TICKS,
+                }),
+            ),
             inbox: this.inboxFor(robot),
         };
     }
@@ -1091,13 +1185,23 @@ export class Match {
                 if (!robot.alive || robot.team === bullet.team) continue; // no friendly fire
                 if (dist(bullet.x, bullet.y, robot.x, robot.y) < ROBOT_RADIUS + BULLET_RADIUS) {
                     robot.health -= bullet.damage;
-                    const owner = this.robots[bullet.owner] as Robot;
-                    owner.damageDealt += bullet.damage;
-                    const bearing = Math.atan2(owner.y - robot.y, owner.x - robot.x);
-                    robot.lastDamage = { tick: this.tick, amount: bullet.damage, bearing, fromId: owner.id };
-                    this.emit(robot.id, { kind: 'hit-by', amount: bullet.damage, bearing, fromId: owner.id });
+                    if (bullet.turret >= 0) {
+                        // Map-turret round: structure damage, credited to the
+                        // turret tally (never to a robot); kills credit nobody.
+                        this.turretDamage += bullet.damage;
+                        const turret = this.turrets[bullet.turret] as MapTurret;
+                        const bearing = Math.atan2(turret.y - robot.y, turret.x - robot.x);
+                        robot.lastDamage = { tick: this.tick, amount: bullet.damage, bearing, fromId: -1 };
+                        this.emit(robot.id, { kind: 'hit-by', amount: bullet.damage, bearing, fromId: -1 });
+                    } else {
+                        const owner = this.robots[bullet.owner] as Robot;
+                        owner.damageDealt += bullet.damage;
+                        const bearing = Math.atan2(owner.y - robot.y, owner.x - robot.x);
+                        robot.lastDamage = { tick: this.tick, amount: bullet.damage, bearing, fromId: owner.id };
+                        this.emit(robot.id, { kind: 'hit-by', amount: bullet.damage, bearing, fromId: owner.id });
+                    }
                     this.stampDanger(robot, bullet.damage);
-                    if (robot.health <= 0) this.slay(robot, owner.id);
+                    if (robot.health <= 0) this.slay(robot, bullet.turret >= 0 ? null : bullet.owner);
                     hit = true;
                     break;
                 }
@@ -1140,6 +1244,83 @@ export class Match {
                 this.emit(robot.id, { kind: 'pickup', pad: pad.kind });
                 break;
             }
+        });
+    }
+
+    /**
+     * Map turrets: presence capture, then combat. Capture pushes the integer
+     * edge toward the sole present team (1 tick of presence = 1 edge step);
+     * both teams present freezes it; no presence runs the decay clock, which
+     * erodes only uncaptured progress (owned turrets persist until the enemy
+     * pushes the edge to the opposite pole). A captured turret fires a
+     * bullet-speed round at the nearest enemy in range every interval; the
+     * rounds travel through the shared stepBullets path next tick, so walls,
+     * blocks, range, and no-friendly-fire apply exactly like robot bullets.
+     */
+    private stepTurrets(): void {
+        this.turrets.forEach((turret, turretIdx) => {
+            let n0 = 0;
+            let n1 = 0;
+            for (const robot of this.robots) {
+                if (!robot.alive) continue;
+                if (dist(robot.x, robot.y, turret.x, turret.y) > TURRET_CAPTURE_RADIUS) continue;
+                if (robot.team === 0) n0 += 1;
+                else n1 += 1;
+            }
+            if (n0 > 0 && n1 > 0) {
+                // Contest: frozen (advances nothing, resets nothing).
+                turret.absentTicks = 0;
+            } else if (n0 === 0 && n1 === 0) {
+                turret.absentTicks += 1;
+                if (turret.owner === -1 && turret.absentTicks >= TURRET_DECAY_TICKS && turret.edge !== 0) {
+                    turret.edge += turret.edge > 0 ? -1 : 1;
+                }
+            } else {
+                turret.absentTicks = 0;
+                const team = (n0 > 0 ? 0 : 1) as 0 | 1;
+                const pole = n0 > 0 ? TURRET_CAPTURE_TICKS : -TURRET_CAPTURE_TICKS;
+                turret.edge = clamp(turret.edge + (n0 > 0 ? 1 : -1), -TURRET_CAPTURE_TICKS, TURRET_CAPTURE_TICKS);
+                if (turret.edge === pole && turret.owner !== team) {
+                    const first = turret.owner === -1;
+                    turret.owner = team;
+                    this.turretLog.push(`${this.tick}:${turretIdx}:${team}`);
+                    for (const other of this.robots) {
+                        if (!other.alive) continue;
+                        this.emit(other.id, { kind: first ? 'turret-captured' : 'turret-flipped', fromId: turretIdx });
+                    }
+                }
+            }
+            // Combat: nearest living enemy in range, fixed interval.
+            if (turret.cooldown > 0) turret.cooldown -= 1;
+            if (turret.owner === -1 || turret.cooldown > 0) return;
+            let target: Robot | null = null;
+            let bestDist = Infinity;
+            for (const robot of this.robots) {
+                if (!robot.alive || robot.team === turret.owner) continue;
+                const d = dist(turret.x, turret.y, robot.x, robot.y);
+                if (d > TURRET_RANGE) continue;
+                if (d < bestDist || (d === bestDist && target !== null && robot.id < target.id)) {
+                    bestDist = d;
+                    target = robot;
+                }
+            }
+            if (!target) return;
+            turret.cooldown = TURRET_FIRE_INTERVAL;
+            turret.shotsFired += 1;
+            const aim = Math.atan2(target.y - turret.y, target.x - turret.x);
+            this.bullets.push({
+                x: turret.x,
+                y: turret.y,
+                vx: Math.cos(aim) * BULLET_SPEED,
+                vy: Math.sin(aim) * BULLET_SPEED,
+                team: turret.owner,
+                owner: -1,
+                turret: turretIdx,
+                travelled: 0,
+                range: TURRET_RANGE,
+                damage: TURRET_DAMAGE,
+                speed: BULLET_SPEED,
+            });
         });
     }
 

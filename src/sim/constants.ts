@@ -154,3 +154,18 @@ export const OVERDRIVE_TICKS = 360; // 6 s of boosted move speed
 export const REPAIR_HP = 60;
 export const AMP_MULT = 2;
 export const OVERDRIVE_MULT = 1.35;
+
+// Map turrets (T1): static structures on the arena center column, always on.
+// Two turrets at fixed arena fractions (0.50 x by 0.30/0.70 y), starting
+// DISABLED (neutral). Presence captures: a robot inside TURRET_CAPTURE_RADIUS
+// pushes progress toward its team at 1/TURRET_CAPTURE_TICKS per tick; both
+// teams present freezes progress; TURRET_DECAY_TICKS with no robot in radius
+// starts decay of uncaptured progress back toward neutral. Owned turrets
+// never decay: recapture is the counterplay. Captured turrets fire at the
+// nearest enemy in TURRET_RANGE every TURRET_FIRE_INTERVAL ticks.
+export const TURRET_CAPTURE_RADIUS = 80;
+export const TURRET_CAPTURE_TICKS = 180;
+export const TURRET_DECAY_TICKS = 300;
+export const TURRET_RANGE = 260;
+export const TURRET_FIRE_INTERVAL = 45;
+export const TURRET_DAMAGE = 6;
