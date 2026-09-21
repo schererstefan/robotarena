@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BARRIER_COUNT, BARRIER_MIN_GAP, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_RADIUS, HAZ_SALT, HAZ_SCORCH_TICKS, HAZ_TELEGRAPH_TICKS, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, barriersForSeed, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BARRIER_COUNT, BARRIER_MIN_GAP, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_RADIUS, HAZ_SALT, HAZ_SCORCH_TICKS, HAZ_TELEGRAPH_TICKS, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_BAND, PAD_COUNT, PAD_MIN_GAP, PAD_MIN_SPAWN_DIST, PAD_MIN_TURRET_DIST, PAD_OBSTACLE_CLEAR, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, barriersForSeed, isExhibition, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, sanitizeIntent, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
@@ -1716,8 +1716,19 @@ console.log('modifiers');
         meta: { id: 'target', name: 'Target', author: 'test', version: '0', description: '' },
         update: (): Intent => ({ throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false }),
     };
-    const duel = (modifiers: MatchModifiers): Match =>
-        new Match(
+    // Close-range duel inside the spawn column: randomized pads sit in the
+    // midfield drive lane, but spawn columns (x 90..170) are pad-free by the
+    // PAD_MIN_SPAWN_DIST guarantee, so this geometry measures the modifier —
+    // never a pad pickup.
+    const placeDuel = (match: Match, id: number, x: number, y: number): void => {
+        const r = match.robots[id] as unknown as { x: number; y: number } | undefined;
+        if (r) {
+            r.x = x;
+            r.y = y;
+        }
+    };
+    const duel = (modifiers: MatchModifiers): Match => {
+        const match = new Match(
             [
                 { team: 0, controller: shooter },
                 { team: 1, controller: target },
@@ -1725,6 +1736,10 @@ console.log('modifiers');
             3,
             { modifiers },
         );
+        placeDuel(match, 0, 130, 250);
+        placeDuel(match, 1, 130, 450);
+        return match;
+    };
     const firstHit = (): number => {
         const match = duel({});
         for (let i = 0; i < 2000; i += 1) {
@@ -1823,51 +1838,183 @@ console.log('powerups');
         }
     };
 
-    // Layout: fixed fractions, center-mirrored positions and kinds, seed offset.
-    const atFrac = (pads: SensePad[], i: number, fx: number, fy: number): boolean =>
-        Math.abs((pads[i] as SensePad).x - fx * ARENA_WIDTH) < 1e-9 &&
-        Math.abs((pads[i] as SensePad).y - fy * ARENA_HEIGHT) < 1e-9;
-    const mirrored = (pads: SensePad[], a: number, b: number): boolean =>
-        Math.abs((pads[a] as SensePad).x + (pads[b] as SensePad).x - ARENA_WIDTH) < 1e-9 &&
-        Math.abs((pads[a] as SensePad).y + (pads[b] as SensePad).y - ARENA_HEIGHT) < 1e-9 &&
-        (pads[a] as SensePad).kind === (pads[b] as SensePad).kind;
+    // Layout: seeded random spots, point-mirrored positions and kinds.
+    // Order-independent mirror check: every pad needs a center partner
+    // (x + x' = 960, y + y' = 640) sharing its kind.
+    const hasMirror = (pads: SensePad[], i: number): boolean => {
+        const p = pads[i] as SensePad;
+        return pads.some(
+            (q, j) =>
+                j !== i &&
+                Math.abs(q.x + p.x - ARENA_WIDTH) < 1e-9 &&
+                Math.abs(q.y + p.y - ARENA_HEIGHT) < 1e-9 &&
+                q.kind === p.kind,
+        );
+    };
+    const kindCount = (pads: SensePad[], kind: string): number => pads.filter((p) => p.kind === kind).length;
+    const inBand = (pads: SensePad[]): boolean =>
+        pads.every((p) => p.x >= PAD_BAND.x0 && p.x <= PAD_BAND.x1 && p.y >= PAD_BAND.y0 && p.y <= PAD_BAND.y1);
+    const canonicalOrder = (pads: SensePad[]): boolean =>
+        pads.every((p, i) => {
+            if (i === 0) return true;
+            const prev = pads[i - 1] as SensePad;
+            return prev.x < p.x || (prev.x === p.x && prev.y <= p.y);
+        });
+    const spaced = (pads: SensePad[]): boolean => {
+        for (let i = 0; i < pads.length; i += 1) {
+            for (let j = i + 1; j < pads.length; j += 1) {
+                const a = pads[i] as SensePad;
+                const b = pads[j] as SensePad;
+                if (Math.hypot(a.x - b.x, a.y - b.y) < PAD_MIN_GAP - 1e-9) return false;
+            }
+        }
+        return true;
+    };
+    const turretClear = (pads: SensePad[]): boolean =>
+        pads.every(
+            (p) =>
+                Math.hypot(p.x - ARENA_WIDTH / 2, p.y - ARENA_HEIGHT * 0.3) >= PAD_MIN_TURRET_DIST &&
+                Math.hypot(p.x - ARENA_WIDTH / 2, p.y - ARENA_HEIGHT * 0.7) >= PAD_MIN_TURRET_DIST,
+        );
+    // Point-to-rect distance (same clamp rule as the engine).
+    const rectDist = (x: number, y: number, o: ArenaObstacle): number => {
+        const cx = Math.max(o.x, Math.min(x, o.x + o.w));
+        const cy = Math.max(o.y, Math.min(y, o.y + o.h));
+        return Math.hypot(x - cx, y - cy);
+    };
+    const obstacleClear = (pads: SensePad[], obstacles: ArenaObstacle[]): boolean =>
+        pads.every((p) => obstacles.every((o) => rectDist(p.x, p.y, o) >= PAD_OBSTACLE_CLEAR));
+    // Analytic spawn guarantee: spawn columns x 90..170 / 790..870 hold for
+    // every lineup size, so any pad with x in the contest band sits 134px+
+    // from every possible spawn point. Asserted on outputs (also catches a
+    // cold fallback path, whose legacy x = 211 would fail here).
+    const spawnClear = (pads: SensePad[]): boolean =>
+        pads.every((p) => Math.min(p.x - 170, 790 - p.x) >= PAD_MIN_SPAWN_DIST);
+    const padCycle = ['amp', 'repair', 'overdrive'];
     for (const seed of [0, 1, 2, 3, 7, 42, 12345]) {
         const pads = Match.padLayout(seed);
         check(
-            `seed ${seed} pads at fixed fractions`,
-            pads.length === 4 &&
-                atFrac(pads, 0, 0.22, 0.3) && atFrac(pads, 1, 0.78, 0.3) &&
-                atFrac(pads, 2, 0.22, 0.7) && atFrac(pads, 3, 0.78, 0.7),
+            `seed ${seed} has 4 active pads`,
+            pads.length === PAD_COUNT && pads.every((p) => p.active && p.respawnIn === 0),
         );
-        check(`seed ${seed} pads mirror-symmetric`, mirrored(pads, 0, 3) && mirrored(pads, 1, 2));
+        check(`seed ${seed} pads point-mirrored with shared kinds`, pads.every((_, i) => hasMirror(pads, i)));
+        const off = seed % padCycle.length;
         check(
-            `seed ${seed} pads start active`,
-            pads.every((p) => p.active && p.respawnIn === 0),
+            `seed ${seed} keeps the 2+2 kind split`,
+            kindCount(pads, padCycle[off] as string) === 2 &&
+                kindCount(pads, padCycle[(off + 1) % padCycle.length] as string) === 2,
         );
+        check(`seed ${seed} pads in canonical (x, y) order`, canonicalOrder(pads));
+        check(`seed ${seed} pads drawn from the contest band`, inBand(pads));
+        check(`seed ${seed} pads spaced ${PAD_MIN_GAP}px+`, spaced(pads));
+        check(`seed ${seed} pads clear of turret structures`, turretClear(pads));
+        check(`seed ${seed} pads clear of every spawn column`, spawnClear(pads));
     }
     check('pad layout is seed-derived (deterministic)', JSON.stringify(Match.padLayout(99)) === JSON.stringify(Match.padLayout(99)));
     check(
+        'pad layouts vary across seeds',
+        new Set([0, 1, 2, 3, 7, 42, 12345].map((s) => JSON.stringify(Match.padLayout(s)))).size > 1,
+    );
+    check(
         'pad kinds cycle with a seed offset',
-        Match.padLayout(0)[0]?.kind === 'amp' &&
-            Match.padLayout(1)[0]?.kind === 'repair' &&
-            Match.padLayout(2)[0]?.kind === 'overdrive',
+        kindCount(Match.padLayout(0), 'overdrive') === 0 &&
+            kindCount(Match.padLayout(1), 'amp') === 0 &&
+            kindCount(Match.padLayout(2), 'repair') === 0,
     );
 
-    // Seed 3 lays out [amp, repair, repair, amp]; seed 4 has overdrive pair.
-    const ampPad = Match.padLayout(3)[0] as SensePad;
-    const repairPad = Match.padLayout(3)[1] as SensePad;
-    const odPad = Match.padLayout(4)[1] as SensePad;
-    check('seed 3 pads are amp/repair', ampPad.kind === 'amp' && repairPad.kind === 'repair');
-    check('seed 4 pad 1 is overdrive', odPad.kind === 'overdrive');
+    // Seed 3 deals amp/repair pairs; seed 4 deals an overdrive pair.
+    const pads3 = Match.padLayout(3);
+    const ampIdx3 = pads3.findIndex((p) => p.kind === 'amp');
+    const ampPad = pads3[ampIdx3] as SensePad;
+    const repairPad = pads3.find((p) => p.kind === 'repair') as SensePad;
+    const pads4 = Match.padLayout(4);
+    const odIdx4 = pads4.findIndex((p) => p.kind === 'overdrive');
+    const odPad = pads4[odIdx4] as SensePad;
+    check(
+        'seed 3 pads are amp/repair pairs',
+        ampIdx3 >= 0 && kindCount(pads3, 'amp') === 2 && kindCount(pads3, 'repair') === 2,
+    );
+    check('seed 4 deals an overdrive pair', odIdx4 >= 0 && kindCount(pads4, 'overdrive') === 2);
+
+    // Blocks: pads respect the live barriers and match the engine wiring,
+    // with real spawn clearance on both lineup sizes.
+    for (const seed of [7, 11, 4242]) {
+        const m = new Match(
+            [
+                { team: 0, controller: recorder },
+                { team: 1, controller: idle },
+            ],
+            seed,
+            { arena: 'blocks' },
+        );
+        const obs = m.obstacles;
+        const snaps = m.padSnapshots;
+        const strip = (pads: SensePad[]): string =>
+            JSON.stringify(pads.map((p) => ({ x: p.x, y: p.y, kind: p.kind })));
+        check(
+            `seed ${seed} blocks pads match padLayout(seed, obstacles)`,
+            strip(snaps) === strip(Match.padLayout(seed, obs)),
+        );
+        check(`seed ${seed} blocks pads clear of barriers`, obstacleClear(snaps, obs));
+        check(
+            `seed ${seed} blocks pads clear of live spawns`,
+            snaps.every((p) =>
+                m.robotSnapshots.every((s) => Math.hypot(p.x - s.x, p.y - s.y) >= PAD_MIN_SPAWN_DIST),
+            ),
+        );
+    }
+    {
+        // 2v2 spawn clearance on blocks (4 live spawn points).
+        const squad = new Match(
+            [
+                { team: 0, controller: recorder },
+                { team: 0, controller: idle },
+                { team: 1, controller: idle },
+                { team: 1, controller: idle },
+            ],
+            7,
+            { arena: 'blocks' },
+        );
+        check(
+            'blocks pads clear of 2v2 spawns',
+            squad.padSnapshots.every((p) =>
+                squad.robotSnapshots.every((s) => Math.hypot(p.x - s.x, p.y - s.y) >= PAD_MIN_SPAWN_DIST),
+            ),
+        );
+    }
+    {
+        // Sweep: hundreds of seeds satisfy every hard constraint on both
+        // arenas (proves the legacy fallback path stays cold).
+        let bad = 0;
+        for (let seed = 0; seed < 200; seed += 1) {
+            for (const arena of ARENA_IDS) {
+                const obs = arena === 'blocks' ? barriersForSeed(seed) : [];
+                const pads = Match.padLayout(seed, obs);
+                if (
+                    pads.length !== PAD_COUNT ||
+                    !pads.every((_, i) => hasMirror(pads, i)) ||
+                    !inBand(pads) ||
+                    !canonicalOrder(pads) ||
+                    !spaced(pads) ||
+                    !turretClear(pads) ||
+                    !spawnClear(pads) ||
+                    !obstacleClear(pads, obs)
+                ) {
+                    bad += 1;
+                }
+            }
+        }
+        check('200-seed sweep: every layout legal on both arenas', bad === 0, `${bad} illegal`);
+    }
 
     // AMP pickup: timed damage boost, dark pad, pickup event, sense channel.
     {
         const m = idleMatch(3);
         place(m, 0, ampPad.x, ampPad.y);
         m.step();
-        check('amp pickup logged as tick:padIdx:robotId', m.pickupLog.join(';') === '0:0:0', m.pickupLog.join(';'));
+        check('amp pickup logged as tick:padIdx:robotId', m.pickupLog.join(';') === `0:${ampIdx3}:0`, m.pickupLog.join(';'));
         check('amp arms full effect ticks', m.effectTicks(0).amp === AMP_TICKS - 1, `${m.effectTicks(0).amp}`);
-        const pad = m.padSnapshots[0] as SensePad;
+        const pad = m.padSnapshots[ampIdx3] as SensePad;
         check('amp pad goes dark for respawn ticks', !pad.active && pad.respawnIn === PAD_RESPAWN_TICKS);
         m.step(); // robot still on the dark pad: no re-pickup, events deliver
         check('no re-pickup while dark', m.pickupLog.length === 1);
@@ -1877,10 +2024,11 @@ console.log('powerups');
             JSON.stringify(lastEvents),
         );
         check(
-            'sense reports all 4 pads in fixed order',
+            'sense reports all 4 pads in canonical order',
             (lastPickups?.length ?? 0) === 4 &&
                 lastPickups !== undefined &&
-                lastPickups[0]?.kind === 'amp' &&
+                lastPickups[ampIdx3]?.kind === 'amp' &&
+                canonicalOrder(lastPickups) &&
                 lastPickups.every((p) => typeof p.x === 'number' && typeof p.active === 'boolean'),
         );
     }
@@ -1891,7 +2039,7 @@ console.log('powerups');
         place(m, 0, ampPad.x, ampPad.y);
         place(m, 1, ampPad.x, ampPad.y);
         m.step();
-        check('contested pad goes to tick-order first', m.pickupLog.join(';') === '0:0:0', m.pickupLog.join(';'));
+        check('contested pad goes to tick-order first', m.pickupLog.join(';') === `0:${ampIdx3}:0`, m.pickupLog.join(';'));
         check('loser gets no effect', m.effectTicks(1).amp === 0);
     }
 
@@ -1917,7 +2065,7 @@ console.log('powerups');
         const m = idleMatch(4);
         place(m, 0, odPad.x, odPad.y);
         m.step();
-        check('overdrive pickup logged', m.pickupLog.join(';') === '0:1:0', m.pickupLog.join(';'));
+        check('overdrive pickup logged', m.pickupLog.join(';') === `0:${odIdx4}:0`, m.pickupLog.join(';'));
         check('overdrive arms full effect ticks', m.effectTicks(0).overdrive === OVERDRIVE_TICKS - 1);
     }
 
@@ -1927,13 +2075,13 @@ console.log('powerups');
         place(m, 0, ampPad.x, ampPad.y);
         m.step();
         for (let i = 0; i < PAD_RESPAWN_TICKS - 1; i += 1) m.step();
-        const dark = m.padSnapshots[0] as SensePad;
+        const dark = m.padSnapshots[ampIdx3] as SensePad;
         check('pad still dark one tick early', !dark.active && dark.respawnIn === 1 && m.pickupLog.length === 1);
         m.step();
-        const back = m.padSnapshots[0] as SensePad;
+        const back = m.padSnapshots[ampIdx3] as SensePad;
         check('pad reactivates after respawn ticks', back.active && back.respawnIn === 0 && m.pickupLog.length === 1);
         m.step();
-        check('reactivated pad collects again', m.pickupLog.length === 2 && !(m.padSnapshots[0] as SensePad).active);
+        check('reactivated pad collects again', m.pickupLog.length === 2 && !(m.padSnapshots[ampIdx3] as SensePad).active);
     }
 
     // Expiry: timed effects run out.
@@ -2911,7 +3059,12 @@ console.log('senses');
         };
         const gunner: RobotController = {
             meta: { id: 'gunner', name: 'Gunner', author: 'test', version: '0', description: '' },
-            update: (): Intent => ({ throttle: 1, turn: 0, towerTurn: 0, fire: true }),
+            // Stationary: the bullets (not the drive) are under test, and a
+            // parked gunner in the pad-free spawn column never collects the
+            // randomized midfield pads, so every sensed round deals exactly
+            // base damage. Rounds still fly 470px toward the spy, which
+            // senses them closing inside its cone.
+            update: (): Intent => ({ throttle: 0, turn: 0, towerTurn: 0, fire: true }),
         };
         let seen = 0;
         let gated = true;

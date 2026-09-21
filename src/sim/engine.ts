@@ -1,7 +1,7 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { AMP_MULT, AMP_TICKS, ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_RADIUS, HAZ_SALT, HAZ_SCORCH_TICKS, HAZ_TELEGRAPH_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_MULT, OVERDRIVE_TICKS, PAD_RADIUS, PAD_RESPAWN_TICKS, REPAIR_HP, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SPAWN_HEADING_JITTER, SPAWN_SALT, SPAWN_X, SPAWN_X_JITTER, SPAWN_Y_JITTER, SPAWN_Y_SHIFT, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, barriersForSeed, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
+import { AMP_MULT, AMP_TICKS, ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_RADIUS, HAZ_SALT, HAZ_SCORCH_TICKS, HAZ_TELEGRAPH_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_MULT, OVERDRIVE_TICKS, PAD_RADIUS, PAD_RESPAWN_TICKS, REPAIR_HP, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SPAWN_HEADING_JITTER, SPAWN_SALT, SPAWN_X, SPAWN_X_JITTER, SPAWN_Y_JITTER, SPAWN_Y_SHIFT, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, barriersForSeed, padSpotsForSeed, sanitizeModifiers, type ArenaId, type ArenaObstacle, type MatchModifiers } from './constants';
 import { angleDiff, assistSteer, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
@@ -351,8 +351,9 @@ export class Match {
         this.gridFoes = [new Array<number>(cells).fill(0), new Array<number>(cells).fill(0)];
         this.gridDanger = [new Array<number>(cells).fill(0), new Array<number>(cells).fill(0)];
         // Seed-derived pad layout (symmetric, public): ready before onSpawn
-        // so the first sense already carries the pads.
-        this.pads = Match.padLayout(seed);
+        // so the first sense already carries the pads. Passes the live
+        // barriers so pads never land inside terrain (empty on `open`).
+        this.pads = Match.padLayout(seed, this.barriers);
         // Fixed turret layout (public map knowledge): disabled until captured.
         this.turrets = Match.turretLayout();
         // Aim towers at the nearest foe and fire spawn hooks in fixed order.
@@ -396,29 +397,32 @@ export class Match {
     }
 
     /**
-     * Seed-derived powerup pad layout: 4 pads at fixed arena fractions
-     * (0.22/0.78 x by 0.30/0.70 y), mirrored through the arena center.
-     * Kinds cycle [amp, repair, overdrive] with a seed offset; each
-     * center-mirror pair shares a kind so neither team gains an edge.
-     * Pure function of the seed: no Math.random, no wall-clock.
+     * Seed-derived powerup pad layout: 4 pads at randomized arena spots
+     * (tuning/random-pads), point-mirrored through the arena center so
+     * neither team gains an edge. Kinds cycle [amp, repair, overdrive]
+     * with a seed offset; each center-mirror pair shares a kind (2+2
+     * split, same per-kind counts as the old fixed layout). Pure function
+     * of (seed, obstacles): no Math.random, no wall-clock. Pass the live
+     * `match.obstacles` (`blocks` barriers, empty on `open`) so pads never
+     * land inside terrain.
      */
-    static padLayout(seed: number): SensePad[] {
-        const fx = [0.22, 0.78, 0.22, 0.78];
-        const fy = [0.3, 0.3, 0.7, 0.7];
-        // Center-mirror pairs: 0 <-> 3, 1 <-> 2.
-        const pairOf = [0, 1, 1, 0];
+    static padLayout(seed: number, obstacles: ArenaObstacle[] = []): SensePad[] {
         const cycle: SensePadKind[] = ['amp', 'repair', 'overdrive'];
         const offset = (seed >>> 0) % cycle.length;
-        return fx.map((x, i) => ({
-            x: (x as number) * ARENA_WIDTH,
-            y: (fy[i] as number) * ARENA_HEIGHT,
-            kind: cycle[(offset + (pairOf[i] as number)) % cycle.length] as SensePadKind,
+        const kinds = [
+            cycle[offset] as SensePadKind,
+            cycle[(offset + 1) % cycle.length] as SensePadKind,
+        ];
+        return padSpotsForSeed(seed, obstacles).map((s) => ({
+            x: s.x,
+            y: s.y,
+            kind: kinds[s.pair] as SensePadKind,
             active: true,
             respawnIn: 0,
         }));
     }
 
-    /** Powerup pads in fixed pad order (fresh copies each read). */
+    /** Powerup pads in canonical pad order (fresh copies each read). */
     get padSnapshots(): SensePad[] {
         return this.pads.map((p) => ({ ...p }));
     }
@@ -1096,7 +1100,7 @@ export class Match {
                 killsTeam,
                 aliveFoes,
             },
-            // All pads, fixed order: public map knowledge. Fresh copies.
+            // All pads, canonical order: public map knowledge. Fresh copies.
             pickups: this.pads.map((p) => ({ ...p })),
             // Both turrets, fixed order: public map knowledge. Fresh copies.
             turrets: this.turrets.map(

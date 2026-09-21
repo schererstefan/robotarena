@@ -194,8 +194,9 @@ function runOneGame(ids: string[], teams: Array<0 | 1>, seed: number, arena: Are
             }
         }
     }
-    // Pads: pickupLog is `tick:padIdx:robotId`; kinds via the seed layout.
-    const layout = Match.padLayout(seed);
+    // Pads: pickupLog is `tick:padIdx:robotId`; kinds via the seed layout
+    // for this match's live obstacles (blocks barriers, empty on open).
+    const layout = Match.padLayout(seed, match.obstacles);
     const byKind = { amp: 0, repair: 0, overdrive: 0 };
     const pickupsByRobot = ids.map(() => 0);
     for (const record of match.pickupLog) {

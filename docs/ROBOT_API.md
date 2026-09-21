@@ -66,7 +66,7 @@ y grows downward). The sim ticks at 60 Hz.
 | `zone`         | Safe circle: `phase` (`normal`/`shrinking`), `suddenDeathIn` (ticks), `circle` (`{x,y,r}`), `distToSafety`, `inside`. |
 | `grid`         | Your team's 12×8 heat-map (`cell` 80): `foes` (presence from cone sightings, decays 1/tick) and `danger` (recent damage) integer arrays. |
 | `match`        | Match state: `arena`, `modifiers`, `tickCap`, `killsYou`, `killsTeam`, `aliveFoes`. |
-| `pickups`      | All 4 powerup pads in fixed pad order (public map knowledge, same for every robot): `{x, y, kind, active, respawnIn}`. `kind` is `amp`, `repair`, or `overdrive`; `active` is false while the pad is dark; `respawnIn` counts down to reactivation (`0` when active). |
+| `pickups`      | All 4 powerup pads in canonical pad order (sorted by x, then y; public map knowledge, same for every robot): `{x, y, kind, active, respawnIn}`. `kind` is `amp`, `repair`, or `overdrive`; `active` is false while the pad is dark; `respawnIn` counts down to reactivation (`0` when active). |
 | `turrets`      | Both map turrets in fixed turret order (public map knowledge, same for every robot): `{x, y, state, owner, progress}`. `state` is `disabled` while neutral, `active` once owned; `owner` is the owning team (`-1` while neutral, persists until recaptured); `progress` is capture lean in `[-1, +1]` (`+` = team 0, `-` = team 1). |
 | `hazards`      | Announced asteroid strikes (empty when none, or all match with `noHazards`): live telegraphs counting down plus the impact-tick frame (`ticksToImpact` 0), sorted by countdown then position — `x`, `y`, `ticksToImpact`, `radius` (70), `damage` (25). World-public: every living robot sees every strike. |
 | `inbox`        | Teammates' radio from exactly 6 ticks ago, sorted (`sent`, `from`), capped at 4. Never your own echo, never from the dead, never cross-team. Empty in 1v1. |
@@ -102,11 +102,17 @@ possibly absent), but the engine always provides them.
 
 ## Powerup pads
 
-Four static pads sit at fixed arena fractions (0.22/0.78 × 0.30/0.70),
-mirrored through the arena center so neither team gains an edge. Pad kinds
-cycle `amp` → `repair` → `overdrive` with a per-match seed offset, so the
-layout varies per match but replays exactly. Blunder into one (within 26
-units) to collect it; the pad goes dark for 15 s, then reactivates.
+Four pads appear at randomized positions each match: two spots are drawn
+from the central contest band (x 304–656, y 112–528) and point-mirrored
+through the arena center, so 1v1 matchups stay fair by construction — each
+mirror pair shares its kind, pads keep 150 px+ spacing, stay clear of
+barriers and turret structures, and sit 130 px+ from every spawn point
+(see `PAD_BAND` / `PAD_MIN_GAP` / `PAD_OBSTACLE_CLEAR` /
+`PAD_MIN_TURRET_DIST` / `PAD_MIN_SPAWN_DIST` in `src/sim/constants.ts`).
+Pad kinds cycle `amp` → `repair` → `overdrive` with a per-match seed
+offset (2+2 split), so the layout varies per match but replays exactly
+from the match seed. Blunder into one (within 26 units) to collect it;
+the pad goes dark for 15 s, then reactivates.
 
 - **AMP** (`amp`, gold diamond): 2× bullet damage for 6 s. Does not stack
   with the double-damage exhibition modifier — the strongest multiplier wins.
