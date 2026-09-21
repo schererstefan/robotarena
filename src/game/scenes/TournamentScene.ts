@@ -89,12 +89,14 @@ export class TournamentScene extends Scene {
         this.input.keyboard?.on('keydown-ENTER', this.onPrimaryKey);
         this.input.keyboard?.on('keydown-W', this.onWatchKey);
         this.input.keyboard?.on('keydown-S', this.onSimKey);
+        this.input.keyboard?.on('keydown-L', this.onLineupKey);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-M', this.onMuteKey);
             this.input.keyboard?.off('keydown-ESC', this.onEscapeKey);
             this.input.keyboard?.off('keydown-ENTER', this.onPrimaryKey);
             this.input.keyboard?.off('keydown-W', this.onWatchKey);
             this.input.keyboard?.off('keydown-S', this.onSimKey);
+            this.input.keyboard?.off('keydown-L', this.onLineupKey);
         });
     }
 
@@ -136,6 +138,18 @@ export class TournamentScene extends Scene {
 
     private onSimKey = (): void => {
         if (this.mode === 'running') this.simRest();
+    };
+
+    /** L returns from a finished bracket to the setup/lineup screen. */
+    private backToLineup(): void {
+        for (const obj of this.bracketObjects) obj.destroy();
+        this.bracketObjects = [];
+        this.mode = 'setup';
+        this.buildSetup();
+    }
+
+    private onLineupKey = (): void => {
+        if (this.mode === 'done') this.backToLineup();
     };
 
     // ---- Setup ------------------------------------------------------------
@@ -523,12 +537,7 @@ export class TournamentScene extends Scene {
             transition(this, [label]);
             this.trackBracket(this.add.text(CX, 697, TOURNAMENT.doneKeys, FONTS.monoSmall).setOrigin(0.5));
             this.bracketButton(CX - 240, 726, 200, 36, TOURNAMENT.runAgain, () => this.startTournament());
-            this.bracketButton(CX, 726, 200, 36, TOURNAMENT.lineup, () => {
-                for (const obj of this.bracketObjects) obj.destroy();
-                this.bracketObjects = [];
-                this.mode = 'setup';
-                this.buildSetup();
-            });
+            this.bracketButton(CX, 726, 200, 36, TOURNAMENT.lineup, () => this.backToLineup());
             this.bracketButton(CX + 240, 726, 200, 36, COMMON.menu, () => this.scene.start('Menu'));
         } else if (this.pendingSlot()) {
             this.trackBracket(this.add.text(CX, 697, TOURNAMENT.bracketKeys, FONTS.monoSmall).setOrigin(0.5));

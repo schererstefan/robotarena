@@ -604,7 +604,7 @@ export const TOURNAMENT = {
     simRest: 'SIM REST',
     setupKeys: 'ENTER: RUN TOURNAMENT - ESC: MENU',
     bracketKeys: 'ENTER/W: WATCH NEXT - S: SIM REST - ESC: MENU',
-    doneKeys: 'ENTER: RUN AGAIN - ESC: MENU',
+    doneKeys: 'ENTER: RUN AGAIN - L: LINEUP - ESC: MENU',
     bracket: 'BRACKET',
     roundFinal: 'FINAL',
     roundSemifinal: 'SEMIFINAL',
