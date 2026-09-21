@@ -463,9 +463,9 @@ export function reelExitCountdown(secondsLeft: number): string {
     return `EXIT IN ${secondsLeft}...`;
 }
 
-/** Results-screen key hints ("ENTER: REMATCH - X: MENU - UP/DN: ROW - D: SAVE"). */
+/** Results-screen key hints ("ENTER: REMATCH - X: MENU - UP/DN: ROW - D: SAVE - C: COPY"). */
 export function resultsKeysHint(primaryLabel: string, secondaryLabel: string): string {
-    return `ENTER: ${primaryLabel} - X: ${secondaryLabel} - UP/DN: ROW - D: SAVE`;
+    return `ENTER: ${primaryLabel} - X: ${secondaryLabel} - UP/DN: ROW - D: SAVE - C: COPY`;
 }
 
 /** Single-action results hint ("ENTER/X: EXIT"). */

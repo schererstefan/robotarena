@@ -252,6 +252,7 @@ export class BattleScene extends Scene {
     private resultsSecondary: (() => void) | null = null;
     private resultsFinish: (() => void) | null = null;
     /** Results keyboard row selection: highlighted row + its robot id. */
+    private resultsReplayCopy: (() => void) | null = null;
     private resultsRowSel: number | null = null;
     private resultsRowIds: number[] = [];
     private resultsRowTexts: Phaser.GameObjects.Text[] = [];
@@ -328,6 +329,7 @@ export class BattleScene extends Scene {
         this.resultsPrimary = null;
         this.resultsSecondary = null;
         this.resultsFinish = null;
+        this.resultsReplayCopy = null;
         this.resultsRowSel = null;
         this.resultsRowIds = [];
         this.resultsRowTexts = [];
@@ -768,6 +770,7 @@ export class BattleScene extends Scene {
         this.input.keyboard?.on('keydown-UP', this.onResultsRowUp);
         this.input.keyboard?.on('keydown-DOWN', this.onResultsRowDown);
         this.input.keyboard?.on('keydown-D', this.onResultsRowSave);
+        this.input.keyboard?.on('keydown-C', this.onResultsReplayCopy);
         this.events.once('shutdown', () => {
             this.input.keyboard?.off('keydown-SPACE', this.onSpaceKey);
             this.input.keyboard?.off('keydown', this.onPilotKeyDown);
@@ -782,6 +785,7 @@ export class BattleScene extends Scene {
             this.input.keyboard?.off('keydown-UP', this.onResultsRowUp);
             this.input.keyboard?.off('keydown-DOWN', this.onResultsRowDown);
             this.input.keyboard?.off('keydown-D', this.onResultsRowSave);
+            this.input.keyboard?.off('keydown-C', this.onResultsReplayCopy);
             stopMusic();
             this.clearFilters();
         });
@@ -998,6 +1002,12 @@ export class BattleScene extends Scene {
         if (!this.resultsShown || this.resultsRowSel === null) return;
         const id = this.resultsRowIds[this.resultsRowSel];
         if (id !== undefined) this.exportRobot(id);
+    };
+
+    /** Results keyboard: C copies the replay code (same path as clicking it). */
+    private onResultsReplayCopy = (): void => {
+        if (!this.resultsShown) return;
+        this.resultsReplayCopy?.();
     };
 
     private onPilotKeyDown = (event: KeyboardEvent): void => {
@@ -3154,14 +3164,16 @@ export class BattleScene extends Scene {
         codeText.setInteractive({ useHandCursor: true });
         codeText.on('pointerover', () => codeText.setColor(COLORS.whiteCss));
         codeText.on('pointerout', () => codeText.setColor(COLORS.goldCss));
-        codeText.on('pointerdown', () => {
+        const doCopy = (): void => {
             void copyText(code).then((ok) => {
                 copyLabel.setText(ok ? BATTLE.replayCopied : BATTLE.replayCopyFailed);
                 this.time.delayedCall(1500, () => {
                     copyLabel.setText(BATTLE.replayLabel);
                 });
             });
-        });
+        };
+        this.resultsReplayCopy = doCopy;
+        codeText.on('pointerdown', doCopy);
         if (hidden) {
             copyLabel.setAlpha(0);
             icon.setAlpha(0);
