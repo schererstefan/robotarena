@@ -3,7 +3,7 @@
 // is sprite transforms plus one small dynamic Graphics (cones + trails).
 
 import { BlendModes, Scene } from 'phaser';
-import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DASH_COOLDOWN_TICKS, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, MAX_TICKS, PAD_RADIUS, ROBOT_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DASH_COOLDOWN_TICKS, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, MAX_TICKS, PAD_RADIUS, ROBOT_RADIUS, TURRET_CAPTURE_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import type { SensePadKind } from '../../sim/types';
 import { angleDiff, clamp, wrapAngle } from '../../sim/math';
@@ -199,6 +199,8 @@ export class BattleScene extends Scene {
     private rings: Phaser.GameObjects.Image[] = [];
     /** Pad active-edge latch per pad index (collect flash on active -> dark). */
     private prevPadActive: boolean[] = [];
+    /** Turret shots-fired latch per turret index (muzzle flash on edge). */
+    private prevTurretShots: number[] = [];
     private treads: Phaser.GameObjects.Image[] = [];
     private treadAcc: number[] = [];
     private treadLastX: number[] = [];
@@ -334,6 +336,7 @@ export class BattleScene extends Scene {
         this.robotIds = [];
         this.rings = [];
         this.prevPadActive = [];
+        this.prevTurretShots = [];
         this.curBX = [];
         this.curBY = [];
         this.prevBX = [];
@@ -436,6 +439,7 @@ export class BattleScene extends Scene {
         this.match = new Match(lineups, this.request.seed, { arena: this.request.arena, modifiers: this.request.modifiers });
         this.obstacles = this.match.obstacles;
         this.prevPadActive = this.match.padSnapshots.map((p) => p.active);
+        this.prevTurretShots = this.match.turretSnapshots.map((t) => t.shotsFired);
         // Imported robots force exhibition: barred from every board, always.
         this.customMatch = this.request.lineupIds.some(isImportedId);
         this.exhibition = isExhibition(this.request.modifiers) || this.customMatch;
@@ -841,6 +845,7 @@ export class BattleScene extends Scene {
         if (stepped) {
             this.diffSnapshots(snaps);
             this.diffPads();
+            this.diffTurrets();
         }
         const tick = this.match.result.tick;
         if (this.request.trails && tick % 3 === 0 && tick !== this.lastTrailTick && !this.match.result.over) {
@@ -1017,6 +1022,7 @@ export class BattleScene extends Scene {
         this.acc = 0;
         this.diffSnapshots(this.match.robotSnapshots);
         this.diffPads();
+        this.diffTurrets();
     }
 
     private cycleSpeed(): void {
@@ -1508,6 +1514,19 @@ export class BattleScene extends Scene {
                 this.burst(px, py, padColor(pad.kind), 6, 120, 0);
             }
             this.prevPadActive[i] = pad.active;
+        });
+    }
+
+    /** Turret muzzle flash: shots-fired edge fires a small team-color burst. */
+    private diffTurrets(): void {
+        const turrets = this.match.turretSnapshots;
+        turrets.forEach((turret, i) => {
+            const was = this.prevTurretShots[i] ?? turret.shotsFired;
+            if (turret.shotsFired > was) {
+                const color = turret.owner === -1 ? COLORS.white : teamColor(turret.owner);
+                this.burst(AX + turret.x, AY + turret.y, color, 3, 140, 0);
+            }
+            this.prevTurretShots[i] = turret.shotsFired;
         });
     }
 
@@ -2088,6 +2107,56 @@ export class BattleScene extends Scene {
                 g.lineStyle(2, color, pulse);
                 g.strokeCircle(px, py, 13);
                 this.diamondPath(g, px, py, 7);
+                g.strokePath();
+            }
+        }
+        // Map turrets: square fortified structures (never circles like the
+        // robot chassis, never diamonds like the pads). Disabled = gray,
+        // owned = team color. Capture-progress arc while |progress| sits in
+        // (0,1); the barrel (owned only) tracks the nearest living enemy,
+        // computed render-side so the sim stays untouched.
+        for (const turret of this.match.turretSnapshots) {
+            const tx = AX + turret.x;
+            const ty = AY + turret.y;
+            g.lineStyle(1, COLORS.faintNum, 0.35);
+            g.strokeCircle(tx, ty, TURRET_CAPTURE_RADIUS);
+            const owner = turret.owner;
+            if (owner === -1) {
+                g.fillStyle(COLORS.faintNum, 0.12);
+                g.fillRect(tx - 13, ty - 13, 26, 26);
+                g.lineStyle(2, COLORS.faintNum, 0.55);
+                g.strokeRect(tx - 13, ty - 13, 26, 26);
+                g.fillStyle(COLORS.faintNum, 0.7);
+                g.fillCircle(tx, ty, 3);
+            } else {
+                const color = teamColor(owner);
+                g.fillStyle(color, 0.25);
+                g.fillRect(tx - 13, ty - 13, 26, 26);
+                g.lineStyle(2, color, 0.95);
+                g.strokeRect(tx - 13, ty - 13, 26, 26);
+                let bx = tx;
+                let by = ty - 20;
+                let best = Infinity;
+                for (const s of snaps) {
+                    if (!s.alive || s.team === owner) continue;
+                    const d = Math.hypot(s.x - turret.x, s.y - turret.y);
+                    if (d < best) {
+                        best = d;
+                        const aim = Math.atan2(s.y - turret.y, s.x - turret.x);
+                        bx = tx + Math.cos(aim) * 20;
+                        by = ty + Math.sin(aim) * 20;
+                    }
+                }
+                g.lineStyle(4, color, 0.95);
+                g.lineBetween(tx, ty, bx, by);
+                g.fillStyle(color, 0.95);
+                g.fillCircle(tx, ty, 4);
+            }
+            const prog = Math.abs(turret.progress);
+            if (prog > 0 && prog < 1) {
+                g.lineStyle(3, teamColor(turret.progress > 0 ? 0 : 1), 0.9);
+                g.beginPath();
+                g.arc(tx, ty, 19, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
                 g.strokePath();
             }
         }

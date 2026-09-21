@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BARRIER_COUNT, BARRIER_MIN_GAP, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, barriersForSeed, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BARRIER_COUNT, BARRIER_MIN_GAP, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, barriersForSeed, isExhibition, sanitizeModifiers, type ArenaId, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, sanitizeIntent, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
@@ -38,7 +38,7 @@ import { createWithParams as createSniperParams, SNIPER_DEFAULTS, sniperParamsFr
 import { createWithParams as createTurretParams, TURRET_DEFAULTS, turretParamsFromGenome } from '../src/robots/turret';
 import { createWithParams as createWandererParams, WANDERER_DEFAULTS, wandererParamsFromGenome } from '../src/robots/wanderer';
 import { computeStats, loadoutCode, loadoutCost, sanitizeLoadout, SKILL_DEFS, type SkillLoadout } from '../src/sim/skills';
-import { ROBOT_API_VERSION, type Intent, type RobotController, type SenseEvent, type SensePad, type SenseState } from '../src/sim/types';
+import { ROBOT_API_VERSION, type Intent, type RobotController, type SenseEvent, type SensePad, type SenseState, type SenseTurret } from '../src/sim/types';
 import { initialRound, nextRound, roundName, tiebreakWinner } from '../src/game/tournament';
 
 let failures = 0;
@@ -74,7 +74,9 @@ function fingerprint(match: Match): string {
     const bullets = match.bulletSnapshots.map((b) => [b.x, b.y, b.team, b.hot ? 1 : 0].join(',')).join(';');
     const barriers = match.obstacles.map((o) => [o.x, o.y, o.w, o.h].join(',')).join(';');
     const pads = match.pickupLog.join(';');
-    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${barriers}|${pads}`;
+    const turrets = match.turretSnapshots.map((t) => [t.owner, t.progress, t.cooldown, t.shotsFired].join(',')).join(';');
+    const turretLog = match.turretCaptureLog.join(';');
+    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${barriers}|${pads}|${turrets}|${turretLog}`;
 }
 
 // --- 1. Determinism: same seed, same everything ------------------------------
@@ -1966,6 +1968,349 @@ console.log('powerups');
     }
 }
 
+// --- T1. Map turrets: layout, capture, contest, decay, recapture, combat --
+console.log('turrets');
+{
+    const idle: RobotController = {
+        meta: { id: 'idle', name: 'Idle', author: 'test', version: '0', description: '' },
+        update: (): Intent => ({}),
+    };
+    let lastEvents: SenseEvent[] = [];
+    let lastTurrets: SenseTurret[] | undefined;
+    const seenEvents: SenseEvent[] = [];
+    const recorder: RobotController = {
+        meta: { id: 'recorder', name: 'Recorder', author: 'test', version: '0', description: '' },
+        update: (sense: SenseState): Intent => {
+            lastEvents = sense.events ?? [];
+            lastTurrets = sense.turrets;
+            seenEvents.push(...(sense.events ?? []));
+            return {};
+        },
+    };
+    const idleMatch = (seed: number, arena: ArenaId = 'open'): Match =>
+        new Match(
+            [
+                // Both slots record: turret hits land on team 1, so the
+                // victim's hit-by events must be observed there too.
+                { team: 0, controller: recorder },
+                { team: 1, controller: recorder },
+            ],
+            seed,
+            { arena },
+        );
+    // White-box placement (deterministic setup only; capture/combat run the
+    // real stepTurrets path).
+    const place = (match: Match, id: number, x: number, y: number): void => {
+        const r = match.robots[id] as unknown as { x: number; y: number } | undefined;
+        if (r) {
+            r.x = x;
+            r.y = y;
+        }
+    };
+    const T0 = { x: ARENA_WIDTH * 0.5, y: ARENA_HEIGHT * 0.3 };
+    const T1 = { x: ARENA_WIDTH * 0.5, y: ARENA_HEIGHT * 0.7 };
+
+    // Layout: fixed center-column positions, mirrored, start disabled.
+    {
+        const a = Match.turretLayout();
+        const b = Match.turretLayout();
+        check('turret layout is fixed and deterministic', JSON.stringify(a) === JSON.stringify(b));
+        check(
+            'two turrets on the center column',
+            a.length === 2 &&
+                a[0]?.x === T0.x && a[0]?.y === T0.y &&
+                a[1]?.x === T1.x && a[1]?.y === T1.y,
+            JSON.stringify(a),
+        );
+        const m = idleMatch(11);
+        const snaps = m.turretSnapshots;
+        check(
+            'turrets start disabled and neutral',
+            snaps.length === 2 &&
+                snaps.every((t) => t.owner === -1 && t.progress === 0 && t.cooldown === 0 && t.shotsFired === 0),
+            JSON.stringify(snaps),
+        );
+        check('no capture log at start', m.turretCaptureLog.length === 0 && m.turretDamageDealt === 0);
+        m.step();
+        check(
+            'sense reports both turrets in fixed order',
+            (lastTurrets?.length ?? 0) === 2 &&
+                lastTurrets !== undefined &&
+                lastTurrets[0]?.state === 'disabled' &&
+                lastTurrets[0]?.owner === -1 &&
+                lastTurrets[0]?.progress === 0 &&
+                typeof lastTurrets[0]?.x === 'number',
+        );
+    }
+
+    // Uncontested capture: exactly TURRET_CAPTURE_TICKS ticks of presence.
+    {
+        const m = idleMatch(11);
+        place(m, 0, T0.x, T0.y);
+        for (let i = 0; i < TURRET_CAPTURE_TICKS - 1; i += 1) m.step();
+        const almost = m.turretSnapshots[0];
+        check(
+            'one tick short of capture stays neutral',
+            almost?.owner === -1 && Math.abs((almost?.progress ?? 0) * TURRET_CAPTURE_TICKS - (TURRET_CAPTURE_TICKS - 1)) < 1e-9,
+            JSON.stringify(almost),
+        );
+        m.step(); // tick TURRET_CAPTURE_TICKS - 1: edge hits the pole
+        const owned = m.turretSnapshots[0];
+        check(
+            'capture lands on exactly TURRET_CAPTURE_TICKS',
+            owned?.owner === 0 && owned?.progress === 1,
+            JSON.stringify(owned),
+        );
+        check(
+            'capture logged as tick:turretIdx:team',
+            m.turretCaptureLog.join(';') === `${TURRET_CAPTURE_TICKS - 1}:0:0`,
+            m.turretCaptureLog.join(';'),
+        );
+        m.step(); // events deliver on the next sense
+        check(
+            'turret-captured event names the turret index',
+            lastEvents.some((e) => e.kind === 'turret-captured' && e.fromId === 0),
+            JSON.stringify(lastEvents),
+        );
+        check(
+            'sense marks the turret active',
+            lastTurrets?.[0]?.state === 'active' && lastTurrets?.[0]?.owner === 0 && lastTurrets?.[1]?.state === 'disabled',
+        );
+        check('silent turret holds no fire with no enemy near', m.turretSnapshots[0]?.shotsFired === 0);
+    }
+
+    // Contest: both teams inside freezes progress (no advance, no reset).
+    {
+        const m = idleMatch(11);
+        place(m, 0, T0.x, T0.y);
+        for (let i = 0; i < 100; i += 1) m.step();
+        const before = m.turretSnapshots[0]?.progress ?? -1;
+        place(m, 1, T0.x, T0.y);
+        for (let i = 0; i < 300; i += 1) m.step();
+        const after = m.turretSnapshots[0];
+        check(
+            'contested progress freezes mid-lean',
+            Math.abs(before * TURRET_CAPTURE_TICKS - 100) < 1e-9 &&
+                Math.abs((after?.progress ?? -1) * TURRET_CAPTURE_TICKS - 100) < 1e-9 &&
+                after?.owner === -1,
+            `before=${before} after=${after?.progress}`,
+        );
+        check('contest captures nothing', m.turretCaptureLog.length === 0);
+    }
+
+    // Decay: 300 absent ticks hold partial progress, then it erodes.
+    {
+        const leanTicks = 120;
+        const lean = leanTicks / TURRET_CAPTURE_TICKS;
+        const m = idleMatch(11);
+        place(m, 0, T0.x, T0.y);
+        for (let i = 0; i < leanTicks; i += 1) m.step();
+        check('partial lean after presence ticks', m.turretSnapshots[0]?.progress === lean);
+        place(m, 0, 30, 30);
+        for (let i = 0; i < TURRET_DECAY_TICKS - 1; i += 1) m.step();
+        check(
+            'no decay before 300 absent ticks',
+            m.turretSnapshots[0]?.progress === lean,
+            `${m.turretSnapshots[0]?.progress}`,
+        );
+        m.step(); // 300th absent tick: first erosion step
+        const eroding = m.turretSnapshots[0]?.progress ?? -1;
+        check(
+            'decay starts after 300 absent ticks',
+            Math.abs(eroding * TURRET_CAPTURE_TICKS - 119) < 1e-9,
+            `${eroding}`,
+        );
+        for (let i = 0; i < 119; i += 1) m.step();
+        const neutral = m.turretSnapshots[0];
+        check(
+            'decay returns to neutral and stays ownerless',
+            neutral?.progress === 0 && neutral?.owner === -1 && m.turretCaptureLog.length === 0,
+            JSON.stringify(neutral),
+        );
+    }
+
+    // Ownership persists while abandoned (no neutral decay once owned).
+    {
+        const m = idleMatch(11);
+        place(m, 0, T0.x, T0.y);
+        for (let i = 0; i < TURRET_CAPTURE_TICKS; i += 1) m.step();
+        place(m, 0, 30, 30);
+        for (let i = 0; i < 2000; i += 1) m.step();
+        const held = m.turretSnapshots[0];
+        check(
+            'owned turret never decays while abandoned',
+            held?.owner === 0 && held?.progress === 1,
+            JSON.stringify(held),
+        );
+    }
+
+    // Recapture: enemy presence pushes the full span, then flips.
+    {
+        const m = idleMatch(11);
+        place(m, 0, T0.x, T0.y);
+        for (let i = 0; i < TURRET_CAPTURE_TICKS; i += 1) m.step();
+        place(m, 0, 30, 30);
+        place(m, 1, T0.x, T0.y);
+        for (let i = 0; i < 2 * TURRET_CAPTURE_TICKS - 1; i += 1) m.step();
+        const mid = m.turretSnapshots[0];
+        check(
+            'recapture holds fire for the owner mid-push',
+            mid?.owner === 0 && Math.abs((mid?.progress ?? 9) * TURRET_CAPTURE_TICKS - (TURRET_CAPTURE_TICKS - (2 * TURRET_CAPTURE_TICKS - 1))) < 1e-9,
+            JSON.stringify(mid),
+        );
+        m.step(); // enemy edge reaches the opposite pole
+        const flipped = m.turretSnapshots[0];
+        check('recapture flips at the opposite pole', flipped?.owner === 1 && flipped?.progress === -1);
+        check(
+            'flip logged and announced',
+            m.turretCaptureLog.join(';') === `${TURRET_CAPTURE_TICKS - 1}:0:0;${3 * TURRET_CAPTURE_TICKS - 1}:0:1`,
+            m.turretCaptureLog.join(';'),
+        );
+        m.step();
+        check(
+            'turret-flipped event names the turret index',
+            lastEvents.some((e) => e.kind === 'turret-flipped' && e.fromId === 0),
+            JSON.stringify(lastEvents),
+        );
+    }
+
+    // Combat: nearest enemy in range, fixed interval, exact damage, fromId -1.
+    // (Turret rounds move in the stepBullets phase, i.e. the tick after the
+    // stepTurrets phase that fires them.)
+    {
+        const seenFrom = seenEvents.length;
+        const m = idleMatch(11);
+        place(m, 0, T0.x, T0.y);
+        for (let i = 0; i < TURRET_CAPTURE_TICKS; i += 1) m.step();
+        place(m, 1, T0.x + 200, T0.y); // 200 units east, inside TURRET_RANGE
+        m.step(); // capture tick + 1: cooldown 0 with a target in range
+        const first = m.turretSnapshots[0];
+        check('turret fires the first tick a target is in range', first?.shotsFired === 1, JSON.stringify(first));
+        m.step(); // the fired round travels one stepBullets phase
+        const bullet = m.bulletSnapshots[0];
+        check(
+            'turret round flies at robot bullet speed toward the target',
+            bullet !== undefined && bullet.x > T0.x && Math.abs(bullet.y - T0.y) < 1e-9,
+            JSON.stringify(bullet),
+        );
+        for (let i = 0; i < TURRET_FIRE_INTERVAL - 1; i += 1) m.step();
+        check('second shot lands exactly one interval later', m.turretSnapshots[0]?.shotsFired === 2);
+        for (let i = 0; i < 60; i += 1) m.step();
+        const victim = m.robotSnapshots[1];
+        check(
+            'turret damage is exactly TURRET_DAMAGE per shot',
+            (victim?.health ?? -1) === 100 - 2 * TURRET_DAMAGE,
+            `health=${victim?.health}`,
+        );
+        check('turret damage tallied separately', m.turretDamageDealt === 2 * TURRET_DAMAGE);
+        check(
+            'turret hit reports fromId -1',
+            victim?.alive === true &&
+                (m.robotSnapshots[1]?.health ?? 0) < 100 &&
+                seenEvents.slice(seenFrom).some((e) => e.kind === 'hit-by' && e.fromId === -1),
+            JSON.stringify(seenEvents.slice(seenFrom).filter((e) => e.kind === 'hit-by').slice(0, 3)),
+        );
+        check('no friendly fire on the owning team', (m.robotSnapshots[0]?.health ?? -1) === 100);
+    }
+
+    // Targeting: nearest living enemy wins (ties break by robot id).
+    {
+        const a: RobotController = {
+            meta: { id: 'a', name: 'a', author: 'test', version: '0', description: '' },
+            update: (): Intent => ({}),
+        };
+        const m = new Match(
+            [
+                { team: 0, controller: a },
+                { team: 0, controller: idle },
+                { team: 1, controller: idle },
+                { team: 1, controller: idle },
+            ],
+            11,
+        );
+        place(m, 0, T0.x, T0.y);
+        for (let i = 0; i < TURRET_CAPTURE_TICKS; i += 1) m.step();
+        place(m, 2, T0.x, T0.y - 150); // north, 150 away
+        place(m, 3, T0.x + 100, T0.y); // east, 100 away (nearest)
+        m.step(); // fires east at robot 3
+        m.step(); // the round travels one stepBullets phase
+        const bullet = m.bulletSnapshots[0];
+        check(
+            'turret aims at the nearest enemy',
+            bullet !== undefined && bullet.x > T0.x && Math.abs(bullet.y - T0.y) < 1e-9,
+            JSON.stringify(bullet),
+        );
+        check('out-of-range enemies hold fire', (() => {
+            const m2 = idleMatch(11);
+            place(m2, 0, T0.x, T0.y);
+            for (let i = 0; i < TURRET_CAPTURE_TICKS; i += 1) m2.step();
+            place(m2, 1, T0.x + TURRET_RANGE + 50, T0.y);
+            for (let i = 0; i < 100; i += 1) m2.step();
+            return m2.turretSnapshots[0]?.shotsFired === 0;
+        })());
+    }
+
+    // Barriers: blocks stop turret rounds exactly like robot bullets.
+    {
+        const setup = (arena: ArenaId): Match => {
+            const m = idleMatch(11, arena);
+            place(m, 0, T0.x, T0.y);
+            for (let i = 0; i < TURRET_CAPTURE_TICKS; i += 1) m.step();
+            // West of turret 0 behind the {300,130,90,90} block: in range,
+            // but every round dies on the wall.
+            place(m, 1, 250, T0.y);
+            return m;
+        };
+        const blocked = setup('blocks');
+        for (let i = 0; i < 120; i += 1) blocked.step();
+        check(
+            'block eats turret rounds (victim unharmed, gun still firing)',
+            (blocked.robotSnapshots[1]?.health ?? -1) === 100 &&
+                (blocked.turretSnapshots[0]?.shotsFired ?? 0) > 0 &&
+                blocked.turretDamageDealt === 0,
+            `hp=${blocked.robotSnapshots[1]?.health} shots=${blocked.turretSnapshots[0]?.shotsFired}`,
+        );
+        const open = setup('open');
+        for (let i = 0; i < 120; i += 1) open.step();
+        check(
+            'same geometry in the open draws blood',
+            (open.robotSnapshots[1]?.health ?? 100) < 100 && open.turretDamageDealt > 0,
+            `hp=${open.robotSnapshots[1]?.health}`,
+        );
+    }
+
+    // Determinism: identical seeds agree on the full turret segment.
+    {
+        const run = (): Match => {
+            const m = idleMatch(77);
+            place(m, 0, T1.x, T1.y);
+            place(m, 1, T1.x + 120, T1.y);
+            for (let i = 0; i < 500; i += 1) m.step();
+            return m;
+        };
+        const a = run();
+        const b = run();
+        check('turret matches are deterministic', fingerprint(a) === fingerprint(b));
+        check(
+            'fingerprint carries turret state and transitions',
+            a.turretCaptureLog.length > 0 && a.turretSnapshots[0]?.shotsFired !== undefined,
+            a.turretCaptureLog.join(';'),
+        );
+    }
+
+    // Capture radius edge: presence counts at exactly TURRET_CAPTURE_RADIUS.
+    {
+        const m = idleMatch(11);
+        place(m, 0, T0.x + TURRET_CAPTURE_RADIUS, T0.y);
+        for (let i = 0; i < TURRET_CAPTURE_TICKS; i += 1) m.step();
+        check(
+            'radius edge still counts as presence',
+            m.turretSnapshots[0]?.owner === 0,
+            JSON.stringify(m.turretSnapshots[0]),
+        );
+    }
+}
+
 // --- Tutorial: first-run flag with guarded storage -------------------------
 console.log('tutorial');
 {
@@ -3110,11 +3455,11 @@ console.log('comms');
     // Dead senders: the spawn-sitter's mail stops the tick it dies, even
     // in flight; the center-sitter keeps listening long after.
     const deadLog: MailboxEntry[] = [];
-    const toCenter = (id: string): RobotController => ({
+    const toPoint = (id: string, px: number, py: number): RobotController => ({
         meta: { id, name: id, author: 'test', version: '0', description: '' },
         update: (sense: SenseState): Intent => {
-            const dx = ARENA_WIDTH / 2 - sense.self.x;
-            const dy = ARENA_HEIGHT / 2 - sense.self.y;
+            const dx = px - sense.self.x;
+            const dy = py - sense.self.y;
             if (Math.hypot(dx, dy) < 4) return {};
             const want = Math.atan2(dy, dx);
             let diff = (want - sense.self.heading) % (Math.PI * 2);
@@ -3123,6 +3468,7 @@ console.log('comms');
             return { throttle: 1, turn: Math.max(-1, Math.min(1, diff * 2)) };
         },
     });
+    const toCenter = (id: string): RobotController => toPoint(id, ARENA_WIDTH / 2, ARENA_HEIGHT / 2);
     const dying = new Match(
         [
             { team: 0, controller: spammer },
@@ -3132,7 +3478,11 @@ console.log('comms');
                     meta: { id: 'listener', name: 'Listener', author: 'test', version: '0', description: '' },
                     update: (sense: SenseState): Intent => {
                         deadLog.push({ tick: sense.tick, inbox: sense.inbox.map((m) => ({ kind: m.kind, x: m.x, y: m.y, foe: m.foe, from: m.from, sent: m.sent })) });
-                        return toCenter('listener').update(sense);
+                        // Observation post east of center: outside both map
+                        // turrets' fire range, so always-on turret fire can
+                        // never kill the observer mid-scenario. The mail
+                        // assertions below are unchanged.
+                        return toPoint('listener', 760, 320).update(sense);
                     },
                 },
             },

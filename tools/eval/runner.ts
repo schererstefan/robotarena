@@ -46,7 +46,9 @@ export function fingerprintMatch(match: Match): string {
     // must reproduce the same terrain (empty on `open`).
     const barriers = match.obstacles.map((o) => [o.x, o.y, o.w, o.h].join(',')).join(';');
     const pads = match.pickupLog.join(';');
-    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${barriers}|${pads}`;
+    const turrets = match.turretSnapshots.map((t) => [t.owner, t.progress, t.cooldown, t.shotsFired].join(',')).join(';');
+    const turretLog = match.turretCaptureLog.join(';');
+    return `${match.arenaId}|${JSON.stringify(match.modifiers)}|${match.result.winner}@${match.result.tick}|${snaps.join('|')}|${bullets}|${barriers}|${pads}|${turrets}|${turretLog}`;
 }
 
 export function runJob(job: MatchJob): EvalRow {

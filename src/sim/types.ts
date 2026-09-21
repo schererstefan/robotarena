@@ -56,7 +56,7 @@ export interface DamageSite {
     amount: number;
     /** Absolute bearing from you to the shooter. */
     bearing: number;
-    /** Shooter's robot id. */
+    /** Shooter's robot id (-1 = map turret). */
     fromId: number;
 }
 
@@ -108,7 +108,9 @@ export type SenseEventKind =
     | 'sudden-death-pulse'
     | 'wall-bump'
     | 'ram'
-    | 'pickup';
+    | 'pickup'
+    | 'turret-captured'
+    | 'turret-flipped';
 
 export interface SenseEvent {
     /** Tick the event happened (the step just completed). */
@@ -118,7 +120,11 @@ export interface SenseEvent {
     amount?: number;
     /** Absolute bearing from you to the shooter, for `hit-by`. */
     bearing?: number;
-    /** Other robot: shooter (`hit-by`), victim (`kill`, `*-down`), bumper (`ram`). */
+    /**
+     * Other robot: shooter (`hit-by`, -1 = map turret), victim (`kill`,
+     * `*-down`), bumper (`ram`), turret index (`turret-captured`,
+     * `turret-flipped`).
+     */
     fromId?: number;
     /** Pad kind collected, for `pickup`. */
     pad?: SensePadKind;
@@ -126,6 +132,21 @@ export interface SenseEvent {
 
 /** Powerup pad kind: `amp` (2x bullet damage), `repair` (+HP), `overdrive` (+move speed). */
 export type SensePadKind = 'amp' | 'repair' | 'overdrive';
+
+/** One static map turret: public map knowledge, reported to every robot. */
+export interface SenseTurret {
+    x: number;
+    y: number;
+    /** `disabled` while neutral (never captured), `active` once owned. */
+    state: 'disabled' | 'active';
+    /** Owning team, or -1 while neutral. Persists until recaptured. */
+    owner: -1 | 0 | 1;
+    /**
+     * Capture progress in [-1, +1] (+ = team 0, - = team 1). |progress| >= 1
+     * means owned; in between is contested ground being pushed either way.
+     */
+    progress: number;
+}
 
 /** One static powerup pad: public map knowledge, reported to every robot. */
 export interface SensePad {
@@ -271,6 +292,11 @@ export interface SenseState {
      * every robot). Optional, engine-provided.
      */
     pickups?: SensePad[];
+    /**
+     * Both map turrets in fixed turret order (public map knowledge, same
+     * for every robot). Optional, engine-provided.
+     */
+    turrets?: SenseTurret[];
     /**
      * Teammates' radio messages from exactly COMMS_DELAY ticks ago, sorted
      * (sent, from), capped at COMMS_INBOX_MAX. Never your own echo, never
