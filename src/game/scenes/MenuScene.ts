@@ -1003,7 +1003,7 @@ export class MenuScene extends Scene {
     private showTutorialPrompt(): void {
         this.clearTour();
         this.tourMode = 'prompt';
-        this.trackTour(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.85).setDepth(60).setInteractive());
+        this.trackTour(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.45).setDepth(60).setInteractive());
         transition(this, [
             this.trackTour(this.add.rectangle(CX, 384, 460, 220, COLORS.panel).setStrokeStyle(2, COLORS.panelEdge).setDepth(60)),
             this.trackTour(this.add.text(CX, 320, TUTORIAL_PROMPT.title, FONTS.heading).setOrigin(0.5).setDepth(60)),

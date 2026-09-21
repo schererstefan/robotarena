@@ -1103,8 +1103,14 @@ export class BattleScene extends Scene {
                     playHit(dmg, s.x);
                 } else {
                     this.spawnDamageNumber(cx, cy - 18, dmg, 'hit');
-                    this.hurtT[i] = 2;
+                    // Plain-hit legibility: a longer white chassis blink
+                    // (frame-counted, tint-only so it survives reduced
+                    // motion) plus a small white core spark over the
+                    // danger burst. No trauma/hitstop/ring: those stay
+                    // kill- and charged-hit-only.
+                    this.hurtT[i] = 5;
                     this.burst(cx, cy, COLORS.danger, 6, 170, 300);
+                    this.burst(cx, cy, COLORS.white, 4, 130, 120);
                     playHit(dmg, s.x);
                 }
                 if (topDealer >= 0 && topDealer !== i) {
