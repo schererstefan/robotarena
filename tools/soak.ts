@@ -2143,16 +2143,17 @@ console.log('turrets');
     // Contest: both teams inside freezes progress (no advance, no reset).
     {
         const m = idleMatch(11);
+        const contestLean = Math.floor(TURRET_CAPTURE_TICKS / 2);
         place(m, 0, T0.x, T0.y);
-        for (let i = 0; i < 100; i += 1) m.step();
+        for (let i = 0; i < contestLean; i += 1) m.step();
         const before = m.turretSnapshots[0]?.progress ?? -1;
         place(m, 1, T0.x, T0.y);
         for (let i = 0; i < 300; i += 1) m.step();
         const after = m.turretSnapshots[0];
         check(
             'contested progress freezes mid-lean',
-            Math.abs(before * TURRET_CAPTURE_TICKS - 100) < 1e-9 &&
-                Math.abs((after?.progress ?? -1) * TURRET_CAPTURE_TICKS - 100) < 1e-9 &&
+            Math.abs(before * TURRET_CAPTURE_TICKS - contestLean) < 1e-9 &&
+                Math.abs((after?.progress ?? -1) * TURRET_CAPTURE_TICKS - contestLean) < 1e-9 &&
                 after?.owner === -1,
             `before=${before} after=${after?.progress}`,
         );
@@ -2161,7 +2162,7 @@ console.log('turrets');
 
     // Decay: 300 absent ticks hold partial progress, then it erodes.
     {
-        const leanTicks = 120;
+        const leanTicks = Math.floor((2 * TURRET_CAPTURE_TICKS) / 3);
         const lean = leanTicks / TURRET_CAPTURE_TICKS;
         const m = idleMatch(11);
         place(m, 0, T0.x, T0.y);
@@ -2178,10 +2179,10 @@ console.log('turrets');
         const eroding = m.turretSnapshots[0]?.progress ?? -1;
         check(
             'decay starts after 300 absent ticks',
-            Math.abs(eroding * TURRET_CAPTURE_TICKS - 119) < 1e-9,
+            Math.abs(eroding * TURRET_CAPTURE_TICKS - (leanTicks - 1)) < 1e-9,
             `${eroding}`,
         );
-        for (let i = 0; i < 119; i += 1) m.step();
+        for (let i = 0; i < leanTicks - 1; i += 1) m.step();
         const neutral = m.turretSnapshots[0];
         check(
             'decay returns to neutral and stays ownerless',
