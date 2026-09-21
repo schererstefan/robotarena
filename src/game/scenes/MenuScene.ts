@@ -468,6 +468,7 @@ export class MenuScene extends Scene {
         this.homeItem(mx, 360, MENU.battleSetup, () => this.showScreen('setup'));
         this.homeItem(mx, 418, MENU.pilot, () => this.startPilot());
         this.homeItem(mx, 476, MENU.watchReplay, () => this.openReplayDialog());
+        this.homeItem(mx, 534, 'TOURNAMENT', () => this.scene.start('Tournament'));
 
         // Slim footer: flow links first, settings second.
         this.layoutFooterRow1();

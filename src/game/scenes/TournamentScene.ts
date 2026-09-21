@@ -267,10 +267,21 @@ export class TournamentScene extends Scene {
         }
     }
 
+    /** Deterministic bracket seed: FNV-1a over the entrant ids (no Math.random/wall-clock). */
+    private hashEntrants(ids: string[]): number {
+        let h = 0x811c9dc5;
+        const s = ids.join('|');
+        for (let i = 0; i < s.length; i += 1) {
+            h ^= s.charCodeAt(i);
+            h = (h * 0x01000193) >>> 0;
+        }
+        return h >>> 0;
+    }
+
     private startTournament(): void {
         this.clearSetup();
         this.mode = 'running';
-        this.seedBase = (Math.random() * 0x7fffffff) | 0;
+        this.seedBase = this.hashEntrants(this.entrants);
         this.matchCounter = 0;
         this.rounds = [initialRound([...this.entrants])];
         this.saveSession();
