@@ -8,6 +8,7 @@ import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { artRegistry, chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
 import { coverScale } from '../art/background';
+import { MenuBanner } from '../banner';
 import menuVistaUrl from '../../../docs/art-evidence/menu-backdrop-vista.webp?url';
 import { isMuted, playClick, playConfirm, playError, playHover, startMenuAmbience, stopMusic, toggleMuted, unlockAudio } from '../audio';
 import {
@@ -172,6 +173,8 @@ export class MenuScene extends Scene {
     private navFooterFlow: NavTarget[] = [];
     private navFooterSettings: NavTarget[] = [];
     private footerFlow: Phaser.GameObjects.GameObject[] = [];
+    /** Animated title banner (extrude + sweep + glow + embers, render-only). */
+    private banner: MenuBanner | null = null;
     private showcaseAvailable = false;
     private tickerTimer: ReturnType<typeof setInterval> | null = null;
     private tickerLines: string[] = [];
@@ -319,6 +322,11 @@ export class MenuScene extends Scene {
         }
     }
 
+    /** Per-frame banner cosmetics (ember drift). Render-only: scene clock. */
+    update(): void {
+        if (this.banner && this.homeLayer.visible) this.banner.update(this.time.now);
+    }
+
     private onAnyPointer = (): void => {
         unlockAudio();
         playClick();
@@ -429,7 +437,11 @@ export class MenuScene extends Scene {
         this.navHome.push({ x: x + w / 2 - 28, y, w, h: 42, activate: onClick });
     }
 
-    /** Centered row of tiny footer text links. */
+    /**
+     * Centered row of footer text links, styled to match the banner: muted
+     * gold VT323 with a letterspaced cut, gold hover glow, and small teal
+     * diamond separators between links.
+     */
     private linkRow(
         y: number,
         defs: Array<{ label: string; onClick: () => void; keep?: (h: { setLabel: (label: string) => void }) => void }>,
@@ -437,8 +449,14 @@ export class MenuScene extends Scene {
         targets: NavTarget[],
     ): Array<{ cx: number; text: Phaser.GameObjects.Text }> {
         const gap = 34;
+        const restColor = '#c8a84b';
+        const hoverColor = '#ffe9a8';
         const texts = defs.map((def) => {
-            const text = this.add.text(0, 0, def.label, { ...FONTS.small, fontSize: '18px' }).setOrigin(0.5).setAlpha(0.9);
+            const text = this.add
+                .text(0, 0, def.label, { ...FONTS.small, fontSize: '20px', letterSpacing: 2, color: restColor })
+                .setOrigin(0.5)
+                .setAlpha(0.95);
+            text.setShadow(0, 2, '#000', 4, true, true);
             this.homeLayer.add(text);
             owned.push(text);
             return { def, text, w: text.width + 26 };
@@ -446,18 +464,28 @@ export class MenuScene extends Scene {
         const total = texts.reduce((sum, t) => sum + t.w, 0) + gap * (texts.length - 1);
         let x = CX - total / 2;
         const out: Array<{ cx: number; text: Phaser.GameObjects.Text }> = [];
+        let prevEnd = -1;
         for (const t of texts) {
             const cx = x + t.w / 2;
             t.text.setPosition(cx, y);
+            if (prevEnd >= 0) {
+                const sep = this.add
+                    .rectangle(prevEnd + gap / 2, y, 6, 6, 0x2a7d8f)
+                    .setRotation(Math.PI / 4)
+                    .setAlpha(0.9);
+                this.homeLayer.add(sep);
+                owned.push(sep);
+            }
+            prevEnd = x + t.w;
             const hit = this.add.rectangle(cx, y, t.w, 40, 0xffffff, 0).setInteractive({ useHandCursor: true });
             this.homeLayer.add(hit);
             owned.push(hit);
             hit.on('pointerover', () => {
-                t.text.setAlpha(1).setColor(COLORS.whiteCss);
+                t.text.setAlpha(1).setColor(hoverColor);
                 playHover();
             });
             hit.on('pointerout', () => {
-                t.text.setAlpha(0.9).setColor(COLORS.dim);
+                t.text.setAlpha(0.95).setColor(restColor);
             });
             hit.on('pointerdown', () => {
                 unlockAudio();
@@ -507,20 +535,15 @@ export class MenuScene extends Scene {
         // Light scrim: the backdrop stays the hero of this screen.
         L.add(this.add.rectangle(CX, 384, 1024, 768, 0x06080b, 0.18));
 
-        // Title lockup, letterspaced like the reference, tagline beneath.
-        const titleObj = this.add.text(CX, 104, APP.title, { ...FONTS.title, letterSpacing: 12 }).setOrigin(0.5);
-        titleObj.setColor(COLORS.goldCss).setShadow(0, 3, '#000', 6, true, true);
-        const logoL = this.add.image(CX - 310, 104, 'logo_bar').setScale(2);
-        const logoR = this.add.image(CX + 310, 104, 'logo_bar').setScale(2);
-        L.add([logoL, titleObj, logoR]);
-        L.add(this.add.text(CX, 154, APP.tagline, FONTS.small).setOrigin(0.5));
-        if (!reduced) {
-            titleObj.setScale(0.92);
-            logoL.setScale(1.84);
-            logoR.setScale(1.84);
-            this.tweens.add({ targets: titleObj, scale: 1, duration: 260, ease: 'Back.easeOut' });
-            this.tweens.add({ targets: [logoL, logoR], scale: 2, duration: 260, ease: 'Back.easeOut' });
-        }
+        // Animated banner: extruded gold title, light sweep, glow pulse,
+        // ember sparks — worthy of the night-arena vista. Tagline kept,
+        // restyled to match (letterspaced warm gold).
+        this.banner = new MenuBanner(this, L, CX, 104, reduced);
+        const tagline = this.add
+            .text(CX, 158, APP.tagline, { ...FONTS.small, fontSize: '18px', letterSpacing: 3, color: '#d9b45c' })
+            .setOrigin(0.5);
+        tagline.setShadow(0, 2, '#000', 4, true, true);
+        L.add(tagline);
 
         // The few options, centered like the reference.
         const mx = CX - 150;

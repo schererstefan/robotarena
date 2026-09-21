@@ -78,10 +78,11 @@ body {
     font-family: 'Press Start 2P', 'Courier New', monospace;
     /* PS2P renders on-grid only at 8px multiples; 8px stays crisp. */
     font-size: 8px;
-    letter-spacing: 1px;
-    color: #5d6a78;
-    background: #0b0e12;
-    border-top: 2px solid #2b3542;
+    letter-spacing: 2px;
+    color: #ffb340;
+    text-shadow: 0 0 8px rgba(255, 179, 64, 0.35);
+    background: linear-gradient(180deg, #11161c 0%, #0b0e12 100%);
+    border-top: 2px solid #8a6420;
     padding: 8px 4px;
     user-select: none;
 }
