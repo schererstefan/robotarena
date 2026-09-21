@@ -253,6 +253,8 @@ export class BattleScene extends Scene {
     private resultsFinish: (() => void) | null = null;
     /** Results keyboard row selection: highlighted row + its robot id. */
     private resultsReplayCopy: (() => void) | null = null;
+    /** Results layout: long codes (big lineups) wrap to two lines. */
+    private resultsCodeLong = false;
     private resultsRowSel: number | null = null;
     private resultsRowIds: number[] = [];
     private resultsRowTexts: Phaser.GameObjects.Text[] = [];
@@ -330,6 +332,7 @@ export class BattleScene extends Scene {
         this.resultsSecondary = null;
         this.resultsFinish = null;
         this.resultsReplayCopy = null;
+        this.resultsCodeLong = false;
         this.resultsRowSel = null;
         this.resultsRowIds = [];
         this.resultsRowTexts = [];
@@ -3013,8 +3016,10 @@ export class BattleScene extends Scene {
                 tutorial: undefined,
             });
         };
+        // Two-line codes drop the buttons + footer 18px so nothing collides.
+        const lowerDy = this.resultsCodeLong ? 18 : 0;
         const hintKeys = (hint: string): void => {
-            this.add.text(512, 614, hint, FONTS.monoSmall).setOrigin(0.5).setDepth(20);
+            this.add.text(512, 614 + lowerDy, hint, FONTS.monoSmall).setOrigin(0.5).setDepth(20);
         };
         const buildButtons = (): void => {
             this.resultsReady = true;
@@ -3022,24 +3027,24 @@ export class BattleScene extends Scene {
                 const toBracket = (): void => {
                     this.scene.start('Tournament');
                 };
-                makeButton(this, 412, 566, 170, 44, COMMON.next, () => this.scene.start('Tournament', { autoWatch: true }), 21, 0, {
+                makeButton(this, 412, 566 + lowerDy, 170, 44, COMMON.next, () => this.scene.start('Tournament', { autoWatch: true }), 21, 0, {
                     tier: 'primary',
                 });
-                makeButton(this, 612, 566, 170, 44, TOURNAMENT.bracket, toBracket, 21);
+                makeButton(this, 612, 566 + lowerDy, 170, 44, TOURNAMENT.bracket, toBracket, 21);
                 this.resultsPrimary = () => this.scene.start('Tournament', { autoWatch: true });
                 this.resultsSecondary = toBracket;
                 hintKeys(resultsKeysHint(COMMON.next, TOURNAMENT.bracket));
             } else if (showcase?.reel) {
                 this.showReelButtons(showcase.reel);
             } else if (showcase !== undefined) {
-                makeButton(this, 412, 566, 170, 44, BATTLE.rematch, doRematch, 21, 0, { tier: 'primary' });
-                makeButton(this, 612, 566, 170, 44, BATTLE.exitShowcase, () => this.scene.start('Showcase'), 21);
+                makeButton(this, 412, 566 + lowerDy, 170, 44, BATTLE.rematch, doRematch, 21, 0, { tier: 'primary' });
+                makeButton(this, 612, 566 + lowerDy, 170, 44, BATTLE.exitShowcase, () => this.scene.start('Showcase'), 21);
                 this.resultsPrimary = doRematch;
                 this.resultsSecondary = () => this.scene.start('Showcase');
                 hintKeys(resultsKeysHint(BATTLE.rematch, BATTLE.exitShowcase));
             } else {
-                makeButton(this, 412, 566, 170, 44, BATTLE.rematch, doRematch, 21, 0, { tier: 'primary' });
-                makeButton(this, 612, 566, 170, 44, COMMON.menu, () => this.scene.start('Menu'), 21);
+                makeButton(this, 412, 566 + lowerDy, 170, 44, BATTLE.rematch, doRematch, 21, 0, { tier: 'primary' });
+                makeButton(this, 612, 566 + lowerDy, 170, 44, COMMON.menu, () => this.scene.start('Menu'), 21);
                 this.resultsPrimary = doRematch;
                 this.resultsSecondary = () => this.scene.start('Menu');
                 hintKeys(resultsKeysHint(BATTLE.rematch, COMMON.menu));
@@ -3176,6 +3181,14 @@ export class BattleScene extends Scene {
             .setOrigin(0.5, 0)
             .setDepth(20);
         codeText.setWordWrapWidth(560);
+        if (codeText.width > 560) {
+            // Hyphenated codes never wrap on their own: split the groups
+            // across two centered lines instead of overflowing the panel.
+            const parts = code.split('-');
+            const mid = Math.ceil(parts.length / 2);
+            codeText.setText(`${parts.slice(0, mid).join('-')}\n${parts.slice(mid).join('-')}`);
+            this.resultsCodeLong = true;
+        }
         codeText.setInteractive({ useHandCursor: true });
         codeText.on('pointerover', () => codeText.setColor(COLORS.whiteCss));
         codeText.on('pointerout', () => codeText.setColor(COLORS.goldCss));
