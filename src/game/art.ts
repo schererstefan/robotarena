@@ -50,10 +50,10 @@ const PALETTE: Record<string, string> = {
     o: '#e06a2d',
     s: '#36435a',
     b: '#3a7ca5',
-    u: '#177a8c',
+    u: '#15907a',
     v: '#5b6ed6',
     i: '#ffa4c8',
-    n: '#d99a26',
+    n: '#b9681f',
     c: '#ffd28a',
     p: '#111820',
     q: '#1b2530',
@@ -79,7 +79,7 @@ export interface ArtEntry {
  */
 export function artRegistry(): ArtEntry[] {
     const entries: ArtEntry[] = [];
-    for (const [id, map] of Object.entries(CHASSIS_V2)) entries.push({ key: `chassis_${id}`, map, w: 32, h: 32 });
+    for (const [id, map] of Object.entries(CHASSIS_V2)) entries.push({ key: `chassis_${id}`, map, w: 64, h: 64 });
     for (const [id, map] of Object.entries(WRECKS)) entries.push({ key: `wreck_${id}`, map, w: 16, h: 16 });
     for (const [id, map] of Object.entries(SKILL_ICONS)) entries.push({ key: `skill_${id}`, map: map as PixelMap, w: 8, h: 8 });
     for (const [id, map] of Object.entries(UI_ICONS)) entries.push({ key: `icon_${id}`, map: map as PixelMap, w: 8, h: 8 });
@@ -209,15 +209,15 @@ function bakeTinted(scene: Scene, key: string, map: PixelMap, recolor: Record<st
  * denser cracks, ember dots (y/o). Same dims, legal chars, no RNG.
  */
 export function damageStamp(map: PixelMap, stage: 1 | 2): PixelMap {
-    // 32px chassis regions: each 16px V3 bound doubled to its 2x2 block
+    // 64px chassis regions: each 32px bound doubled to its 2x2 block
     // ([a,b] -> [2a,2b+1]), so the visual proportions and the ember
     // guarantee carry over unchanged.
     const HULL_DMG = new Set(['w', 'l', 'm', 't', 'd', 'r', 'o', 'y', 'g', 'b', 'u', 'v', 'i', 'n']);
     const scorch =
         stage === 1
-            ? (x: number, y: number) => x >= 6 && x <= 17 && y >= 18 && y <= 25
-            : (x: number, y: number) => x >= 4 && x <= 19 && y >= 16 && y <= 27;
-    const core = (x: number, y: number) => x >= 8 && x <= 15 && y >= 18 && y <= 23;
+            ? (x: number, y: number) => x >= 12 && x <= 35 && y >= 36 && y <= 51
+            : (x: number, y: number) => x >= 8 && x <= 39 && y >= 32 && y <= 55;
+    const core = (x: number, y: number) => x >= 16 && x <= 31 && y >= 36 && y <= 47;
     const crackMod = stage === 1 ? 17 : 13;
     const out = map.map((row, y) =>
         row
@@ -290,7 +290,7 @@ export function dir8ForHeading(heading: number): number {
 
 /**
  * Nearest-neighbor rotation of a char map onto a dir8SizeFor(map) canvas
- * (24 for every legacy ≤16px sprite, 46 for 32px chassis). Inverse-mapped
+ * (24 for every legacy ≤16px sprite, 91 for 64px chassis). Inverse-mapped
  * (no holes); cardinals are pixel-exact. Diagonals get a conservative
  * orphan cleanup (fully-isolated ramp singles only; accent chars are
  * never touched). Deterministic: no RNG anywhere.

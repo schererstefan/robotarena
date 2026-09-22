@@ -585,7 +585,9 @@ export class BattleScene extends Scene {
             this.robotIds.push(robotId);
             // Bake-time team tint (t pixels only): no whole-sprite setTint.
             // Nearest-direction frames: pixel sprites are never rotated.
-            const body = this.add.image(0, 0, chassisTeamKey(robotId, snap.team, 0, dir8ForHeading(snap.heading))).setScale(2).setDepth(4);
+            // 64px chassis bake 91px direction frames: scale 1 displays
+            // ~1:1 (~91px, same presence as the old 92px), pixels crisp.
+            const body = this.add.image(0, 0, chassisTeamKey(robotId, snap.team, 0, dir8ForHeading(snap.heading))).setScale(1).setDepth(4);
             this.hurtT.push(0);
             this.punchT.push(0);
             this.punchOn.push(false);
@@ -2116,11 +2118,11 @@ export class BattleScene extends Scene {
             const visible = s.alive || throes;
             // Staged-intro analytic phases (local time, 120 ms stagger):
             // hidden → drop (Cubic ease-in, −46 px) → power-on (Back
-            // ease-out 1.2→2 + aura flash). Pure function of elapsed time,
+            // ease-out 0.6→1 + aura flash). Pure function of elapsed time,
             // so skip/pauses snap cleanly.
             let dropY = 0;
             let introAlpha = 1;
-            let introScale = 2;
+            let introScale = 1;
             let auraFlash = 0;
             if (this.introActive && !this.reducedMotion) {
                 const lt = this.introElapsed - i * 0.12;
@@ -2137,7 +2139,7 @@ export class BattleScene extends Scene {
                     }
                     const t = Math.min((lt - 0.25) / 0.25, 1);
                     const e = 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
-                    introScale = 1.2 + 0.8 * e;
+                    introScale = 0.6 + 0.4 * e;
                     auraFlash = 1 - t;
                 }
             }
@@ -2225,10 +2227,10 @@ export class BattleScene extends Scene {
                 const wantAura = auraDirKey(auraDir);
                 if (aura.texture.key !== wantAura) aura.setTexture(wantAura);
             }
-            // Idle breathing: 2±0.03 (intro/throes own the scale otherwise).
+            // Idle breathing: 1±0.015 (intro/throes own the scale otherwise).
             let chassisScale = introScale;
             if (!this.reducedMotion && !this.introActive) {
-                chassisScale = throes ? 2 + Math.random() * 0.15 : 2 + 0.03 * Math.sin((tick + i * 13) / 14);
+                chassisScale = throes ? 1 + Math.random() * 0.075 : 1 + 0.015 * Math.sin((tick + i * 13) / 14);
             }
             body
                 .setVisible(visible && introAlpha > 0.05)

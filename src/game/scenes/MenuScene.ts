@@ -825,8 +825,9 @@ export class MenuScene extends Scene {
 
         const rows = this.teamSize * 2;
         // Row 0 must clear the 16px headers at y=208 (bottom edge 216):
-        // sprites are 32px tall, cyclers 44px. The 6-row step shrinks so
-        // the last row still clears the description panel at y=558.
+        // sprites are 64px maps at scale 1 (64px display), cyclers 44px.
+        // The 6-row step shrinks so the last row still clears the
+        // description panel at y=558.
         const startY = rows <= 2 ? 252 : 240;
         const step = rows <= 2 ? 84 : rows <= 4 ? 64 : 58;
         for (let i = 0; i < rows; i += 1) {
@@ -839,7 +840,7 @@ export class MenuScene extends Scene {
             const spriteId = displayRobotId(id);
 
             this.track(this.add.rectangle(100, y, 14, 14, teamColor(team)));
-            const preview = this.track(this.add.image(152, y, chassisKey(spriteId)).setScale(2));
+            const preview = this.track(this.add.image(152, y, chassisKey(spriteId)).setScale(1));
             preview.setTint(teamColor(team));
             // Live paint preview: tower + hub exactly as the battle renders them.
             const previewTower = this.track(this.add.image(152, y, towerKey(spriteId)).setScale(2));

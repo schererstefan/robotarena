@@ -76,7 +76,14 @@ const ROW_RE = /^\s*'([^']*)',?\s*$/;
 const CONST_RE = /export const (\w+)/;
 const KEY_RE = /^\s*([A-Za-z0-9_]+):\s*\[$/;
 
-const budgetFor = (w, h) => (Math.max(w, h) <= 16 ? 6 : Math.max(w, h) <= 32 ? 10 : 16);
+// Color budget: <=16px: 6, <=32px: 10, <=64px (chassis): 16.
+// (No larger maps exist; the final else holds the 64px ceiling.)
+const budgetFor = (w, h) => {
+    const m = Math.max(w, h);
+    if (m <= 16) return 6;
+    if (m <= 32) return 10;
+    return 16;
+};
 
 let mapCount = 0;
 for (const file of readdirSync(ART_DIR).filter((f) => f.endsWith('.ts')).sort()) {
