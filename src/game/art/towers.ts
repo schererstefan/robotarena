@@ -94,14 +94,5 @@ export const HUB_V2: PixelMap = [
     '................',
 ];
 
-// 8x8 pointed star: white hot core/beams, yellow tips + diagonal sparks.
-export const MUZZLE_V2: PixelMap = [
-    '...yy...',
-    '.y.ww.y.',
-    '..ywwy..',
-    'yywwwwyy',
-    'yywwwwyy',
-    '..ywwy..',
-    '.y.ww.y.',
-    '...yy...',
-];
+// (Sprite-inventory-2: the generic 8x8 MUZZLE_V2 star was replaced by the
+// per-weapon 12x12 muzzle_<id> flashes in ./projectiles.ts.)
