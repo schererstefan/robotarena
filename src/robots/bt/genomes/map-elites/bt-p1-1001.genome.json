@@ -1,0 +1,300 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "sequence",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "sequence",
+                "children": [
+                  {
+                    "kind": "sequence",
+                    "children": [
+                      {
+                        "kind": "action",
+                        "name": "aim-weakest",
+                        "params": []
+                      },
+                      {
+                        "kind": "selector",
+                        "children": [
+                          {
+                            "kind": "action",
+                            "name": "aim-track",
+                            "params": []
+                          },
+                          {
+                            "kind": "action",
+                            "name": "dodge",
+                            "params": []
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "action",
+                    "name": "kite-foe",
+                    "params": [
+                      420
+                    ]
+                  },
+                  {
+                    "kind": "latch",
+                    "key": 0,
+                    "ttl": 120,
+                    "child": {
+                      "kind": "inverter",
+                      "child": {
+                        "kind": "action",
+                        "name": "wander",
+                        "params": []
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "kind": "sequence",
+                "children": [
+                  {
+                    "kind": "condition",
+                    "name": "charged-shot",
+                    "params": []
+                  },
+                  {
+                    "kind": "action",
+                    "name": "orbit-foe",
+                    "params": [
+                      1
+                    ]
+                  },
+                  {
+                    "kind": "condition",
+                    "name": "foe-weak",
+                    "params": [
+                      0.55
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "sequence",
+                "children": [
+                  {
+                    "kind": "sequence",
+                    "children": [
+                      {
+                        "kind": "condition",
+                        "name": "zone-shrinking",
+                        "params": []
+                      },
+                      {
+                        "kind": "condition",
+                        "name": "just-hit-hard",
+                        "params": [
+                          16
+                        ]
+                      },
+                      {
+                        "kind": "condition",
+                        "name": "hazard-soon",
+                        "params": [
+                          30
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "sequence",
+                    "children": [
+                      {
+                        "kind": "selector",
+                        "children": [
+                          {
+                            "kind": "condition",
+                            "name": "ally-nearby",
+                            "params": [
+                              400
+                            ]
+                          },
+                          {
+                            "kind": "action",
+                            "name": "dash-away",
+                            "params": []
+                          },
+                          {
+                            "kind": "condition",
+                            "name": "foe-farther-than",
+                            "params": [
+                              240
+                            ]
+                          },
+                          {
+                            "kind": "action",
+                            "name": "scan",
+                            "params": [
+                              0.7
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "condition",
+                        "name": "pad-kind-nearby",
+                        "params": [
+                          0,
+                          400
+                        ]
+                      },
+                      {
+                        "kind": "inverter",
+                        "child": {
+                          "kind": "condition",
+                          "name": "gun-ready",
+                          "params": []
+                        }
+                      },
+                      {
+                        "kind": "selector",
+                        "children": [
+                          {
+                            "kind": "action",
+                            "name": "kite-foe",
+                            "params": [
+                              300
+                            ]
+                          },
+                          {
+                            "kind": "action",
+                            "name": "drive-to-foe",
+                            "params": []
+                          },
+                          {
+                            "kind": "action",
+                            "name": "drive-to-foe",
+                            "params": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "inverter",
+                "child": {
+                  "kind": "latch",
+                  "key": 0,
+                  "ttl": 240,
+                  "child": {
+                    "kind": "inverter",
+                    "child": {
+                      "kind": "condition",
+                      "name": "foe-weak",
+                      "params": [
+                        0.30000000000000004
+                      ]
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "action",
+                "name": "emp",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "flee-foe",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "drive-to-safety",
+                "params": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-nearest",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "drive-to-safety",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "dash-at-foe",
+            "params": []
+          }
+        ]
+      },
+      {
+        "kind": "condition",
+        "name": "sudden-death-soon",
+        "params": [
+          180
+        ]
+      },
+      {
+        "kind": "condition",
+        "name": "pad-nearby",
+        "params": [
+          180
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 35,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 4.384855132642743,
+    "wins": 4,
+    "novelty01": 0.12828504421424772,
+    "kills": 4,
+    "damage": 528,
+    "nodes": 49,
+    "behav": [
+      0.7347378545809943,
+      0.18155018694276676,
+      0,
+      0.4166666666666667,
+      0.559915164369035,
+      0.006433404216896464,
+      0.19305555555555556
+    ]
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "sequence",
+    "children": [
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      },
+      {
+        "kind": "selector",
+        "children": [
+          {
+            "kind": "action",
+            "name": "emp",
+            "params": []
+          },
+          {
+            "kind": "inverter",
+            "child": {
+              "kind": "action",
+              "name": "drive-to-pad",
+              "params": [
+                0
+              ]
+            }
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "latch",
+                "key": 1,
+                "ttl": 240,
+                "child": {
+                  "kind": "condition",
+                  "name": "slowed",
+                  "params": []
+                }
+              },
+              {
+                "kind": "inverter",
+                "child": {
+                  "kind": "action",
+                  "name": "drive-to-pad",
+                  "params": [
+                    0
+                  ]
+                }
+              },
+              {
+                "kind": "condition",
+                "name": "always",
+                "params": []
+              },
+              {
+                "kind": "condition",
+                "name": "zone-shrinking",
+                "params": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "action",
+        "name": "dash-at-foe",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 48,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 4.548030144493135,
+    "wins": 4,
+    "novelty01": 0.18267671483104475,
+    "kills": 4,
+    "damage": 636,
+    "nodes": 14,
+    "behav": [
+      0.6638619106940056,
+      0.5154859380562478,
+      1.5,
+      0.625,
+      0.4642335766423358,
+      0.02410233819852421,
+      0.24722222222222223
+    ]
+  }
+}

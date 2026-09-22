@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "sequence",
+    "children": [
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      },
+      {
+        "kind": "inverter",
+        "child": {
+          "kind": "action",
+          "name": "drive-to-pad",
+          "params": [
+            0
+          ]
+        }
+      },
+      {
+        "kind": "action",
+        "name": "dash-at-foe",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 45,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 5.59906934098768,
+    "wins": 5,
+    "novelty01": 0.19968978032922655,
+    "kills": 4,
+    "damage": 732,
+    "nodes": 5,
+    "behav": [
+      0.7005574387478918,
+      0.1964542405366555,
+      1.5,
+      0.3333333333333333,
+      0.48963210702341137,
+      0.025620992686149542,
+      0.3
+    ]
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "sequence",
+    "children": [
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      },
+      {
+        "kind": "selector",
+        "children": [
+          {
+            "kind": "action",
+            "name": "emp",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "flee-foe",
+            "params": []
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "action",
+                "name": "emp",
+                "params": []
+              },
+              {
+                "kind": "latch",
+                "key": 1,
+                "ttl": 360,
+                "child": {
+                  "kind": "condition",
+                  "name": "pad-kind-nearby",
+                  "params": [
+                    1,
+                    220
+                  ]
+                }
+              },
+              {
+                "kind": "condition",
+                "name": "always",
+                "params": []
+              },
+              {
+                "kind": "condition",
+                "name": "foe-weak",
+                "params": [
+                  0.55
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "action",
+        "name": "dash-at-foe",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 33,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 4.67714634233151,
+    "wins": 4,
+    "novelty01": 0.22571544744383684,
+    "kills": 4,
+    "damage": 564,
+    "nodes": 12,
+    "behav": [
+      0.8974283518162849,
+      0.5516784869976359,
+      0,
+      0.8333333333333334,
+      0.5044722719141324,
+      0.004512652236771084,
+      0.4444444444444445
+    ]
+  }
+}

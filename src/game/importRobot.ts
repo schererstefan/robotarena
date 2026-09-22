@@ -292,3 +292,13 @@ export async function importRobotFromUrl(url: string): Promise<ImportResult> {
     }
     return importRobotFromText(source);
 }
+
+/**
+ * Phase 1B capture hook (worktree-only): register a session-only robot for
+ * the ?bgshot capture harness. Backed by the imported-robot registry —
+ * never touches ROBOTS.
+ */
+export function registerCaptureRobot(id: string, robot: ImportedRobot): void {
+    if (!id.startsWith(IMPORT_PREFIX)) throw new Error('capture robot id must use the custom: prefix');
+    registry.set(id, robot);
+}

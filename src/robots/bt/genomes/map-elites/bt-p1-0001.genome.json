@@ -1,0 +1,100 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "sequence",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "action",
+                "name": "drive-to-track",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "aim-nearest",
+                "params": []
+              }
+            ]
+          },
+          {
+            "kind": "action",
+            "name": "emp",
+            "params": []
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-nearest",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "drive-to-safety",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "dash-at-foe",
+            "params": []
+          }
+        ]
+      },
+      {
+        "kind": "condition",
+        "name": "sudden-death-soon",
+        "params": [
+          180
+        ]
+      },
+      {
+        "kind": "condition",
+        "name": "pad-nearby",
+        "params": [
+          180
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 24,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 2.4572822189993935,
+    "wins": 2,
+    "novelty01": 0.1524274063331312,
+    "kills": 2,
+    "damage": 552,
+    "nodes": 12,
+    "behav": [
+      0.3180020500646343,
+      0.2467741935483871,
+      0,
+      0.25,
+      0.43567482241515393,
+      0.007069412477905982,
+      0.12916666666666668
+    ]
+  }
+}
