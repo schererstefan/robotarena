@@ -3,7 +3,7 @@
 
 import { Scene } from 'phaser';
 import { getRobot, ROBOTS } from '../../robots/registry';
-import { modifierCodes, type ArenaId, type MatchModifiers } from '../../sim/constants';
+import { ARENA_IDS, modifierCodes, type ArenaId, type MatchModifiers } from '../../sim/constants';
 import { decodeReplay } from '../../sim/replay';
 import { loadoutCost, rankOf, SKILL_BUDGET, SKILL_DEFS, type SkillId, type SkillLoadout } from '../../sim/skills';
 import { artRegistry, chassisKey, ensureArtTextures, skillIconKey, towerKey } from '../art';
@@ -29,7 +29,6 @@ import { fetchOnlineBoard, type OnlineBoard } from '../onlineBoard';
 import { loadShowcase } from '../showcase';
 import {
     APP,
-    arenaLabel,
     bracketedLabel,
     colorLabel,
     COMMON,
@@ -145,7 +144,7 @@ export class MenuScene extends Scene {
     );
     private trails = true;
     private arena: ArenaId = 'open';
-    private arenaButton!: { setLabel: (label: string) => void };
+    private arenaButtons: Array<{ setLabel: (label: string) => void }> = [];
     private mods: MatchModifiers = {};
     private modsButton!: { setLabel: (label: string) => void };
     private modsObjects: Phaser.GameObjects.GameObject[] = [];
@@ -297,11 +296,17 @@ export class MenuScene extends Scene {
         startMenuAmbience();
 
         // Headless screenshot entry: ?bgshot=seed jumps straight into a
-        // seeded battle for deterministic capture. No query: boot normally.
+        // seeded battle for deterministic capture (&arena= picks the layout,
+        // defaulting to `open`). No query: boot normally.
         try {
-            const shotSeed = new URLSearchParams(window.location.search).get('bgshot');
+            const params = new URLSearchParams(window.location.search);
+            const shotSeed = params.get('bgshot');
             if (shotSeed !== null) {
                 markTutorialSeen();
+                const shotArena = params.get('arena');
+                if (shotArena !== null && (ARENA_IDS as readonly string[]).includes(shotArena)) {
+                    this.arena = shotArena as ArenaId;
+                }
                 this.startBattleWithSeed(Number.parseInt(shotSeed, 10) || 7);
                 return;
             }
@@ -578,16 +583,21 @@ export class MenuScene extends Scene {
             { label: MENU.modeLabels[2] ?? '3 v 3', size: 3 },
         ] as const;
         modeDefs.forEach((def, i) => {
-            const btn = this.setupButton(CX - 220 + i * 220, 104, 200, 44, '', () => this.setMode(def.size));
+            const btn = this.setupButton(CX - 270 + i * 180, 104, 160, 44, '', () => this.setMode(def.size));
             this.modeButtons.push(btn);
         });
         this.refreshModeLabels();
-
-        // Arena + modifiers pickers.
-        this.arenaButton = this.setupButton(CX - 170, 164, 320, 44, '', () => this.cycleArena());
-        this.refreshArenaLabel();
-        this.modsButton = this.setupButton(CX + 170, 164, 320, 44, '', () => this.openMods());
+        this.modsButton = this.setupButton(CX + 270, 104, 160, 44, '', () => this.openMods());
         this.refreshModsLabel();
+
+        // Arena picker: one button per layout, brackets marking the pick.
+        // Every button registers a nav target, so the shared focus ring
+        // tracks the new options exactly like the mode row.
+        ARENA_IDS.forEach((id, i) => {
+            const btn = this.setupButton(CX - 304 + i * 152, 164, 148, 44, '', () => this.setArena(id));
+            this.arenaButtons.push(btn);
+        });
+        this.refreshArenaLabels();
 
         // Column headers for the slot table.
         const headers: Array<[number, string]> = [
@@ -784,13 +794,16 @@ export class MenuScene extends Scene {
         });
     }
 
-    private cycleArena(): void {
-        this.arena = this.arena === 'open' ? 'blocks' : 'open';
-        this.refreshArenaLabel();
+    private setArena(id: ArenaId): void {
+        this.arena = id;
+        this.refreshArenaLabels();
     }
 
-    private refreshArenaLabel(): void {
-        this.arenaButton.setLabel(arenaLabel(this.arena));
+    private refreshArenaLabels(): void {
+        ARENA_IDS.forEach((id, i) => {
+            const btn = this.arenaButtons[i];
+            if (btn) btn.setLabel(bracketedLabel(id.toUpperCase(), id === this.arena));
+        });
     }
 
     private refreshTrailsLabel(): void {

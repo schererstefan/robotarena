@@ -62,7 +62,7 @@ y grows downward). The sim ticks at 60 Hz.
 | `events`       | What happened during the step just completed (empty at tick 0): `hit-by` (`fromId` is the shooter, `-1` = map turret), `kill`, `ally-down`, `foe-down`, `sudden-death-pulse`, `wall-bump`, `ram`, `pickup` (`pickup` carries `pad`: the pad kind collected), `turret-captured` / `turret-flipped` (`fromId` is the turret index, broadcast to every living robot), `blast` (asteroid hit: `amount`, no `fromId` — the world did it). Sorted kind-then-id, capped at 8. |
 | `bullets`      | Incoming foe-team bullets inside your sensor cone, nearest first, capped at 12: `x`, `y`, `vx`, `vy`, `distance`, `bearing`, `closing` (positive = approaching), `damage`. |
 | `tracks`       | Engine-kept memory: one entry per living foe ever in your cone (`id`, `x`, `y`, `heading`, `speed`, `lastSeenTick`, `seenNow`), refreshed on every sighting, sorted by id. |
-| `arena`        | Layout: `id` (`open`/`blocks`), `obstacles` (`{x,y,w,h}` barrier rects, seed-derived on `blocks`), `centerX`, `centerY`. Symmetric public state. |
+| `arena`        | Layout: `id` (`open`/`blocks`/`ruins`/`foundry`/`crossfire`), `obstacles` (`{x,y,w,h}` barrier rects, seed-derived on every arena but `open`), `centerX`, `centerY`. Public state, same for both teams (barriers may be asymmetric). |
 | `zone`         | Safe circle: `phase` (`normal`/`shrinking`), `suddenDeathIn` (ticks), `circle` (`{x,y,r}`), `distToSafety`, `inside`. |
 | `grid`         | Your team's 12×8 heat-map (`cell` 80): `foes` (presence from cone sightings, decays 1/tick) and `danger` (recent damage) integer arrays. |
 | `match`        | Match state: `arena`, `modifiers`, `tickCap`, `killsYou`, `killsTeam`, `aliveFoes`. |
@@ -89,7 +89,7 @@ no `fromId`). `bullets` shows incoming rounds your
 tower currently covers, with closing speed for dodging. `tracks` is the
 engine's memory of every foe your cone has seen — stale positions stay
 available after the foe leaves the cone, flagged with `seenNow: false`.
-`arena` is the (symmetric, public) barrier map plus the
+`arena` is the (public, same-for-both-teams) barrier map plus the
 `blocked.ahead` whisker for steering; `zone` is the sudden-death circle with
 your distance to safety; `grid` is your team's coarse 12×8 heat-map of foe
 presence and recent damage; `match` carries kills and the living-foe count;
@@ -129,8 +129,11 @@ remember every robot sees the same pads.
 
 ## Map turrets
 
-Two turret structures sit on the arena center column (0.50 × 0.30/0.70),
-mirrored so neither team gains an edge. They are structures, not robots:
+Two turret structures sit as a center-symmetric pair on every arena —
+(0.50 × 0.30/0.70) on `open`/`blocks`, midline (0.35/0.65 × 0.50) on
+`ruins`, wide (0.50 × 0.22/0.78) on `foundry`, diagonal
+(0.32/0.68 × 0.32/0.68) on `crossfire` — mirrored so neither team gains
+an edge. They are structures, not robots:
 indestructible, with no cone, no loadout, and no foe-contract data. Both
 start `disabled` (neutral) and are captured by presence:
 
@@ -312,7 +315,12 @@ friendly fire. Arena is 960×640 with mirrored spawns. The BLOCKS layout adds
 four barrier segments, dealt from the match seed (2 drawn rects + their
 center mirrors, so both teams face identical terrain; same seed + loadouts
 ⇒ identical layout, and replay codes are unchanged — the layout is derived,
-not stored). Robots collide with barriers (stop/slide push-out, no
+not stored). Three asymmetric layouts vary the terrain instead: RUINS deals
+5 small rubble rects (56–80), FOUNDRY deals 3 large slabs (88–112), and
+CROSSFIRE deals 6 alternating bars and squares — every rect sampled
+independently with no mirroring, while spawns, pads, and turret pairs stay
+center-symmetric so neither side gains an edge. New-arena replays travel as
+RA1 codes (the RA2 bit layout is untouched). Robots collide with barriers (stop/slide push-out, no
 tunneling: segments are far thicker than one drive step) and bullets die on
 impact. Barriers are public: `sense.arena.obstacles` lists the rects,
 `self.blocked.ahead` measures to the nearest wall *or barrier* along your

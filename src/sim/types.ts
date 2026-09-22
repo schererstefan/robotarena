@@ -203,7 +203,7 @@ export interface TrackedFoe {
     seenNow: boolean;
 }
 
-/** Static arena layout (symmetric public state, same for both teams). */
+/** Static arena layout (public state, same for both teams; barriers may be asymmetric). */
 export interface SenseArena {
     id: ArenaId;
     obstacles: ArenaObstacle[];

@@ -1683,12 +1683,12 @@ export class BattleScene extends Scene {
         });
     }
 
-    /** Arena grade: warm `open` / cool `blocks`, SD cross-tween saturating. */
+    /** Arena grade: warm `open` / cool walled arenas, SD cross-tween saturating. */
     private applyGrade(sdFrac: number): void {
         const cm = this.fxGrade?.colorMatrix;
         if (!cm) return;
         cm.reset();
-        if (this.request.arena === 'blocks') {
+        if (this.request.arena !== 'open') {
             cm.saturate(0.94).hue(-8);
         } else {
             cm.saturate(1.08).brightness(0.03).hue(6);
