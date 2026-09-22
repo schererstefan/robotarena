@@ -50,6 +50,10 @@ const PALETTE: Record<string, string> = {
     o: '#e06a2d',
     s: '#36435a',
     b: '#3a7ca5',
+    u: '#177a8c',
+    v: '#5b6ed6',
+    i: '#ffa4c8',
+    n: '#d99a26',
     c: '#ffd28a',
     p: '#111820',
     q: '#1b2530',
@@ -199,7 +203,8 @@ function bakeTinted(scene: Scene, key: string, map: PixelMap, recolor: Record<st
 
 /**
  * Deterministic damage stamp over a char-map copy, hull pixels only
- * (w/l/m/t — scorch eats trim too). Stage 1 (<50% HP): scorch blotch +
+ * (neutral pans w/l/m/t/d plus role-color hulls r/o/y/g/b/u/v/i/n —
+ * scorch eats trim too). Stage 1 (<50% HP): scorch blotch +
  * crack seams. Stage 2 (<25% HP): larger scorch with a burnt-through core,
  * denser cracks, ember dots (y/o). Same dims, legal chars, no RNG.
  */
@@ -207,6 +212,7 @@ export function damageStamp(map: PixelMap, stage: 1 | 2): PixelMap {
     // 32px chassis regions: each 16px V3 bound doubled to its 2x2 block
     // ([a,b] -> [2a,2b+1]), so the visual proportions and the ember
     // guarantee carry over unchanged.
+    const HULL_DMG = new Set(['w', 'l', 'm', 't', 'd', 'r', 'o', 'y', 'g', 'b', 'u', 'v', 'i', 'n']);
     const scorch =
         stage === 1
             ? (x: number, y: number) => x >= 6 && x <= 17 && y >= 18 && y <= 25
@@ -217,7 +223,7 @@ export function damageStamp(map: PixelMap, stage: 1 | 2): PixelMap {
         row
             .split('')
             .map((ch, x) => {
-                if (ch !== 'w' && ch !== 'l' && ch !== 'm' && ch !== 't') return ch;
+                if (!HULL_DMG.has(ch)) return ch;
                 if (scorch(x, y)) {
                     if (stage === 2 && core(x, y)) return 'k';
                     // Ember dots on scorched hull (stage 2 only).
@@ -383,7 +389,7 @@ function bakeTeamChassis(scene: Scene): void {
         }
         for (const team of [0, 1] as const) {
             for (const cb of [false, true]) {
-                // Trim-only team tint: `t` takes the team color, `w` stays hull steel.
+                // Trim-only team tint: `t` takes the team color, role-color hulls stay as drawn.
                 const recolor = { t: css(teamColorFor(team, cb)) };
                 const pal = cb ? 'cb' : 'std';
                 for (let dir = 0; dir < 8; dir += 1) {
