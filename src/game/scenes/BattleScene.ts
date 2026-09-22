@@ -11,7 +11,7 @@ import { loadoutCode, type SkillLoadout } from '../../sim/skills';
 import { decodeReplay, encodeReplay } from '../../sim/replay';
 import { getRobot } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
-import { SD_RING_R, auraDirKey, bakedTextureCount, blockKey, chassisTeamKey, dir8ForHeading, ensureArtTextures, ensureBlockTexture, muzzleDirKey, repaintArenaFloor, towerDirKey, towerKey, treadsDirKey, uiIconKey, wreckDirKey } from '../art';
+import { SD_RING_R, auraDirKey, bakedTextureCount, blockKey, chassisTeamKey, crateKey, dir8ForHeading, ensureArtTextures, ensureBlockTexture, mapTurretKey, muzzleDirKey, padSpriteKey, repaintArenaFloor, rockKey, towerDirKey, towerKey, treadsDirKey, uiIconKey, wreckDirKey } from '../art';
 import {
     playBattleStart,
     playClick,
@@ -209,6 +209,11 @@ export class BattleScene extends Scene {
     private rings: Phaser.GameObjects.Image[] = [];
     /** Pad active-edge latch per pad index (collect flash on active -> dark). */
     private prevPadActive: boolean[] = [];
+    /** Landed pad/turret/rock sprites (sprite-64): pooled images synced
+     * render-side; padKeys caches the live texture per pad (swap on change). */
+    private padImgs: Phaser.GameObjects.Image[] = [];
+    private padKeys: string[] = [];
+    private rockImgs: Phaser.GameObjects.Image[] = [];
     /** Turret shots-fired latch per turret index (muzzle flash on edge). */
     private prevTurretShots: number[] = [];
     private treads: Phaser.GameObjects.Image[] = [];
@@ -379,6 +384,9 @@ export class BattleScene extends Scene {
         this.robotIds = [];
         this.rings = [];
         this.prevPadActive = [];
+        this.padImgs = [];
+        this.padKeys = [];
+        this.rockImgs = [];
         this.prevTurretShots = [];
         this.curBX = [];
         this.curBY = [];
@@ -534,6 +542,13 @@ export class BattleScene extends Scene {
             ensureBlockTexture(this, o.w, o.h);
             this.add.image(cx, cy, blockKey(o.w, o.h)).setDepth(1);
         }
+        // Landed crate face-plates (sprite-64): one 32px medallion per block
+        // at 1:1, deterministic variant, above the tiled base.
+        this.obstacles.forEach((o, i) => {
+            this.add
+                .image(AX + o.x + o.w / 2, AY + o.y + o.h / 2, crateKey(i))
+                .setDepth(1.1);
+        });
         // SD danger-fill sprite: pre-baked ring, scaled per frame to the
         // safe circle (hidden until the 10 s pre-warning).
         this.sdRing = this.add
@@ -542,6 +557,24 @@ export class BattleScene extends Scene {
             .setVisible(false);
 
         this.dyn = this.add.graphics().setDepth(2);
+        // Landed sprites (sprite-64): fixed-position pad/turret bodies under
+        // the dyn overlays (rings, barrels, arcs stay vector); rock pool
+        // synced per frame to live W1 telegraphs in drawDynamic.
+        this.padKeys = [];
+        this.padImgs = this.match.padSnapshots.map((pad) => {
+            const key = padSpriteKey(pad.kind, pad.active);
+            this.padKeys.push(key);
+            return this.add.image(AX + pad.x, AY + pad.y, key).setDepth(1.6);
+        });
+        // Static bodies: turret ownership/barrels animate via dyn vectors,
+        // so the images need no per-frame sync (scene-owned, die with it).
+        for (let i = 0; i < this.match.turretSnapshots.length; i += 1) {
+            const t = this.match.turretSnapshots[i] as { x: number; y: number };
+            this.add.image(AX + t.x, AY + t.y, mapTurretKey(i)).setDepth(1.6);
+        }
+        this.rockImgs = [0, 1, 2, 3].map((i) =>
+            this.add.image(0, 0, rockKey(i)).setScale(2).setDepth(1.6).setVisible(false),
+        );
 
         // Robot sprite sets.
         this.normalDamage = this.request.modifiers.doubleDamage === true ? BULLET_DAMAGE * 2 : BULLET_DAMAGE;
@@ -2389,61 +2422,43 @@ export class BattleScene extends Scene {
                 g.strokeCircle(AX + s.x, AY + s.y, 34 - 14 * t);
             }
         }
-        // Powerup pads: team-neutral diamond/ring markers per kind. Active
-        // pads pulse (outer ring = pickup radius); dark pads render dim.
-        // Pixel-art: 2px strokes on dyn, zero new objects.
-        for (const pad of this.match.padSnapshots) {
+        // Powerup pads: landed kind sprites (sprite-64) + team-neutral
+        // vector rings per kind. The sprite carries the kind glyph; the
+        // outer ring still marks the PAD_RADIUS pickup radius (active pulse)
+        // or a dim kind-color ring while dark, so the respawning kind stays
+        // readable next to the neutral ward marker.
+        // One snapshot read: positions, kinds, and active flags are static
+        // per match except the active flag, which flips on pickup/respawn.
+        const pads = this.match.padSnapshots;
+        for (let i = 0; i < pads.length; i += 1) {
+            const pad = pads[i] as (typeof pads)[number];
             const px = AX + pad.x;
             const py = AY + pad.y;
             const color = padColor(pad.kind);
-            if (!pad.active) {
-                // Dark (respawning) pads stay dim = "not ready", but keep the
-                // kind-specific glyph so the respawning kind stays readable.
-                if (pad.kind === 'amp') {
-                    g.fillStyle(color, 0.18);
-                    this.diamondPath(g, px, py, 9);
-                    g.fillPath();
-                } else {
-                    g.lineStyle(2, color, 0.22);
-                    this.diamondPath(g, px, py, 9);
-                    g.strokePath();
-                    if (pad.kind === 'repair') {
-                        g.fillStyle(color, 0.22);
-                        g.fillRect(px - 1, py - 4, 2, 8);
-                        g.fillRect(px - 4, py - 1, 8, 2);
-                    } else {
-                        g.lineStyle(1, color, 0.22);
-                        g.strokeCircle(px, py, 13);
-                    }
+            const img = this.padImgs[i] as Phaser.GameObjects.Image | undefined;
+            if (img !== undefined) {
+                const key = padSpriteKey(pad.kind, pad.active);
+                if (this.padKeys[i] !== key) {
+                    this.padKeys[i] = key;
+                    img.setTexture(key);
                 }
+                img.setAlpha(pad.active ? 1 : 0.85);
+            }
+            if (!pad.active) {
+                g.lineStyle(2, color, 0.22);
+                g.strokeCircle(px, py, 13);
                 continue;
             }
             const pulse = this.reducedMotion ? 0.7 : 0.55 + 0.3 * Math.sin(tickNow * 0.15 + (pad.x + pad.y) * 0.01);
             g.lineStyle(2, color, pulse);
             g.strokeCircle(px, py, PAD_RADIUS);
-            if (pad.kind === 'amp') {
-                g.fillStyle(color, pulse);
-                this.diamondPath(g, px, py, 9);
-                g.fillPath();
-            } else if (pad.kind === 'repair') {
-                g.lineStyle(2, color, pulse);
-                this.diamondPath(g, px, py, 9);
-                g.strokePath();
-                g.fillStyle(color, pulse);
-                g.fillRect(px - 2, py - 6, 4, 12);
-                g.fillRect(px - 6, py - 2, 12, 4);
-            } else {
-                g.lineStyle(2, color, pulse);
-                g.strokeCircle(px, py, 13);
-                this.diamondPath(g, px, py, 7);
-                g.strokePath();
-            }
         }
-        // Map turrets: square fortified structures (never circles like the
-        // robot chassis, never diamonds like the pads). Disabled = gray,
-        // owned = team color. Capture-progress arc while |progress| sits in
-        // (0,1); the barrel (owned only) tracks the nearest living enemy,
-        // computed render-side so the sim stays untouched.
+        // Map turrets: landed sprite bodies (sprite-64, variant per turret
+        // index, never circles like the chassis, never rings like the
+        // pads). Disabled = gray wash, owned = team-color wash + live
+        // barrel. Capture-progress arc while |progress| sits in (0,1); the
+        // barrel (owned only) tracks the nearest living enemy, computed
+        // render-side so the sim stays untouched.
         for (const turret of this.match.turretSnapshots) {
             const tx = AX + turret.x;
             const ty = AY + turret.y;
@@ -2452,19 +2467,15 @@ export class BattleScene extends Scene {
             const owner = turret.owner;
             if (owner === -1) {
                 g.fillStyle(COLORS.faintNum, 0.12);
-                g.fillRect(tx - 13, ty - 13, 26, 26);
-                g.lineStyle(2, COLORS.faintNum, 0.55);
-                g.strokeRect(tx - 13, ty - 13, 26, 26);
+                g.fillRect(tx - 26, ty - 26, 52, 52);
                 g.fillStyle(COLORS.faintNum, 0.7);
-                g.fillCircle(tx, ty, 3);
+                g.fillCircle(tx, ty, 5);
             } else {
                 const color = teamColor(owner);
                 g.fillStyle(color, 0.25);
-                g.fillRect(tx - 13, ty - 13, 26, 26);
-                g.lineStyle(2, color, 0.95);
-                g.strokeRect(tx - 13, ty - 13, 26, 26);
+                g.fillRect(tx - 26, ty - 26, 52, 52);
                 let bx = tx;
-                let by = ty - 20;
+                let by = ty - 40;
                 let best = Infinity;
                 for (const s of snaps) {
                     if (!s.alive || s.team === owner) continue;
@@ -2472,20 +2483,20 @@ export class BattleScene extends Scene {
                     if (d < best) {
                         best = d;
                         const aim = Math.atan2(s.y - turret.y, s.x - turret.x);
-                        bx = tx + Math.cos(aim) * 20;
-                        by = ty + Math.sin(aim) * 20;
+                        bx = tx + Math.cos(aim) * 40;
+                        by = ty + Math.sin(aim) * 40;
                     }
                 }
-                g.lineStyle(4, color, 0.95);
+                g.lineStyle(6, color, 0.95);
                 g.lineBetween(tx, ty, bx, by);
                 g.fillStyle(color, 0.95);
-                g.fillCircle(tx, ty, 4);
+                g.fillCircle(tx, ty, 6);
             }
             const prog = Math.abs(turret.progress);
             if (prog > 0 && prog < 1) {
-                g.lineStyle(3, teamColor(turret.progress > 0 ? 0 : 1), 0.9);
+                g.lineStyle(5, teamColor(turret.progress > 0 ? 0 : 1), 0.9);
                 g.beginPath();
-                g.arc(tx, ty, 19, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
+                g.arc(tx, ty, 38, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * prog);
                 g.strokePath();
             }
         }
@@ -2506,6 +2517,23 @@ export class BattleScene extends Scene {
                 g.lineStyle(2, COLORS.gold, 0.8);
                 g.strokeCircle(AX + h.x, AY + h.y, Math.max(h.radius * frac, 2));
             }
+            // Landed asteroid rocks (sprite-64): one pooled sprite per live
+            // telegraph, deterministic variant per slot, integer 2x (128px in
+            // the r=70 blast circle). Rings above stay the dodge read; extra
+            // telegraphs beyond the pool keep rings only.
+            const live = this.match.hazardSnapshots;
+            for (let r = 0; r < this.rockImgs.length; r += 1) {
+                const img = this.rockImgs[r] as Phaser.GameObjects.Image;
+                const h = live[r] as { x: number; y: number } | undefined;
+                if (h === undefined) {
+                    img.setVisible(false);
+                    continue;
+                }
+                img.setPosition(AX + h.x, AY + h.y).setAlpha(0.9).setVisible(true);
+            }
+        }
+        if (this.resultsShown) {
+            for (const img of this.rockImgs) img.setVisible(false);
         }
         for (const s of snaps) {
             if (!s.alive) continue;
