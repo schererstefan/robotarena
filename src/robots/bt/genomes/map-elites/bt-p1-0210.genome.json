@@ -1,0 +1,104 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "inverter",
+                "child": {
+                  "kind": "action",
+                  "name": "drive-to-foe",
+                  "params": []
+                }
+              },
+              {
+                "kind": "inverter",
+                "child": {
+                  "kind": "action",
+                  "name": "drive-to-pad",
+                  "params": [
+                    2
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "action",
+                "name": "aim-weakest",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "bank-charge",
+                "params": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "inverter",
+        "child": {
+          "kind": "action",
+          "name": "drive-to-pad",
+          "params": [
+            0
+          ]
+        }
+      },
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 33,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 4.536074625817657,
+    "wins": 4,
+    "novelty01": 0.17869154193921907,
+    "kills": 4,
+    "damage": 720,
+    "nodes": 14,
+    "behav": [
+      0.4328755283079399,
+      0.994193836534167,
+      0.75,
+      0,
+      0.5373134328358209,
+      0.0029610612883765124,
+      0.4361111111111111
+    ]
+  }
+}

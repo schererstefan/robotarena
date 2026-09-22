@@ -15,6 +15,10 @@ export interface NavTarget {
 
 export class FocusNav {
     onEscape: (() => void) | null = null;
+    /** Fired when the focused target changes (before the ring redraws). */
+    onMove: ((t: NavTarget) => void) | null = null;
+    /** Vertical world-space offset subtracted when drawing the ring (scroll). */
+    getRingOffset: (() => number) | null = null;
     private readonly g: Phaser.GameObjects.Graphics;
     private targets: NavTarget[] = [];
     private index = -1;
@@ -50,6 +54,8 @@ export class FocusNav {
     move(dir: 1 | -1): void {
         if (this.targets.length === 0) return;
         this.index = (this.index + dir + this.targets.length) % this.targets.length;
+        const t = this.targets[this.index];
+        if (t) this.onMove?.(t);
         this.draw();
     }
 
@@ -104,7 +110,8 @@ export class FocusNav {
         }
         this.g.clear();
         this.g.lineStyle(2, COLORS.gold, 1);
-        this.g.strokeRect(target.x - target.w / 2 - 3, target.y - target.h / 2 - 3, target.w + 6, target.h + 6);
+        const oy = this.getRingOffset?.() ?? 0;
+        this.g.strokeRect(target.x - target.w / 2 - 3, target.y - oy - target.h / 2 - 3, target.w + 6, target.h + 6);
         this.g.setVisible(true);
     }
 }

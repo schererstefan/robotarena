@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "condition",
+                "name": "ally-nearby",
+                "params": [
+                  400
+                ]
+              },
+              {
+                "kind": "action",
+                "name": "dash-away",
+                "params": []
+              },
+              {
+                "kind": "condition",
+                "name": "foe-farther-than",
+                "params": [
+                  240
+                ]
+              },
+              {
+                "kind": "sequence",
+                "children": [
+                  {
+                    "kind": "sequence",
+                    "children": [
+                      {
+                        "kind": "action",
+                        "name": "drive-to-track",
+                        "params": []
+                      },
+                      {
+                        "kind": "action",
+                        "name": "aim-nearest",
+                        "params": []
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "action",
+                    "name": "emp",
+                    "params": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "action",
+                "name": "aim-weakest",
+                "params": []
+              },
+              {
+                "kind": "selector",
+                "children": [
+                  {
+                    "kind": "action",
+                    "name": "aim-track",
+                    "params": []
+                  },
+                  {
+                    "kind": "action",
+                    "name": "dodge",
+                    "params": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "inverter",
+        "child": {
+          "kind": "action",
+          "name": "drive-to-pad",
+          "params": [
+            0
+          ]
+        }
+      },
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 41,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 5.159861401818647,
+    "wins": 4,
+    "novelty01": 0.38662046727288224,
+    "kills": 4,
+    "damage": 564,
+    "nodes": 20,
+    "behav": [
+      0.559460340430845,
+      0.5282324058919804,
+      0.9166666666666666,
+      0.7083333333333334,
+      0.46267432321575064,
+      0.008379155897113015,
+      0.28055555555555556
+    ]
+  }
+}

@@ -853,6 +853,8 @@ export class BattleScene extends Scene {
         if (this.request.tournament !== undefined) {
             // Abandon the battle: the unsettled slot stays open on the bracket.
             makeButton(this, 80, 740, 100, 36, TOURNAMENT.bracket, () => this.scene.start('Tournament'), 0, 44);
+        } else if (this.request.league === true) {
+            makeButton(this, 80, 740, 100, 36, BATTLE.exitLeague, () => this.scene.start('League'), 0, 44);
         } else {
             makeButton(this, 80, 740, 100, 36, COMMON.menu, () => this.scene.start('Menu'), 0, 44);
         }
@@ -3340,6 +3342,12 @@ export class BattleScene extends Scene {
                 hintKeys(resultsKeysHint(COMMON.next, TOURNAMENT.bracket));
             } else if (showcase?.reel) {
                 this.showReelButtons(showcase.reel);
+            } else if (this.request.league === true) {
+                makeButton(this, 412, 566 + lowerDy, 170, 44, BATTLE.rematch, doRematch, 21, 0, { tier: 'primary' });
+                makeButton(this, 612, 566 + lowerDy, 170, 44, BATTLE.exitLeague, () => this.scene.start('League'), 21);
+                this.resultsPrimary = doRematch;
+                this.resultsSecondary = () => this.scene.start('League');
+                hintKeys(resultsKeysHint(BATTLE.rematch, BATTLE.exitLeague));
             } else if (showcase !== undefined) {
                 makeButton(this, 412, 566 + lowerDy, 170, 44, BATTLE.rematch, doRematch, 21, 0, { tier: 'primary' });
                 makeButton(this, 612, 566 + lowerDy, 170, 44, BATTLE.exitShowcase, () => this.scene.start('Showcase'), 21);

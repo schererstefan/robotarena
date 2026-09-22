@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "drive-to-safety",
+            "params": []
+          },
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "action",
+                "name": "aim-weakest",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "drive-to-safety",
+                "params": []
+              },
+              {
+                "kind": "condition",
+                "name": "pad-kind-nearby",
+                "params": [
+                  1,
+                  260
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "selector",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "bank-charge",
+            "params": []
+          }
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 19,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 4.422809073508877,
+    "wins": 4,
+    "novelty01": 0.14093635783629244,
+    "kills": 2,
+    "damage": 455.45,
+    "nodes": 11,
+    "behav": [
+      0.8465407858882064,
+      0.5278888484995355,
+      0.08333333333333333,
+      0,
+      0.43316372628275235,
+      0.00824302606597809,
+      0.9333333333333333
+    ]
+  }
+}

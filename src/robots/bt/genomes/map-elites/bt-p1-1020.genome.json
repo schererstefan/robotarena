@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "condition",
+            "name": "pad-kind-nearby",
+            "params": [
+              1,
+              260
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "inverter",
+        "child": {
+          "kind": "action",
+          "name": "drive-to-pad",
+          "params": [
+            0
+          ]
+        }
+      },
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 32,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 3.229448766457593,
+    "wins": 2,
+    "novelty01": 0.4098162554858643,
+    "kills": 2,
+    "damage": 528,
+    "nodes": 7,
+    "behav": [
+      0.6178070564394709,
+      0.16663199500728104,
+      1.5,
+      0,
+      0.4528301886792453,
+      0.005154610158247795,
+      0.6541666666666667
+    ]
+  }
+}

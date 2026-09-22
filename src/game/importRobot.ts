@@ -25,6 +25,8 @@ export interface ImportedRobot {
     meta: RobotMeta;
     loadout: SkillLoadout;
     create: RobotFactory;
+    /** Base-chassis sprite id for session robots (e.g. league fighters); must be a registry id. */
+    displayId?: string;
 }
 
 export type ImportResult = { ok: true; id: string; robot: ImportedRobot } | { ok: false; error: string };
@@ -50,6 +52,11 @@ export function resolveLineupEntry(id: string): RobotEntry {
 
 /** Sprite id for menus/battles: imports reuse a generic scout look. */
 export function displayRobotId(id: string): string {
+    // Session robots (e.g. league fighters) can pin a base chassis sprite.
+    const imported = getImported(id);
+    if (imported?.displayId !== undefined && getRobot(imported.displayId) !== undefined) {
+        return imported.displayId;
+    }
     // Hillclimb variants (e.g. hunter-hc1) share base chassis art:
     // the registry only bakes the 8 base chassis, so map -hcN -> base.
     const base = id.replace(/-hc\d+$/, "");
@@ -224,6 +231,16 @@ export function validateAndRegister(module: unknown): ImportResult {
 }
 
 /**
+ * Register a session-only robot under a fully-qualified id (must start
+ * with `custom:`). Used by the League view for its curated fighters.
+ * Idempotent: re-registering an existing id is a no-op.
+ */
+export function registerSessionRobot(id: string, robot: ImportedRobot): void {
+    if (!id.startsWith(IMPORT_PREFIX)) throw new Error(`session robot id must start with ${IMPORT_PREFIX}`);
+    if (!registry.has(id)) registry.set(id, robot);
+}
+
+/**
  * Leftover TypeScript after import-type stripping (annotations, interfaces,
  * return types). Runs only on the blob-import failure path, so plain
  * JavaScript never reaches it — a match upgrades a cryptic SyntaxError into
@@ -291,4 +308,14 @@ export async function importRobotFromUrl(url: string): Promise<ImportResult> {
         return { ok: false, error: IMPORT_ERROR.fetchFailed };
     }
     return importRobotFromText(source);
+}
+
+/**
+ * Phase 1B capture hook (worktree-only): register a session-only robot for
+ * the ?bgshot capture harness. Backed by the imported-robot registry —
+ * never touches ROBOTS.
+ */
+export function registerCaptureRobot(id: string, robot: ImportedRobot): void {
+    if (!id.startsWith(IMPORT_PREFIX)) throw new Error('capture robot id must use the custom: prefix');
+    registry.set(id, robot);
 }

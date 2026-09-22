@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "condition",
+                "name": "zone-shrinking",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "dash-away",
+                "params": []
+              },
+              {
+                "kind": "condition",
+                "name": "foe-visible",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "drive-to-pad",
+                "params": [
+                  0
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "inverter",
+        "child": {
+          "kind": "action",
+          "name": "drive-to-pad",
+          "params": [
+            0
+          ]
+        }
+      },
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 30,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 3.6089696318548876,
+    "wins": 3,
+    "novelty01": 0.2029898772849625,
+    "kills": 3,
+    "damage": 588,
+    "nodes": 11,
+    "behav": [
+      0.4857718586576748,
+      0.2907356264122521,
+      0.6666666666666666,
+      0.4166666666666667,
+      0.47304907481898634,
+      0.01346840161714964,
+      0.19166666666666668
+    ]
+  }
+}

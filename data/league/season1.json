@@ -1,0 +1,2492 @@
+{
+  "season": "Season 1",
+  "format": "double round-robin",
+  "fighters": [
+    {
+      "id": "bt-p1-1120",
+      "name": "Warden",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-1120.genome.json",
+      "tree": "Selector (3)\n├─ Sequence (3)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  ├─ Sequence (2)\n│  │  ├─ IF 3+ foes visible\n│  │  └─ Inverter\n│  │     └─ DO drive to repair pad\n│  └─ Latch 'ambush' ttl=240\n│     └─ IF foe closer than 80u\n├─ Inverter\n│  └─ DO drive to any pad\n└─ DO aim at nearest foe (lead, hold-to-fire)",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-2211",
+      "name": "Blackout",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-2211.genome.json",
+      "tree": "Selector (3)\n├─ Sequence (2)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  └─ Selector (3)\n│     ├─ DO emp burst (foe in radius)\n│     ├─ DO run from foe\n│     └─ DO drive to safe-circle center\n├─ Inverter\n│  └─ DO drive to any pad\n└─ DO aim at nearest foe (lead, hold-to-fire)",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-0221",
+      "name": "Cyclone",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-0221.genome.json",
+      "tree": "Selector (3)\n├─ Sequence (2)\n│  ├─ Inverter\n│  │  └─ DO drive to any pad\n│  └─ DO emp burst (foe in radius)\n├─ Sequence (3)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  ├─ DO drive to safe-circle center\n│  └─ Sequence (3)\n│     ├─ IF sudden death shrinking\n│     ├─ IF just hit for 16+ dmg\n│     └─ IF asteroid impact within 30 ticks\n└─ DO orbit foe clockwise",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-1220",
+      "name": "Drifter",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-1220.genome.json",
+      "tree": "Selector (3)\n├─ Sequence (2)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  └─ Inverter\n│     └─ DO wander to a fresh waypoint\n├─ Inverter\n│  └─ DO drive to any pad\n└─ DO aim at nearest foe (lead, hold-to-fire)",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-1221",
+      "name": "Pulse",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-1221.genome.json",
+      "tree": "Selector (3)\n├─ Sequence (2)\n│  ├─ Inverter\n│  │  └─ DO drive to any pad\n│  └─ DO emp burst (foe in radius)\n├─ Sequence (3)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  ├─ DO drive to safe-circle center\n│  └─ Inverter\n│     └─ DO wander to a fresh waypoint\n└─ DO orbit foe clockwise",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-1212",
+      "name": "Survivor",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-1212.genome.json",
+      "tree": "Selector (4)\n├─ Sequence (3)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  ├─ IF repair pad within 260u\n│  └─ Sequence (2)\n│     ├─ Selector (2)\n│     │  ├─ DO drive at foe\n│     │  └─ IF foe farther than 180u\n│     └─ Inverter\n│        └─ IF always\n├─ Sequence (3)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  ├─ DO drive to safe-circle center\n│  └─ IF repair pad within 260u\n├─ Sequence (3)\n│  ├─ IF sudden death shrinking\n│  ├─ IF just hit for 16+ dmg\n│  └─ IF asteroid impact within 30 ticks\n└─ Selector (4)\n   ├─ IF sudden death shrinking\n   ├─ DO dash away from foe\n   ├─ IF foe visible\n   └─ DO drive to any pad",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-1210",
+      "name": "Scalpel",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-1210.genome.json",
+      "tree": "Selector (2)\n├─ Sequence (2)\n│  ├─ DO drive to foe's last-known position\n│  └─ DO aim at nearest foe (lead, hold-to-fire)\n└─ Selector (2)\n   ├─ DO aim at weakest foe (lead, hold-to-fire)\n   └─ DO bank charge (slow drive, charged shot)",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-1222",
+      "name": "Poltergeist",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-1222.genome.json",
+      "tree": "Selector (3)\n├─ Sequence (3)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  ├─ Selector (4)\n│  │  ├─ IF ally within 400u\n│  │  ├─ DO dash away from foe\n│  │  ├─ IF foe farther than 240u\n│  │  └─ Sequence (3)\n│  │     ├─ Sequence (2)\n│  │     │  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  │     │  └─ Selector (2)\n│  │     │     ├─ DO aim at stale track (ambush the last-known position)\n│  │     │     └─ DO sidestep the nearest incoming bullet lane\n│  │     ├─ DO hold 420u from foe\n│  │     └─ Latch 'revenge' ttl=120\n│  │        └─ Inverter\n│  │           └─ DO wander to a fresh waypoint\n│  └─ Sequence (3)\n│     ├─ DO dash away from foe\n│     ├─ DO sweep tower (0.6)\n│     └─ Inverter\n│        └─ IF foe closer than 500u\n├─ Inverter\n│  └─ DO drive to any pad\n└─ DO aim at nearest foe (lead, hold-to-fire)",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-0222",
+      "name": "Mirage",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-0222.genome.json",
+      "tree": "Selector (3)\n├─ Sequence (3)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  ├─ Selector (4)\n│  │  ├─ IF ally within 400u\n│  │  ├─ DO dash away from foe\n│  │  ├─ IF foe farther than 240u\n│  │  └─ Sequence (3)\n│  │     ├─ Sequence (2)\n│  │     │  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  │     │  └─ Sequence (3)\n│  │     │     ├─ IF sudden death shrinking\n│  │     │     ├─ IF just hit for 16+ dmg\n│  │     │     └─ IF asteroid impact within 30 ticks\n│  │     ├─ DO hold 420u from foe\n│  │     └─ Latch 'revenge' ttl=120\n│  │        └─ Inverter\n│  │           └─ DO wander to a fresh waypoint\n│  └─ Sequence (3)\n│     ├─ DO dash away from foe\n│     ├─ DO sweep tower (0.6)\n│     └─ Inverter\n│        └─ Sequence (2)\n│           ├─ Inverter\n│           │  └─ IF slowed by enemy emp\n│           └─ IF full charge banked\n├─ Inverter\n│  └─ DO drive to any pad\n└─ DO aim at nearest foe (lead, hold-to-fire)",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-2222",
+      "name": "Outlier",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-2222.genome.json",
+      "tree": "Selector (4)\n├─ Sequence (3)\n│  ├─ DO aim at nearest foe (lead, hold-to-fire)\n│  ├─ DO drive to safe-circle center\n│  └─ DO dash at foe\n├─ Sequence (3)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  ├─ DO drive to safe-circle center\n│  └─ IF repair pad within 260u\n├─ Sequence (3)\n│  ├─ IF sudden death shrinking\n│  ├─ IF just hit for 16+ dmg\n│  └─ IF asteroid impact within 30 ticks\n└─ Selector (4)\n   ├─ IF sudden death shrinking\n   ├─ DO dash away from foe\n   ├─ IF foe visible\n   └─ Inverter\n      └─ DO drive to any pad",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-2022",
+      "name": "Tracker",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-2022.genome.json",
+      "tree": "Selector (3)\n├─ Sequence (3)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  ├─ Selector (4)\n│  │  ├─ IF ally within 400u\n│  │  ├─ DO dash away from foe\n│  │  ├─ IF foe farther than 240u\n│  │  └─ Sequence (2)\n│  │     ├─ Sequence (2)\n│  │     │  ├─ DO drive to foe's last-known position\n│  │     │  └─ DO aim at nearest foe (lead, hold-to-fire)\n│  │     └─ DO emp burst (foe in radius)\n│  └─ Selector (2)\n│     ├─ Inverter\n│     │  └─ DO aim at weakest foe (lead, hold-to-fire)\n│     └─ DO sweep tower (0.4)\n├─ Inverter\n│  └─ DO drive to any pad\n└─ DO aim at nearest foe (lead, hold-to-fire)",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-1020",
+      "name": "Occam",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-1020.genome.json",
+      "tree": "Selector (3)\n├─ Sequence (2)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  └─ IF repair pad within 260u\n├─ Inverter\n│  └─ DO drive to any pad\n└─ DO aim at nearest foe (lead, hold-to-fire)",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-1010",
+      "name": "Mote",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-1010.genome.json",
+      "tree": "Sequence (3)\n├─ DO aim at weakest foe (lead, hold-to-fire)\n├─ DO drive to safe-circle center\n└─ IF repair pad within 260u",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-0121",
+      "name": "Banshee",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-0121.genome.json",
+      "tree": "Selector (3)\n├─ Sequence (3)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  ├─ Selector (4)\n│  │  ├─ IF ally within 400u\n│  │  ├─ DO dash away from foe\n│  │  ├─ IF foe farther than 240u\n│  │  └─ Sequence (3)\n│  │     ├─ Sequence (2)\n│  │     │  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  │     │  └─ Sequence (3)\n│  │     │     ├─ IF sudden death shrinking\n│  │     │     ├─ IF just hit for 16+ dmg\n│  │     │     └─ IF asteroid impact within 30 ticks\n│  │     ├─ DO hold 420u from foe\n│  │     └─ Latch 'revenge' ttl=120\n│  │        └─ Inverter\n│  │           └─ DO wander to a fresh waypoint\n│  └─ Sequence (3)\n│     ├─ DO dash away from foe\n│     ├─ DO sweep tower (0.6)\n│     └─ Inverter\n│        └─ Selector (2)\n│           ├─ DO aim at weakest foe (lead, hold-to-fire)\n│           └─ DO bank charge (slow drive, charged shot)\n├─ Inverter\n│  └─ DO drive to any pad\n└─ DO aim at nearest foe (lead, hold-to-fire)",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-p1-0210",
+      "name": "Banker",
+      "genome": "src/robots/bt/genomes/map-elites/bt-p1-0210.genome.json",
+      "tree": "Selector (3)\n├─ Sequence (3)\n│  ├─ DO aim at weakest foe (lead, hold-to-fire)\n│  ├─ Sequence (2)\n│  │  ├─ Inverter\n│  │  │  └─ DO drive at foe\n│  │  └─ Inverter\n│  │     └─ DO drive to repair pad\n│  └─ Selector (2)\n│     ├─ DO aim at weakest foe (lead, hold-to-fire)\n│     └─ DO bank charge (slow drive, charged shot)\n├─ Inverter\n│  └─ DO drive to any pad\n└─ DO aim at nearest foe (lead, hold-to-fire)",
+      "startElo": 1500
+    },
+    {
+      "id": "bt-n1",
+      "name": "Moth",
+      "genome": "src/robots/bt/genomes/moth-v0.2.0.genome.json",
+      "tree": "Sequence (4)\n├─ Sequence (3)\n│  ├─ DO aim at nearest foe (lead, hold-to-fire)\n│  ├─ Sequence (4)\n│  │  ├─ DO drive to any pad\n│  │  ├─ DO drive to safe-circle center\n│  │  ├─ DO sweep tower (0.7)\n│  │  └─ IF pad within 380u\n│  └─ IF pad within 120u\n├─ DO dash at foe\n├─ IF hp below 35%\n└─ Sequence (3)\n   ├─ DO aim at nearest foe (lead, hold-to-fire)\n   ├─ DO orbit foe counter-clockwise\n   └─ IF pad within 120u",
+      "startElo": 1500
+    }
+  ],
+  "matches": [
+    {
+      "id": "s1-m001",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-2211",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMDAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m002",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-2211",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMDIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m003",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-1120",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMDIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m004",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1120",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMDMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m005",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1220",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMDQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m006",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1120",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMDUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m007",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMDYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m008",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1120",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMDcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m009",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-1120",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMDgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m010",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1120",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMDksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m011",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-1120",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMTAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m012",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1120",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMTEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m013",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-1222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMTIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m014",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMTMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m015",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-0222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMTcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m016",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-0222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMTcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m017",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-2222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMTYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m018",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1120",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMTcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m019",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-1120",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMTksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m020",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1120",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMTksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m021",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-1120",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMjEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m022",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1120",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMjEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m023",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-1120",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMjIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m024",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1120",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMjMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m025",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-0121",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMjUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m026",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1120",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMjUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m027",
+      "a": "bt-p1-1120",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-0210",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMjYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m028",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-1120",
+      "winner": "bt-p1-1120",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMjcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m029",
+      "a": "bt-p1-1120",
+      "b": "bt-n1",
+      "winner": "bt-n1",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMjgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMTIwIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m030",
+      "a": "bt-n1",
+      "b": "bt-p1-1120",
+      "winner": "bt-n1",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMjksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMTEyMCJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m031",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-0221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMzAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m032",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-2211",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMzEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m033",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1220",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMzIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m034",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-2211",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMzMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m035",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMzQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m036",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMzUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m037",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-2211",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMzYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m038",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-1212",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMzcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m039",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-2211",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMzgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m040",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-1210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMzksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m041",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-2211",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNDAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m042",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-1222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNDEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m043",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-2211",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNDIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m044",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-2211",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNDMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m045",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-2211",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNDQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m046",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-2222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNDUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m047",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-2211",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNDYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m048",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-2211",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNDcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m049",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-1020",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNDgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m050",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-2211",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNTAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m051",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-2211",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNTAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m052",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-1010",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNTEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m053",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-2211",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNTIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m054",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-0121",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNTMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m055",
+      "a": "bt-p1-2211",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-2211",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNTQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m056",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-2211",
+      "winner": "bt-p1-2211",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNTUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m057",
+      "a": "bt-p1-2211",
+      "b": "bt-n1",
+      "winner": "bt-p1-2211",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNTYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m058",
+      "a": "bt-n1",
+      "b": "bt-p1-2211",
+      "winner": "bt-n1",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNTcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMjIxMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m059",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1220",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNTgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m060",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNTksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m061",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNjQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m062",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNjIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m063",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-0221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNjIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m064",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-0221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNjMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m065",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-0221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNjQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m066",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-1210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNjUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m067",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-0221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNjYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m068",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-0221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNjcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m069",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-0221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNjgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m070",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-0222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNjksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m071",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-2222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNzAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m072",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-0221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNzEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m073",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-0221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNzIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m074",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-0221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNzMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m075",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-0221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNzUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m076",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-0221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNzUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m077",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-0221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNzYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m078",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-1010",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNzcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m079",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-0221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNzgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m080",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-0221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwNzksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m081",
+      "a": "bt-p1-0221",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-0210",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwODEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m082",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-0210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwODEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m083",
+      "a": "bt-p1-0221",
+      "b": "bt-n1",
+      "winner": "bt-p1-0221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwODIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m084",
+      "a": "bt-n1",
+      "b": "bt-p1-0221",
+      "winner": "bt-p1-0221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwODMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMDIyMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m085",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwODQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m086",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwODUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m087",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-1212",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwODYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m088",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1212",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwODcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m089",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwODgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m090",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1220",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwODksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m091",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwOTAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m092",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1220",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwOTEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m093",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwOTIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m094",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-0222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwOTMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m095",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwOTQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m096",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1220",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwOTUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m097",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwOTYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m098",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1220",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwOTcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m099",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwOTgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m100",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1220",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwOTksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m101",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMDAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m102",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1220",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMDEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m103",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMDIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m104",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-0121",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMDMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m105",
+      "a": "bt-p1-1220",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMDQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m106",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-1220",
+      "winner": "bt-p1-1220",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMDUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m107",
+      "a": "bt-p1-1220",
+      "b": "bt-n1",
+      "winner": "bt-p1-1220",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMDYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m108",
+      "a": "bt-n1",
+      "b": "bt-p1-1220",
+      "winner": "bt-n1",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMDcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMTIyMCJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m109",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMDgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m110",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m111",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m112",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m113",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m114",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m115",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m116",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m117",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-2222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m118",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-2222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m119",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m120",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-2022",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m121",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMjAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m122",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMjEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m123",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMjIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m124",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1010",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMjMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m125",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMjQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m126",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMjUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m127",
+      "a": "bt-p1-1221",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMjcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m128",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-0210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMjcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m129",
+      "a": "bt-p1-1221",
+      "b": "bt-n1",
+      "winner": "bt-p1-1221",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMjgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m130",
+      "a": "bt-n1",
+      "b": "bt-p1-1221",
+      "winner": "bt-p1-1221",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMjksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMTIyMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m131",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-1212",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMzAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m132",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-1210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMzEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m133",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-1222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMzIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m134",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-1222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMzMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m135",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-1212",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMzQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m136",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-0222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMzUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m137",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-1212",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMzYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m138",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-1212",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMzcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m139",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-1212",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMzgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m140",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-1212",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMzksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m141",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-1020",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNDAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m142",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-1212",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNDEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m143",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-1212",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNDIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m144",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-1212",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNDMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m145",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-1212",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNDQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m146",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-0121",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNDUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m147",
+      "a": "bt-p1-1212",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-1212",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNDYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m148",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-1212",
+      "winner": "bt-p1-1212",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNDcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m149",
+      "a": "bt-p1-1212",
+      "b": "bt-n1",
+      "winner": "bt-p1-1212",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNDgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m150",
+      "a": "bt-n1",
+      "b": "bt-p1-1212",
+      "winner": "bt-n1",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNDksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMTIxMiJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m151",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-1222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNTAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m152",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-1222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNTEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m153",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-0222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNTIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m154",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-0222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNTMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m155",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-2222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNTQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m156",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-2222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNTUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m157",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-2022",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNTYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m158",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-1210",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNTcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m159",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-1020",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNTgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m160",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-1210",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNTksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m161",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-1010",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNjAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m162",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-1210",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNjEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m163",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-0121",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNjIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m164",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-1210",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNjMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m165",
+      "a": "bt-p1-1210",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-1210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNjQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m166",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-1210",
+      "winner": "bt-p1-0210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNjUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m167",
+      "a": "bt-p1-1210",
+      "b": "bt-n1",
+      "winner": "bt-p1-1210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNjYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m168",
+      "a": "bt-n1",
+      "b": "bt-p1-1210",
+      "winner": "bt-n1",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNjcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMTIxMCJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m169",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-0222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNjksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m170",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-1222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNjksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m171",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-2222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNzAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m172",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-2222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNzEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m173",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-1222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNzIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m174",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-2022",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNzQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m175",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-1222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNzQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m176",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-1222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNzUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m177",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-1222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNzYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m178",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-1222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNzcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m179",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-1222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNzksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m180",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-1222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNzksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m181",
+      "a": "bt-p1-1222",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-1222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxODAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m182",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-1222",
+      "winner": "bt-p1-0210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxODEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m183",
+      "a": "bt-p1-1222",
+      "b": "bt-n1",
+      "winner": "bt-p1-1222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxODIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m184",
+      "a": "bt-n1",
+      "b": "bt-p1-1222",
+      "winner": "bt-n1",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxODMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMTIyMiJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m185",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-0222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxODQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m186",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-0222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxODUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m187",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-0222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxODYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m188",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-2022",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxODcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m189",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-0222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxODgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m190",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-0222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxODksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m191",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-0222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxOTAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m192",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-0222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxOTEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m193",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-0121",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxOTIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m194",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-0121",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxOTMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m195",
+      "a": "bt-p1-0222",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-0210",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxOTQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m196",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-0222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxOTUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m197",
+      "a": "bt-p1-0222",
+      "b": "bt-n1",
+      "winner": "bt-p1-0222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxOTYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m198",
+      "a": "bt-n1",
+      "b": "bt-p1-0222",
+      "winner": "bt-p1-0222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxOTcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMDIyMiJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m199",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-2222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxOTgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m200",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-2222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxOTksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m201",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-1020",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMDAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m202",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-2222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMDEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m203",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-1010",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMDIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m204",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-2222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMDMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m205",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-2222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMDQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m206",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-0121",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMDUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m207",
+      "a": "bt-p1-2222",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-2222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMDYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m208",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-2222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMDcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m209",
+      "a": "bt-p1-2222",
+      "b": "bt-n1",
+      "winner": "bt-p1-2222",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMDgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjIyIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m210",
+      "a": "bt-n1",
+      "b": "bt-p1-2222",
+      "winner": "bt-p1-2222",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMDksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMjIyMiJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m211",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-1020",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMTAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m212",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-2022",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMTEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m213",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-1010",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMTIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m214",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-2022",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMTMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m215",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-0121",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMTQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m216",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-0121",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMTUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m217",
+      "a": "bt-p1-2022",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-2022",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMTYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m218",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-2022",
+      "winner": "bt-p1-0210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMTcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m219",
+      "a": "bt-p1-2022",
+      "b": "bt-n1",
+      "winner": "bt-n1",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMTgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m220",
+      "a": "bt-n1",
+      "b": "bt-p1-2022",
+      "winner": "bt-n1",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMTksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMjAyMiJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m221",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-1020",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMjAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m222",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-1020",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMjEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m223",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-0121",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMjUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m224",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-0121",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMjMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m225",
+      "a": "bt-p1-1020",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-1020",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMjQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m226",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-0210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMjUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m227",
+      "a": "bt-p1-1020",
+      "b": "bt-n1",
+      "winner": "bt-n1",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMjYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDIwIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m228",
+      "a": "bt-n1",
+      "b": "bt-p1-1020",
+      "winner": "bt-p1-1020",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMjcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMTAyMCJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m229",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-0121",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMjgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m230",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-0121",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMjksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m231",
+      "a": "bt-p1-1010",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-0210",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMzAsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m232",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-1010",
+      "winner": "bt-p1-0210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMzEsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m233",
+      "a": "bt-p1-1010",
+      "b": "bt-n1",
+      "winner": "bt-p1-1010",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMzIsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMDEwIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m234",
+      "a": "bt-n1",
+      "b": "bt-p1-1010",
+      "winner": "bt-n1",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMzMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMTAxMCJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m235",
+      "a": "bt-p1-0121",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-0210",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMzQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoib3BlbiIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m236",
+      "a": "bt-p1-0210",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-0121",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMzUsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9"
+    },
+    {
+      "id": "s1-m237",
+      "a": "bt-p1-0121",
+      "b": "bt-n1",
+      "winner": "bt-p1-0121",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMzYsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m238",
+      "a": "bt-n1",
+      "b": "bt-p1-0121",
+      "winner": "bt-p1-0121",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMzcsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMDEyMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    },
+    {
+      "id": "s1-m239",
+      "a": "bt-p1-0210",
+      "b": "bt-n1",
+      "winner": "bt-p1-0210",
+      "scoreA": 1,
+      "scoreB": 0,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMzgsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1uMSJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6Im9wZW4iLCJtIjoiIn0"
+    },
+    {
+      "id": "s1-m240",
+      "a": "bt-n1",
+      "b": "bt-p1-0210",
+      "winner": "bt-p1-0210",
+      "scoreA": 0,
+      "scoreB": 1,
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAyMzksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1uMSIsImN1c3RvbTpsZWFndWUtYnQtcDEtMDIxMCJdLCJvIjpbIjU6Miw3OjIsODoyIiwiNToyLDc6Miw4OjIiXSwiYSI6ImJsb2NrcyIsIm0iOiIifQ"
+    }
+  ],
+  "standings": [
+    {
+      "fighter": "bt-p1-1220",
+      "wins": 22,
+      "losses": 8,
+      "draws": 0,
+      "elo": 1624,
+      "rank": 1
+    },
+    {
+      "fighter": "bt-p1-1221",
+      "wins": 22,
+      "losses": 8,
+      "draws": 0,
+      "elo": 1603,
+      "rank": 2
+    },
+    {
+      "fighter": "bt-p1-2211",
+      "wins": 18,
+      "losses": 12,
+      "draws": 0,
+      "elo": 1555,
+      "rank": 3
+    },
+    {
+      "fighter": "bt-p1-2222",
+      "wins": 18,
+      "losses": 12,
+      "draws": 0,
+      "elo": 1553,
+      "rank": 4
+    },
+    {
+      "fighter": "bt-p1-0222",
+      "wins": 18,
+      "losses": 12,
+      "draws": 0,
+      "elo": 1548,
+      "rank": 5
+    },
+    {
+      "fighter": "bt-p1-1222",
+      "wins": 18,
+      "losses": 12,
+      "draws": 0,
+      "elo": 1543,
+      "rank": 6
+    },
+    {
+      "fighter": "bt-p1-0121",
+      "wins": 17,
+      "losses": 13,
+      "draws": 0,
+      "elo": 1564,
+      "rank": 7
+    },
+    {
+      "fighter": "bt-p1-0221",
+      "wins": 17,
+      "losses": 13,
+      "draws": 0,
+      "elo": 1561,
+      "rank": 8
+    },
+    {
+      "fighter": "bt-p1-1120",
+      "wins": 17,
+      "losses": 13,
+      "draws": 0,
+      "elo": 1533,
+      "rank": 9
+    },
+    {
+      "fighter": "bt-p1-1212",
+      "wins": 16,
+      "losses": 14,
+      "draws": 0,
+      "elo": 1533,
+      "rank": 10
+    },
+    {
+      "fighter": "bt-p1-0210",
+      "wins": 14,
+      "losses": 16,
+      "draws": 0,
+      "elo": 1496,
+      "rank": 11
+    },
+    {
+      "fighter": "bt-n1",
+      "wins": 11,
+      "losses": 19,
+      "draws": 0,
+      "elo": 1401,
+      "rank": 12
+    },
+    {
+      "fighter": "bt-p1-1210",
+      "wins": 9,
+      "losses": 21,
+      "draws": 0,
+      "elo": 1401,
+      "rank": 13
+    },
+    {
+      "fighter": "bt-p1-1020",
+      "wins": 9,
+      "losses": 21,
+      "draws": 0,
+      "elo": 1399,
+      "rank": 14
+    },
+    {
+      "fighter": "bt-p1-2022",
+      "wins": 7,
+      "losses": 23,
+      "draws": 0,
+      "elo": 1348,
+      "rank": 15
+    },
+    {
+      "fighter": "bt-p1-1010",
+      "wins": 7,
+      "losses": 23,
+      "draws": 0,
+      "elo": 1338,
+      "rank": 16
+    }
+  ],
+  "rivalries": [
+    {
+      "a": "bt-p1-1010",
+      "b": "bt-n1",
+      "record": "1-1",
+      "note": "The Marathon: both legs went to sudden death (9,918 and 9,708 ticks) and both were decided by 4 HP. The 4-node minimalist Mote vs the Phase-0 champion Moth — neither could finish the other before the circle collapsed."
+    },
+    {
+      "a": "bt-p1-2022",
+      "b": "bt-p1-1221",
+      "record": "1-1",
+      "note": "Biggest shock of the season: Tracker (novelty 0.706, finished #15) beat #2 Pulse by 4 HP for a +185.6 Elo swing in 275 ticks; Pulse took revenge on the other leg."
+    },
+    {
+      "a": "bt-p1-1222",
+      "b": "bt-p1-1221",
+      "record": "1-1",
+      "note": "Poltergeist’s revenge-latch ambush game toppled the #2 seed Pulse (+150.6 Elo) in 862 ticks; Pulse answered on the open leg."
+    },
+    {
+      "a": "bt-p1-0121",
+      "b": "bt-p1-1220",
+      "record": "1-1",
+      "note": "Banshee beat the eventual champion Drifter (+164.8 Elo) in 460 ticks; Drifter took the other leg on the way to the title."
+    },
+    {
+      "a": "bt-n1",
+      "b": "bt-p1-1220",
+      "record": "1-1",
+      "note": "The legacy Phase-0 Moth took a leg off the champion Drifter (+148.1 Elo) — the old king reminding the new one it still has teeth."
+    },
+    {
+      "a": "bt-p1-1020",
+      "b": "bt-p1-2211",
+      "record": "1-1",
+      "note": "Occam’s 9,163-tick sudden-death comeback from a 72 HP deficit (+74.2 upset over Blackout); Blackout needed a shootout to answer on blocks."
+    },
+    {
+      "a": "bt-p1-1020",
+      "b": "bt-p1-2222",
+      "record": "1-1",
+      "note": "The 7-node minimalist Occam upset the novelty-1.00 king Outlier (+155.3 Elo) in 266 ticks; Outlier answered on blocks."
+    },
+    {
+      "a": "bt-p1-1010",
+      "b": "bt-p1-1210",
+      "record": "1-1",
+      "note": "Two minimalists, two circle-collapse grinds: both legs hit sudden death (9,721 and 10,284 ticks). The grindiest rivalry of the season."
+    }
+  ],
+  "highlights": [
+    {
+      "title": "Match of the season",
+      "match": "s1-m040",
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAwMzksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEwIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMjExIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+      "note": "Scalpel trailed Blackout by 126 HP, dragged the fight into sudden death, and won by 4 HP after 9,942 ticks — comeback, grind, nail-biter, and a +47.1 Elo upset all in one match."
+    },
+    {
+      "title": "Biggest upset",
+      "match": "s1-m120",
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMTksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIxIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+      "note": "Tracker (+185.6 Elo swing) beat #2 Pulse by 4 HP in 275 ticks — the largest underdog win of the season."
+    },
+    {
+      "title": "Sudden-death war",
+      "match": "s1-m174",
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxNzQsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+      "note": "Tracker vs Poltergeist needed a shootout just to get a decisive seed, then ground through 10,164 ticks of sudden death — Tracker by 10 HP."
+    },
+    {
+      "title": "Fastest KO",
+      "match": "s1-m140",
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMzksInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0yMDIyIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjEyIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+      "note": "Survivor needed 253 ticks to put Tracker away — the quickest kill of the season."
+    },
+    {
+      "title": "Champion toppled",
+      "match": "s1-m104",
+      "replay": "RA1.eyJ2IjoxLCJnIjoiMC4xLjAiLCJzIjo5MTAxMDMsInQiOjEsImwiOlsiY3VzdG9tOmxlYWd1ZS1idC1wMS0wMTIxIiwiY3VzdG9tOmxlYWd1ZS1idC1wMS0xMjIwIl0sIm8iOlsiNToyLDc6Miw4OjIiLCI1OjIsNzoyLDg6MiJdLCJhIjoiYmxvY2tzIiwibSI6IiJ9",
+      "note": "Banshee beat the eventual champion Drifter (+164.8 Elo) in 460 ticks — the highest-Elo scalp claimed all season."
+    }
+  ]
+}

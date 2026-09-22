@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "inverter",
+            "child": {
+              "kind": "action",
+              "name": "drive-to-pad",
+              "params": [
+                0
+              ]
+            }
+          },
+          {
+            "kind": "action",
+            "name": "emp",
+            "params": []
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "drive-to-safety",
+            "params": []
+          },
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "condition",
+                "name": "zone-shrinking",
+                "params": []
+              },
+              {
+                "kind": "condition",
+                "name": "just-hit-hard",
+                "params": [
+                  16
+                ]
+              },
+              {
+                "kind": "condition",
+                "name": "hazard-soon",
+                "params": [
+                  30
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "action",
+        "name": "orbit-foe",
+        "params": [
+          1
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 9,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 6.842107733962728,
+    "wins": 6,
+    "novelty01": 0.28070257798757603,
+    "kills": 6,
+    "damage": 792,
+    "nodes": 13,
+    "behav": [
+      0.44472674551893865,
+      0.989587852494577,
+      1.5,
+      0.16666666666666666,
+      0.5358592692828146,
+      0.024512909106230434,
+      0.225
+    ]
+  }
+}

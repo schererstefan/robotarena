@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "drive-to-safety",
+            "params": []
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "action",
+                "name": "drive-to-foe",
+                "params": []
+              },
+              {
+                "kind": "condition",
+                "name": "pad-nearby",
+                "params": [
+                  300
+                ]
+              },
+              {
+                "kind": "condition",
+                "name": "kills-at-least",
+                "params": [
+                  2
+                ]
+              },
+              {
+                "kind": "condition",
+                "name": "sudden-death-soon",
+                "params": [
+                  780
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "condition",
+            "name": "bullet-closer-than",
+            "params": [
+              220
+            ]
+          },
+          {
+            "kind": "action",
+            "name": "drive-to-safety",
+            "params": []
+          }
+        ]
+      },
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 5,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 2.6468115800206746,
+    "wins": 2,
+    "novelty01": 0.21560386000689155,
+    "kills": 2,
+    "damage": 504,
+    "nodes": 13,
+    "behav": [
+      0.4697498857765094,
+      0.36681691350075124,
+      0,
+      0,
+      0.41895261845386533,
+      0.010315326123095651,
+      0.3777777777777778
+    ]
+  }
+}

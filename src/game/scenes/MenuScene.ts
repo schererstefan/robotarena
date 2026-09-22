@@ -23,7 +23,8 @@ import {
 } from '../history';
 import { COLORS, FONT_STACKS, FONTS } from '../theme';
 import { isColorblind, isReducedMotion, setColorblind, setReducedMotion, teamColor } from '../accessibility';
-import { displayRobotId, getImported, importRobotFromFile, importRobotFromUrl } from '../importRobot';
+import { displayRobotId, getImported, importRobotFromFile, importRobotFromUrl, resolveLineupEntry } from '../importRobot';
+import { registerP1CaptureLineup } from '../../robots/bt/mapelites-capture-bridge';
 import { FocusNav, type NavTarget } from '../nav';
 import { fetchOnlineBoard, type OnlineBoard } from '../onlineBoard';
 import { loadShowcase } from '../showcase';
@@ -103,6 +104,12 @@ export interface BattleRequest {
      * in history like any bot-vs-bot battle.
      */
     tournament?: { round: number; index: number; label: string };
+    /**
+     * League replay watch (Season 1). Excluded from history like
+     * replay/pilot; results and the exit button return to the League
+     * scene instead of the menu.
+     */
+    league?: boolean;
 }
 
 const CX = 512;
@@ -306,6 +313,26 @@ export class MenuScene extends Scene {
                 const shotArena = params.get('arena');
                 if (shotArena !== null && (ARENA_IDS as readonly string[]).includes(shotArena)) {
                     this.arena = shotArena as ArenaId;
+                }
+                const shotLineup = params.get('lineup');
+                if (shotLineup !== null) {
+                    // Phase 1B capture: &lineup=id1,id2 — p1 genome ids resolve
+                    // via the capture bridge (session-only custom: registration
+                    // from genome JSONs, never registry entries).
+                    const ids = registerP1CaptureLineup(
+                        shotLineup.split(',').map((s) => s.trim()).filter((s) => s.length > 0),
+                    );
+                    if (ids.length >= 2) {
+                        this.lineupIds = ids.slice(0, 2);
+                        this.loadouts = this.lineupIds.map((id) => ({ ...resolveLineupEntry(id).loadout }));
+                        this.skins = this.lineupIds.map((id, i) =>
+                            defaultSkin(
+                                (resolveLineupEntry(id).meta.name ?? id).toUpperCase(),
+                                i,
+                                (i < this.teamSize ? 0 : 1) as 0 | 1,
+                            ),
+                        );
+                    }
                 }
                 this.startBattleWithSeed(Number.parseInt(shotSeed, 10) || 7);
                 return;
@@ -551,6 +578,7 @@ export class MenuScene extends Scene {
         this.homeItem(mx, 418, MENU.pilot, () => this.startPilot());
         this.homeItem(mx, 476, MENU.watchReplay, () => this.openReplayDialog());
         this.homeItem(mx, 534, 'TOURNAMENT', () => this.scene.start('Tournament'));
+        this.homeItem(mx, 592, MENU.league, () => this.scene.start('League'));
 
         // Slim footer: flow links first, settings second.
         this.layoutFooterRow1();

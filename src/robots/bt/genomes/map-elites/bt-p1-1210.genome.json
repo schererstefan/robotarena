@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "drive-to-track",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "aim-nearest",
+            "params": []
+          }
+        ]
+      },
+      {
+        "kind": "selector",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "bank-charge",
+            "params": []
+          }
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 29,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 5.3981956137736535,
+    "wins": 5,
+    "novelty01": 0.13273187125788452,
+    "kills": 5,
+    "damage": 754.75,
+    "nodes": 7,
+    "behav": [
+      0.4905996691543677,
+      0.7961730449251248,
+      0.16666666666666666,
+      0,
+      0.5667354984043552,
+      0.01826288993466602,
+      0.2708333333333333
+    ]
+  }
+}

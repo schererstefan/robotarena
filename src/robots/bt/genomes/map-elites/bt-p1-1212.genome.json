@@ -1,0 +1,163 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "condition",
+            "name": "pad-kind-nearby",
+            "params": [
+              1,
+              260
+            ]
+          },
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "selector",
+                "children": [
+                  {
+                    "kind": "action",
+                    "name": "drive-to-foe",
+                    "params": []
+                  },
+                  {
+                    "kind": "condition",
+                    "name": "foe-farther-than",
+                    "params": [
+                      180
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "inverter",
+                "child": {
+                  "kind": "condition",
+                  "name": "always",
+                  "params": []
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "drive-to-safety",
+            "params": []
+          },
+          {
+            "kind": "condition",
+            "name": "pad-kind-nearby",
+            "params": [
+              1,
+              260
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "condition",
+            "name": "zone-shrinking",
+            "params": []
+          },
+          {
+            "kind": "condition",
+            "name": "just-hit-hard",
+            "params": [
+              16
+            ]
+          },
+          {
+            "kind": "condition",
+            "name": "hazard-soon",
+            "params": [
+              30
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "selector",
+        "children": [
+          {
+            "kind": "condition",
+            "name": "zone-shrinking",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "dash-away",
+            "params": []
+          },
+          {
+            "kind": "condition",
+            "name": "foe-visible",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "drive-to-pad",
+            "params": [
+              0
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 46,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 7.630038224745887,
+    "wins": 6,
+    "novelty01": 0.5433460749152956,
+    "kills": 4,
+    "damage": 552,
+    "nodes": 23,
+    "behav": [
+      0.5391596072893793,
+      1,
+      0.5833333333333334,
+      0.875,
+      0.6079295154185022,
+      0.0020214943943272223,
+      1.5
+    ]
+  }
+}

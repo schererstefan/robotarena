@@ -1,0 +1,167 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-weakest",
+            "params": []
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "condition",
+                "name": "ally-nearby",
+                "params": [
+                  400
+                ]
+              },
+              {
+                "kind": "action",
+                "name": "dash-away",
+                "params": []
+              },
+              {
+                "kind": "condition",
+                "name": "foe-farther-than",
+                "params": [
+                  240
+                ]
+              },
+              {
+                "kind": "sequence",
+                "children": [
+                  {
+                    "kind": "sequence",
+                    "children": [
+                      {
+                        "kind": "action",
+                        "name": "aim-weakest",
+                        "params": []
+                      },
+                      {
+                        "kind": "selector",
+                        "children": [
+                          {
+                            "kind": "action",
+                            "name": "aim-track",
+                            "params": []
+                          },
+                          {
+                            "kind": "action",
+                            "name": "dodge",
+                            "params": []
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "action",
+                    "name": "kite-foe",
+                    "params": [
+                      420
+                    ]
+                  },
+                  {
+                    "kind": "latch",
+                    "key": 0,
+                    "ttl": 120,
+                    "child": {
+                      "kind": "inverter",
+                      "child": {
+                        "kind": "action",
+                        "name": "wander",
+                        "params": []
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "action",
+                "name": "dash-away",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "scan",
+                "params": [
+                  0.6000000000000001
+                ]
+              },
+              {
+                "kind": "inverter",
+                "child": {
+                  "kind": "condition",
+                  "name": "foe-closer-than",
+                  "params": [
+                    500
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "inverter",
+        "child": {
+          "kind": "action",
+          "name": "drive-to-pad",
+          "params": [
+            0
+          ]
+        }
+      },
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 16,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 6.135799637406927,
+    "wins": 5,
+    "novelty01": 0.3785998791356423,
+    "kills": 5,
+    "damage": 696,
+    "nodes": 25,
+    "behav": [
+      0.7429136370379053,
+      0.826565335753176,
+      1.5,
+      0.7083333333333334,
+      0.5366229760986893,
+      0.020240314383783608,
+      0.3625
+    ]
+  }
+}

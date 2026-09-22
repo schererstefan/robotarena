@@ -1,0 +1,216 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "action",
+                "name": "aim-weakest",
+                "params": []
+              },
+              {
+                "kind": "selector",
+                "children": [
+                  {
+                    "kind": "action",
+                    "name": "aim-track",
+                    "params": []
+                  },
+                  {
+                    "kind": "action",
+                    "name": "dodge",
+                    "params": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "action",
+            "name": "kite-foe",
+            "params": [
+              420
+            ]
+          },
+          {
+            "kind": "latch",
+            "key": 0,
+            "ttl": 120,
+            "child": {
+              "kind": "inverter",
+              "child": {
+                "kind": "action",
+                "name": "wander",
+                "params": []
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "condition",
+            "name": "charged-shot",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "orbit-foe",
+            "params": [
+              1
+            ]
+          },
+          {
+            "kind": "condition",
+            "name": "foe-weak",
+            "params": [
+              0.55
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "sequence",
+                "children": [
+                  {
+                    "kind": "action",
+                    "name": "drive-to-track",
+                    "params": []
+                  },
+                  {
+                    "kind": "action",
+                    "name": "aim-nearest",
+                    "params": []
+                  }
+                ]
+              },
+              {
+                "kind": "action",
+                "name": "emp",
+                "params": []
+              }
+            ]
+          },
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "sequence",
+                "children": [
+                  {
+                    "kind": "action",
+                    "name": "drive-to-track",
+                    "params": []
+                  },
+                  {
+                    "kind": "action",
+                    "name": "aim-nearest",
+                    "params": []
+                  }
+                ]
+              },
+              {
+                "kind": "condition",
+                "name": "pad-kind-nearby",
+                "params": [
+                  0,
+                  400
+                ]
+              },
+              {
+                "kind": "inverter",
+                "child": {
+                  "kind": "condition",
+                  "name": "gun-ready",
+                  "params": []
+                }
+              },
+              {
+                "kind": "selector",
+                "children": [
+                  {
+                    "kind": "action",
+                    "name": "kite-foe",
+                    "params": [
+                      300
+                    ]
+                  },
+                  {
+                    "kind": "action",
+                    "name": "drive-to-foe",
+                    "params": []
+                  },
+                  {
+                    "kind": "action",
+                    "name": "drive-to-foe",
+                    "params": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "inverter",
+        "child": {
+          "kind": "latch",
+          "key": 0,
+          "ttl": 240,
+          "child": {
+            "kind": "action",
+            "name": "dash-at-foe",
+            "params": []
+          }
+        }
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 35,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 4.409879093922766,
+    "wins": 4,
+    "novelty01": 0.13662636464092182,
+    "kills": 4,
+    "damage": 588,
+    "nodes": 35,
+    "behav": [
+      0.7910707608199421,
+      0.9008375555785337,
+      0,
+      1,
+      0.5500467726847521,
+      0.003371639763953389,
+      0.6652777777777777
+    ]
+  }
+}

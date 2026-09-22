@@ -1,0 +1,115 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "sequence",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "action",
+                "name": "drive-to-track",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "aim-nearest",
+                "params": []
+              }
+            ]
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "action",
+                "name": "emp",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "flee-foe",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "drive-to-safety",
+                "params": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-nearest",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "drive-to-safety",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "dash-at-foe",
+            "params": []
+          }
+        ]
+      },
+      {
+        "kind": "condition",
+        "name": "sudden-death-soon",
+        "params": [
+          180
+        ]
+      },
+      {
+        "kind": "condition",
+        "name": "pad-nearby",
+        "params": [
+          180
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 30,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 2.050132643315128,
+    "wins": 1,
+    "novelty01": 0.35004421443837597,
+    "kills": 1,
+    "damage": 528,
+    "nodes": 15,
+    "behav": [
+      0.2783256572428394,
+      0.43942701954310665,
+      0,
+      1.375,
+      0.43278688524590164,
+      0.0022878228457211642,
+      0.6347222222222223
+    ]
+  }
+}

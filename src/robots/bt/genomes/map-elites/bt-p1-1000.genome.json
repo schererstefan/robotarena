@@ -1,0 +1,207 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "action",
+                "name": "aim-weakest",
+                "params": []
+              },
+              {
+                "kind": "selector",
+                "children": [
+                  {
+                    "kind": "action",
+                    "name": "aim-track",
+                    "params": []
+                  },
+                  {
+                    "kind": "action",
+                    "name": "dodge",
+                    "params": []
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "action",
+            "name": "kite-foe",
+            "params": [
+              420
+            ]
+          },
+          {
+            "kind": "latch",
+            "key": 0,
+            "ttl": 120,
+            "child": {
+              "kind": "inverter",
+              "child": {
+                "kind": "action",
+                "name": "wander",
+                "params": []
+              }
+            }
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "condition",
+            "name": "charged-shot",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "orbit-foe",
+            "params": [
+              1
+            ]
+          },
+          {
+            "kind": "condition",
+            "name": "foe-weak",
+            "params": [
+              0.55
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "condition",
+                "name": "zone-shrinking",
+                "params": []
+              },
+              {
+                "kind": "condition",
+                "name": "just-hit-hard",
+                "params": [
+                  16
+                ]
+              },
+              {
+                "kind": "condition",
+                "name": "hazard-soon",
+                "params": [
+                  30
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "sequence",
+                "children": [
+                  {
+                    "kind": "action",
+                    "name": "aim-weakest",
+                    "params": []
+                  },
+                  {
+                    "kind": "selector",
+                    "children": [
+                      {
+                        "kind": "action",
+                        "name": "aim-track",
+                        "params": []
+                      },
+                      {
+                        "kind": "action",
+                        "name": "dodge",
+                        "params": []
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "action",
+                "name": "kite-foe",
+                "params": [
+                  420
+                ]
+              },
+              {
+                "kind": "latch",
+                "key": 0,
+                "ttl": 120,
+                "child": {
+                  "kind": "inverter",
+                  "child": {
+                    "kind": "action",
+                    "name": "wander",
+                    "params": []
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "inverter",
+        "child": {
+          "kind": "latch",
+          "key": 0,
+          "ttl": 240,
+          "child": {
+            "kind": "action",
+            "name": "drive-to-safety",
+            "params": []
+          }
+        }
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 24,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 3.2462934790428672,
+    "wins": 3,
+    "novelty01": 0.08209782634762247,
+    "kills": 3,
+    "damage": 468,
+    "nodes": 33,
+    "behav": [
+      0.685445122321399,
+      0.22039013617960987,
+      0,
+      0,
+      0.4394366197183099,
+      0.003814609966052241,
+      0.225
+    ]
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "selector",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "drive-to-track",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "aim-nearest",
+            "params": []
+          }
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "action",
+                "name": "drive-to-track",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "aim-nearest",
+                "params": []
+              }
+            ]
+          },
+          {
+            "kind": "condition",
+            "name": "pad-kind-nearby",
+            "params": [
+              0,
+              400
+            ]
+          },
+          {
+            "kind": "inverter",
+            "child": {
+              "kind": "condition",
+              "name": "gun-ready",
+              "params": []
+            }
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "action",
+                "name": "kite-foe",
+                "params": [
+                  300
+                ]
+              },
+              {
+                "kind": "action",
+                "name": "drive-to-foe",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "drive-to-foe",
+                "params": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "latch",
+        "key": 1,
+        "ttl": 480,
+        "child": {
+          "kind": "action",
+          "name": "scan",
+          "params": [
+            0.8
+          ]
+        }
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 6,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 3.5512015262623686,
+    "wins": 3,
+    "novelty01": 0.18373384208745625,
+    "kills": 3,
+    "damage": 516,
+    "nodes": 17,
+    "behav": [
+      0.32055607539128994,
+      0.864009047215154,
+      0,
+      0,
+      0.4425385934819897,
+      0.006285714194859203,
+      0.4583333333333333
+    ]
+  }
+}

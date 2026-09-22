@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "sequence",
+    "children": [
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      },
+      {
+        "kind": "selector",
+        "children": [
+          {
+            "kind": "action",
+            "name": "emp",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "flee-foe",
+            "params": []
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "selector",
+                "children": [
+                  {
+                    "kind": "condition",
+                    "name": "zone-shrinking",
+                    "params": []
+                  },
+                  {
+                    "kind": "action",
+                    "name": "dash-away",
+                    "params": []
+                  },
+                  {
+                    "kind": "condition",
+                    "name": "foe-visible",
+                    "params": []
+                  },
+                  {
+                    "kind": "action",
+                    "name": "drive-to-pad",
+                    "params": [
+                      0
+                    ]
+                  }
+                ]
+              },
+              {
+                "kind": "latch",
+                "key": 1,
+                "ttl": 360,
+                "child": {
+                  "kind": "condition",
+                  "name": "pad-kind-nearby",
+                  "params": [
+                    1,
+                    220
+                  ]
+                }
+              },
+              {
+                "kind": "condition",
+                "name": "always",
+                "params": []
+              },
+              {
+                "kind": "condition",
+                "name": "zone-shrinking",
+                "params": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "action",
+        "name": "dash-at-foe",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 22,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 3.53422359834736,
+    "wins": 3,
+    "novelty01": 0.1780745327824533,
+    "kills": 3,
+    "damage": 456,
+    "nodes": 16,
+    "behav": [
+      0.7941706788979693,
+      0.16798810703666997,
+      0,
+      0.5833333333333334,
+      0.39344262295081966,
+      0.014231422493716863,
+      0.1763888888888889
+    ]
+  }
+}

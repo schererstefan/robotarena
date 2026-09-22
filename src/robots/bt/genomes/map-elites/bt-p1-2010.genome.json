@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "sequence",
+    "children": [
+      {
+        "kind": "action",
+        "name": "aim-weakest",
+        "params": []
+      },
+      {
+        "kind": "action",
+        "name": "drive-to-safety",
+        "params": []
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "drive-to-track",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "aim-nearest",
+            "params": []
+          }
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 49,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 2.436950512875414,
+    "wins": 2,
+    "novelty01": 0.14565017095847138,
+    "kills": 1,
+    "damage": 564,
+    "nodes": 6,
+    "behav": [
+      0.8079655957412066,
+      0.3250858501364797,
+      0.25,
+      0,
+      0.4409695074276779,
+      0.020470271173418302,
+      0.24305555555555555
+    ]
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "sequence",
+    "children": [
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      },
+      {
+        "kind": "selector",
+        "children": [
+          {
+            "kind": "action",
+            "name": "emp",
+            "params": []
+          },
+          {
+            "kind": "inverter",
+            "child": {
+              "kind": "action",
+              "name": "drive-to-pad",
+              "params": [
+                0
+              ]
+            }
+          },
+          {
+            "kind": "selector",
+            "children": [
+              {
+                "kind": "latch",
+                "key": 1,
+                "ttl": 240,
+                "child": {
+                  "kind": "condition",
+                  "name": "slowed",
+                  "params": []
+                }
+              },
+              {
+                "kind": "latch",
+                "key": 1,
+                "ttl": 360,
+                "child": {
+                  "kind": "condition",
+                  "name": "pad-kind-nearby",
+                  "params": [
+                    1,
+                    220
+                  ]
+                }
+              },
+              {
+                "kind": "condition",
+                "name": "always",
+                "params": []
+              },
+              {
+                "kind": "condition",
+                "name": "zone-shrinking",
+                "params": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "action",
+        "name": "dash-at-foe",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 46,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 6.038574136535159,
+    "wins": 5,
+    "novelty01": 0.3461913788450529,
+    "kills": 5,
+    "damage": 660,
+    "nodes": 14,
+    "behav": [
+      0.6327400506052957,
+      0.4331781914893617,
+      1.5,
+      0.8333333333333334,
+      0.5209155485398579,
+      0.02616466676512498,
+      0.24722222222222223
+    ]
+  }
+}

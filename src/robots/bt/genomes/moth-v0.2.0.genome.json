@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "sequence",
+    "children": [
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-nearest",
+            "params": []
+          },
+          {
+            "kind": "sequence",
+            "children": [
+              {
+                "kind": "action",
+                "name": "drive-to-pad",
+                "params": [
+                  0
+                ]
+              },
+              {
+                "kind": "action",
+                "name": "drive-to-safety",
+                "params": []
+              },
+              {
+                "kind": "action",
+                "name": "scan",
+                "params": [
+                  0.7
+                ]
+              },
+              {
+                "kind": "condition",
+                "name": "pad-nearby",
+                "params": [
+                  380
+                ]
+              }
+            ]
+          },
+          {
+            "kind": "condition",
+            "name": "pad-nearby",
+            "params": [
+              120
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "action",
+        "name": "dash-at-foe",
+        "params": []
+      },
+      {
+        "kind": "condition",
+        "name": "hp-below",
+        "params": [
+          0.35
+        ]
+      },
+      {
+        "kind": "sequence",
+        "children": [
+          {
+            "kind": "action",
+            "name": "aim-nearest",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "orbit-foe",
+            "params": [
+              -1
+            ]
+          },
+          {
+            "kind": "condition",
+            "name": "pad-nearby",
+            "params": [
+              120
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "n1-run3",
+    "algorithm": "gp",
+    "seed": 20260924,
+    "generation": 24,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ],
+    "notes": "Moth v0.2.0 — re-evolved after fixing the inverted damage tie-break in the GP comparator (score 6.59)."
+  },
+  "fitness": {
+    "score": 6.59,
+    "wins": 4,
+    "novelty01": 0.86,
+    "kills": 3,
+    "damage": 576,
+    "nodes": 15
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "kind": "robotarena-bt-genome",
+  "tree": {
+    "kind": "sequence",
+    "children": [
+      {
+        "kind": "action",
+        "name": "aim-nearest",
+        "params": []
+      },
+      {
+        "kind": "selector",
+        "children": [
+          {
+            "kind": "action",
+            "name": "emp",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "flee-foe",
+            "params": []
+          },
+          {
+            "kind": "action",
+            "name": "drive-to-safety",
+            "params": []
+          }
+        ]
+      },
+      {
+        "kind": "action",
+        "name": "dash-at-foe",
+        "params": []
+      }
+    ]
+  },
+  "provenance": {
+    "runId": "mapelites-full-20260922",
+    "algorithm": "map-elites",
+    "seed": 20260922,
+    "generation": 25,
+    "opponents": [
+      "hunter",
+      "rusher",
+      "ghost"
+    ],
+    "arenas": [
+      "open",
+      "blocks"
+    ]
+  },
+  "fitness": {
+    "score": 4.6823672274085295,
+    "wins": 4,
+    "novelty01": 0.22745574246950984,
+    "kills": 4,
+    "damage": 636,
+    "nodes": 7,
+    "behav": [
+      0.8760253317110538,
+      0.2508060801473975,
+      0,
+      0.6666666666666666,
+      0.5787079162875342,
+      0.008129002862901677,
+      0.2486111111111111
+    ]
+  }
+}
