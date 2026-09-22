@@ -853,7 +853,12 @@ export class MenuScene extends Scene {
             if (skin.finish === 'Ring') {
                 const previewRing = this.track(this.add.graphics());
                 previewRing.lineStyle(2, skin.paint, 0.85);
-                previewRing.strokeCircle(152, y, 20);
+                // Local-origin geometry: the sway tween below animates each
+                // target's position, so the circle must be drawn around the
+                // object's own origin (absolute coords here would offset by
+                // the full row y and detach the ring from the sprite).
+                previewRing.strokeCircle(0, 0, 20);
+                previewRing.setPosition(152, y);
                 sway.push(previewRing);
             } else if (skin.finish === 'Stripe') {
                 sway.push(this.track(this.add.rectangle(152, y, 26, 5, skin.paint)));

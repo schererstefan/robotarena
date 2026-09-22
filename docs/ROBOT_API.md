@@ -114,10 +114,10 @@ offset (2+2 split), so the layout varies per match but replays exactly
 from the match seed. Blunder into one (within 26 units) to collect it;
 the pad goes dark for 15 s, then reactivates.
 
-- **AMP** (`amp`, gold diamond): 2× bullet damage for 6 s. Does not stack
+- **AMP** (`amp`, gold bolt ring): 2× bullet damage for 6 s. Does not stack
   with the double-damage exhibition modifier — the strongest multiplier wins.
-- **REPAIR** (`repair`, green cross): +60 HP instantly, clamped to max health.
-- **OVERDRIVE** (`overdrive`, white rings): +35% move speed for 6 s.
+- **REPAIR** (`repair`, green cross ring): +60 HP instantly, clamped to max health.
+- **OVERDRIVE** (`overdrive`, red target ring): +35% move speed for 6 s.
 
 You get a `pickup` event (with `pad`) on the collecting tick; timed effects
 clear on death (no drops). The shipped brains seek pads opportunistically
