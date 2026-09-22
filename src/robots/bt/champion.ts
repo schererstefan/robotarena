@@ -36,6 +36,7 @@
 // dashes=14, shots/match=24.5 — a pad-hunting skirmisher, not a turret.
 
 import type { BTNode } from './tree';
+import type { TreeFitnessSummary, TreeProvenance } from './serialization';
 
 /** The champion: what the evolved tree actually does each tick. */
 export const CHAMPION_TREE: BTNode = {
@@ -68,4 +69,29 @@ export const CHAMPION_TREE: BTNode = {
             ],
         },
     ],
+};
+
+/**
+ * Provenance for the genome JSON (src/robots/bt/genomes/moth-v0.2.0.genome.json).
+ * The JSON file is the canonical experiment artifact; this literal stays the
+ * in-game source of truth for the bt-n1 registration (btbot.ts).
+ */
+export const CHAMPION_PROVENANCE: TreeProvenance = {
+    runId: 'n1-run3',
+    algorithm: 'gp',
+    seed: 20260924,
+    generation: 24,
+    opponents: ['hunter', 'rusher', 'ghost'],
+    arenas: ['open', 'blocks'],
+    notes: 'Moth v0.2.0 — re-evolved after fixing the inverted damage tie-break in the GP comparator (score 6.59).',
+};
+
+/** Fitness summary recorded for the champion at the end of run 3. */
+export const CHAMPION_FITNESS: TreeFitnessSummary = {
+    score: 6.59,
+    wins: 4,
+    novelty01: 0.86,
+    kills: 3,
+    damage: 576,
+    nodes: 15,
 };

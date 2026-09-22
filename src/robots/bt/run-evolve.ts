@@ -6,10 +6,12 @@
 //   && node /tmp/robotarena-evolve-bt.mjs
 //
 // Prints: per-generation best, the champion's full printed tree, the
-// champion as a JSON literal (paste into champion.ts), and a behavior probe.
+// champion as a genome JSON (schema 1, with provenance — save under
+// src/robots/bt/genomes/), and a behavior probe.
 
 import { BT_LOADOUT, MIN_DRIVE_ACTIVITY, NOVELTY_WEIGHT, probeBehavior, runEvolution, type Competitor } from './gp';
-import { printTree, pruneUnreachable, treeSize } from './tree';
+import { parseGenome, treeToGenomeJSON, type TreeProvenance } from './serialization';
+import { printTree, simplifyTree, treeSize } from './tree';
 import { create as createHunter, loadout as hunterLoadout } from '../hunter';
 import { create as createRusher, loadout as rusherLoadout } from '../rusher';
 import { create as createGhost, loadout as ghostLoadout } from '../ghost';
@@ -27,6 +29,16 @@ const OPPONENTS: Competitor[] = [
     { id: 'rusher', create: createRusher, loadout: rusherLoadout },
     { id: 'ghost', create: createGhost, loadout: ghostLoadout },
 ];
+
+const PROVENANCE: TreeProvenance = {
+    runId: `n1-gp-${SEED}`,
+    algorithm: 'gp',
+    seed: SEED,
+    generation: GENERATIONS,
+    opponents: OPPONENTS.map((o) => o.id),
+    arenas: ['open', 'blocks'],
+    notes: `pop ${POP_SIZE}, novelty weight ${NOVELTY_WEIGHT}, minimal criterion drive >= ${MIN_DRIVE_ACTIVITY}`,
+};
 
 const result = runEvolution({
     seed: SEED,
@@ -46,7 +58,9 @@ const result = runEvolution({
 });
 
 const champ = result.champion;
-const pruned = pruneUnreachable(champ.tree);
+// The bloat pass already ran on every evaluated tree; simplify once more
+// for the record so the printed/genome tree is exactly what runs.
+const pruned = simplifyTree(champ.tree);
 console.log(`\n[evolve] loadout: ${JSON.stringify(BT_LOADOUT)} noveltyWeight=${NOVELTY_WEIGHT} minDrive=${MIN_DRIVE_ACTIVITY}`);
 console.log(
     `[evolve] champion fitness: score=${champ.fit.score.toFixed(2)} wins=${champ.fit.wins} ` +
@@ -55,10 +69,28 @@ console.log(
 );
 console.log('\n===== CHAMPION TREE (read the mind) =====');
 console.log(printTree(champ.tree));
-console.log('\n===== CHAMPION TREE, PRUNED (what actually runs) =====');
+console.log('\n===== CHAMPION TREE, SIMPLIFIED (what actually runs) =====');
 console.log(printTree(pruned));
-console.log('===== CHAMPION JSON (for champion.ts) =====');
-console.log(JSON.stringify(pruned));
+console.log('===== CHAMPION GENOME JSON (for src/robots/bt/genomes/) =====');
+const genomeJson = treeToGenomeJSON(
+    pruned,
+    PROVENANCE,
+    {
+        score: champ.fit.score,
+        wins: champ.fit.wins,
+        novelty01: champ.fit.novelty01,
+        kills: champ.fit.kills,
+        damage: champ.fit.damage,
+        nodes: treeSize(pruned),
+        behav: champ.behav,
+    },
+);
+// Round-trip check: the printed genome must parse back to the same tree.
+const reparsed = parseGenome(genomeJson);
+if (JSON.stringify(reparsed.tree) !== JSON.stringify(pruned)) {
+    throw new Error('genome round-trip mismatch');
+}
+console.log(genomeJson);
 
 console.log('\n===== BEHAVIOR PROBE (fresh seeds, pruned champion) =====');
 const probe = probeBehavior(pruned, {

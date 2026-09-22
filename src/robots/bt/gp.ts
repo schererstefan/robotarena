@@ -14,6 +14,10 @@
 // A hard minimal criterion (MIN_DRIVE_ACTIVITY) makes stationary turrets
 // ineligible, so the search cannot re-discover stand-still-and-shoot.
 // The trailing -nodes tiebreak is the parsimony pressure against bloat.
+// Every evaluated tree goes through simplifyTree first (the Phase-0-scoped
+// bloat pass: dead-code elimination + structural collapse, iterated to a
+// fixpoint), so the -nodes tiebreak counts the tree that actually runs and
+// champions stay legible without a separate cleanup step.
 
 import { Match } from '../../sim/engine';
 import { createRng, type Rand } from '../../sim/rng';
@@ -21,7 +25,7 @@ import type { ArenaId } from '../../sim/constants';
 import type { RobotController, SenseState } from '../../sim/types';
 import type { SkillLoadout } from '../../sim/skills';
 import { ACTIONS, CONDITIONS, LATCH_NAMES, type ParamSpec } from './primitives';
-import { cloneTree, printTree, treeSize, type BTNode } from './tree';
+import { cloneTree, printTree, simplifyTree, treeSize, type BTNode } from './tree';
 import { createBTTreeBrain } from './brain';
 
 export const BT_LOADOUT: SkillLoadout = { charger: 2, trigger: 2, plating: 2 };
@@ -478,7 +482,9 @@ export function runEvolution(cfg: GPConfig): EvolutionResult {
     for (let i = 0; i < cfg.popSize; i += 1) {
         const depth = 2 + (i % Math.max(1, cfg.initDepth - 1));
         const method = i % 2 === 0 ? 'full' : 'grow';
-        pop.push(evaluateInto(randomTree(r, depth, method), i));
+        // Bloat pass from generation 0: every evaluated tree is simplified,
+        // so fitness node counts are comparable across the whole run.
+        pop.push(evaluateInto(simplifyTree(randomTree(r, depth, method)), i));
     }
     pop.sort((a, b) => compareFitness(a.fit, b.fit));
     const bestHistory: Fitness[] = [pop[0]?.fit ?? { score: 0, wins: 0, novelty01: 0, kills: 0, damage: 0, nodes: 0 }];
@@ -495,6 +501,10 @@ export function runEvolution(cfg: GPConfig): EvolutionResult {
             const p2 = tournament(r, pop, cfg.tournamentSize);
             let child = r() < cfg.crossoverRate ? crossover(r, p1.tree, p2.tree, cfg.maxNodes) : cloneTree(p1.tree);
             if (r() < cfg.mutationRate) child = mutate(r, child);
+            // Bloat pass (Phase 0 scope): dead-code elimination + structural
+            // collapse before evaluation. Semantics-preserving, so fitness is
+            // unaffected — only the node count (and the printed tree) shrink.
+            child = simplifyTree(child);
             if (treeSize(child) > cfg.maxNodes) child = cloneTree(p1.tree);
             next.push(evaluateInto(child, tag));
             tag += 1;

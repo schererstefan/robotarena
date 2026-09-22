@@ -6,6 +6,17 @@
 // in a tick owns it; later claims on the same channel are ignored. So a
 // Sequence [aim-nearest, kite-foe] aims AND kites in one tick, while a
 // Selector picks exactly one branch's drive.
+//
+// FOE-SIGNAL CONTRACT: every condition documents `reads` (the legal sense
+// surface it touches) and every action documents `reads` + `writes` (the
+// intent channels it claims). Foe entries carry only id/team/position/
+// heading/speed/health/distance/bearing — never hidden cooldown/charge/
+// loadout. Anything here that read a new sense field would be a contract
+// change and must update docs/ROBOT_API.md.
+//
+// LEGIBILITY: a printed tree must read like a game plan. desc() renders
+// one line per node for printTree; keep it short, concrete, and jargon-
+// free ("orbit foe counter-clockwise", not "orbit-foe[-1]").
 
 import { ARENA_HEIGHT, ARENA_WIDTH, EMP_RADIUS } from '../../sim/constants';
 import type { Intent } from '../../sim/types';
@@ -56,12 +67,25 @@ export interface ConditionDef {
     desc: (params: number[]) => string;
     params: ParamSpec[];
     test: (bb: Blackboard, params: number[]) => boolean;
+    /** Legal sense surface this condition reads (foe-signal contract). */
+    reads: readonly string[];
 }
 
 export interface ActionDef {
     desc: (params: number[]) => string;
     params: ParamSpec[];
     run: (bb: Blackboard, out: IntentBuilder, params: number[]) => BTStatus;
+    /** Legal sense surface this action reads (foe-signal contract). */
+    reads: readonly string[];
+    /** Intent channels this action may claim, in claim order. */
+    writes: readonly Channel[];
+    /**
+     * True when run() can never return 'failure' (no early-outs). The
+     * static analysis in tree.ts (pruneUnreachable) relies on this:
+     * an action that can fail must NOT make later selector branches
+     * look unreachable.
+     */
+    alwaysSucceeds: boolean;
 }
 
 const DIST: ParamSpec = { min: 80, max: 520, step: 20 };
@@ -85,56 +109,67 @@ export const CONDITIONS: Record<string, ConditionDef> = {
         desc: () => 'always',
         params: [],
         test: () => true,
+        reads: [],
     },
     'foe-visible': {
         desc: () => 'foe visible',
         params: [],
         test: (bb) => bb.foe !== null,
+        reads: ['foes[]'],
     },
     'foe-closer-than': {
         desc: (p) => `foe closer than ${p[0]}u`,
         params: [DIST],
         test: (bb, p) => bb.foe !== null && bb.foe.distance < (p[0] ?? 0),
+        reads: ['foes[].distance'],
     },
     'foe-farther-than': {
         desc: (p) => `foe farther than ${p[0]}u`,
         params: [DIST],
         test: (bb, p) => bb.foe !== null && bb.foe.distance > (p[0] ?? 0),
+        reads: ['foes[].distance'],
     },
     'foe-count-at-least': {
         desc: (p) => `${p[0]}+ foes visible`,
         params: [{ min: 1, max: 3, step: 1 }],
         test: (bb, p) => bb.foeCount >= (p[0] ?? 1),
+        reads: ['foes[]'],
     },
     'hp-below': {
         desc: (p) => `hp below ${Math.round((p[0] ?? 0) * 100)}%`,
         params: [HP],
         test: (bb, p) => bb.hpFrac < (p[0] ?? 0),
+        reads: ['self.health'],
     },
     'hp-above': {
         desc: (p) => `hp above ${Math.round((p[0] ?? 0) * 100)}%`,
         params: [HP],
         test: (bb, p) => bb.hpFrac > (p[0] ?? 0),
+        reads: ['self.health'],
     },
     'gun-ready': {
         desc: () => 'gun ready',
         params: [],
         test: (bb) => bb.gunReady,
+        reads: ['self.cooldown'],
     },
     'bullet-incoming': {
         desc: () => 'bullet incoming',
         params: [],
         test: (bb) => bb.bullets.length > 0,
+        reads: ['bullets[]'],
     },
     'bullet-closer-than': {
         desc: (p) => `bullet closer than ${p[0]}u`,
         params: [{ min: 60, max: 300, step: 20 }],
         test: (bb, p) => bb.bullets.length > 0 && (bb.bullets[0]?.distance ?? Infinity) < (p[0] ?? 0),
+        reads: ['bullets[].distance'],
     },
     'pad-nearby': {
         desc: (p) => `pad within ${p[0]}u`,
         params: [{ min: 60, max: 400, step: 20 }],
         test: (bb, p) => bb.pads.some((pad) => pad.distance < (p[0] ?? 0)),
+        reads: ['pickups[]'],
     },
     'pad-kind-nearby': {
         desc: (p) => `${['amp', 'repair', 'overdrive'][Math.round(p[0] ?? 0)] ?? '?'} pad within ${p[1]}u`,
@@ -147,41 +182,49 @@ export const CONDITIONS: Record<string, ConditionDef> = {
             const kind = kinds[Math.round(p[0] ?? 0)] ?? 'amp';
             return bb.pads.some((pad) => pad.kind === kind && pad.distance < (p[1] ?? 0));
         },
+        reads: ['pickups[]'],
     },
     'zone-shrinking': {
         desc: () => 'sudden death shrinking',
         params: [],
         test: (bb) => bb.zone !== null && bb.zone.shrinking,
+        reads: ['zone.phase'],
     },
     'outside-zone': {
         desc: () => 'outside safe circle',
         params: [],
         test: (bb) => bb.zone !== null && !bb.zone.inside,
+        reads: ['zone.inside'],
     },
     'sudden-death-soon': {
         desc: (p) => `sudden death within ${p[0]} ticks`,
         params: [{ min: 60, max: 900, step: 60 }],
         test: (bb, p) => bb.zone !== null && bb.zone.suddenDeathIn < (p[0] ?? 0),
+        reads: ['zone.suddenDeathIn'],
     },
     'ally-nearby': {
         desc: (p) => `ally within ${p[0]}u`,
         params: [{ min: 60, max: 500, step: 20 }],
         test: (bb, p) => bb.allyCount > 0 && bb.nearestAllyDist < (p[0] ?? 0),
+        reads: ['allies[]'],
     },
     'just-hit': {
         desc: () => 'just got hit',
         params: [],
         test: (bb) => bb.justHit,
+        reads: ['events[]'],
     },
     'just-hit-hard': {
         desc: (p) => `just hit for ${p[0]}+ dmg`,
         params: [{ min: 8, max: 40, step: 4 }],
         test: (bb, p) => bb.justHit && bb.justHitAmount >= (p[0] ?? 0),
+        reads: ['events[]'],
     },
     'track-stale': {
         desc: () => 'stale foe track (seen before, blind now)',
         params: [],
         test: (bb) => bb.stalestTrack !== null && !bb.stalestTrack.seenNow,
+        reads: ['tracks[]'],
     },
     'hazard-soon': {
         desc: (p) => `asteroid impact within ${p[0]} ticks`,
@@ -190,36 +233,43 @@ export const CONDITIONS: Record<string, ConditionDef> = {
             bb.hazard !== null &&
             bb.hazard.ticksToImpact < (p[0] ?? 0) &&
             bb.hazard.distance < bb.hazard.radius + 140,
+        reads: ['hazards[]'],
     },
     'dash-ready': {
         desc: () => 'dash ready',
         params: [],
         test: (bb) => bb.dashReady,
+        reads: ['self.dashCd'],
     },
     'emp-ready': {
         desc: () => 'emp ready',
         params: [],
         test: (bb) => bb.empReady,
+        reads: ['self.empCd'],
     },
     'charged-shot': {
         desc: () => 'full charge banked',
         params: [],
         test: (bb) => bb.charged,
+        reads: ['self.charged'],
     },
     'slowed': {
         desc: () => 'slowed by enemy emp',
         params: [],
         test: (bb) => bb.slowed,
+        reads: ['self.slowed'],
     },
     'kills-at-least': {
         desc: (p) => `${p[0]}+ kills`,
         params: [{ min: 1, max: 4, step: 1 }],
         test: (bb, p) => bb.kills >= (p[0] ?? 1),
+        reads: ['match.killsYou'],
     },
     'foe-weak': {
         desc: (p) => `foe hp below ${Math.round((p[0] ?? 0) * 100)}%`,
         params: [{ min: 0.15, max: 0.8, step: 0.05 }],
         test: (bb, p) => bb.foe !== null && bb.foe.hpFrac < (p[0] ?? 0),
+        reads: ['foes[].health'],
     },
 };
 
@@ -243,6 +293,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             );
             return 'success';
         },
+        reads: ['foes[]', 'self.tower'],
+        writes: ['tower'],
+        alwaysSucceeds: false,
     },
     'aim-weakest': {
         desc: () => 'aim at weakest foe (lead, hold-to-fire)',
@@ -263,6 +316,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             );
             return 'success';
         },
+        reads: ['foes[]', 'self.tower'],
+        writes: ['tower'],
+        alwaysSucceeds: false,
     },
     'aim-track': {
         desc: () => 'aim at stale track (ambush the last-known position)',
@@ -273,14 +329,20 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('tower', { aimMode: 1, aimTarget: t.id, fireMode: 0, fire: false }, 'focus');
             return 'success';
         },
+        reads: ['tracks[]'],
+        writes: ['tower'],
+        alwaysSucceeds: false,
     },
     'scan': {
-        desc: (p) => `sweep tower (${p[0]})`,
+        desc: (p) => `sweep tower (${(p[0] ?? 0.6).toFixed(1)})`,
         params: [{ min: 0.3, max: 1, step: 0.1 }],
         run: (_bb, out, p) => {
             out.claim('tower', { aimMode: 0, towerTurn: p[0] ?? 0.6, fireMode: 0 }, 'roam');
             return 'success';
         },
+        reads: [],
+        writes: ['tower'],
+        alwaysSucceeds: true,
     },
     'drive-to-foe': {
         desc: () => 'drive at foe',
@@ -292,6 +354,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 1, moveX: t.x, moveY: t.y }, 'engage');
             return 'success';
         },
+        reads: ['foes[]'],
+        writes: ['drive'],
+        alwaysSucceeds: false,
     },
     'kite-foe': {
         desc: (p) => `hold ${p[0]}u from foe`,
@@ -307,6 +372,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 1, moveX: t.x, moveY: t.y }, 'kite');
             return 'success';
         },
+        reads: ['foes[]', 'self.position'],
+        writes: ['drive'],
+        alwaysSucceeds: false,
     },
     'orbit-foe': {
         desc: (p) => `orbit foe ${(p[0] ?? 1) > 0 ? 'clockwise' : 'counter-clockwise'}`,
@@ -325,6 +393,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 1, moveX: t.x, moveY: t.y }, 'flank');
             return 'success';
         },
+        reads: ['foes[]', 'self.position'],
+        writes: ['drive'],
+        alwaysSucceeds: false,
     },
     'drive-to-pad': {
         desc: (p) => `drive to ${['any', 'amp', 'repair', 'overdrive'][Math.round(p[0] ?? 0)] ?? 'any'} pad`,
@@ -337,6 +408,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 1, moveX: pad.x, moveY: pad.y }, 'roam');
             return 'success';
         },
+        reads: ['pickups[]'],
+        writes: ['drive'],
+        alwaysSucceeds: false,
     },
     'drive-to-safety': {
         desc: () => 'drive to safe-circle center',
@@ -346,6 +420,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 1, moveX: bb.zone.cx, moveY: bb.zone.cy }, 'retreat');
             return 'success';
         },
+        reads: ['zone.circle'],
+        writes: ['drive'],
+        alwaysSucceeds: false,
     },
     'drive-to-track': {
         desc: () => "drive to foe's last-known position",
@@ -357,6 +434,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 1, moveX: c.x, moveY: c.y }, 'focus');
             return 'success';
         },
+        reads: ['tracks[]'],
+        writes: ['drive'],
+        alwaysSucceeds: false,
     },
     'flee-foe': {
         desc: () => 'run from foe',
@@ -371,6 +451,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 1, moveX: t.x, moveY: t.y }, 'retreat');
             return 'success';
         },
+        reads: ['foes[]', 'self.position'],
+        writes: ['drive'],
+        alwaysSucceeds: false,
     },
     'dodge': {
         desc: () => 'sidestep the nearest incoming bullet lane',
@@ -385,6 +468,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 1, moveX: t.x, moveY: t.y }, 'kite');
             return 'success';
         },
+        reads: ['bullets[]'],
+        writes: ['drive'],
+        alwaysSucceeds: false,
     },
     'hold': {
         desc: () => 'hold position',
@@ -393,6 +479,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 0, throttle: 0, turn: 0, strafe: 0 }, 'roam');
             return 'success';
         },
+        reads: [],
+        writes: ['drive'],
+        alwaysSucceeds: true,
     },
     'wander': {
         desc: () => 'wander to a fresh waypoint',
@@ -404,6 +493,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 1, moveX: wx, moveY: wy }, 'roam');
             return 'success';
         },
+        reads: ['tick'],
+        writes: ['drive'],
+        alwaysSucceeds: true,
     },
     'dash-at-foe': {
         desc: () => 'dash at foe',
@@ -416,6 +508,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 1, moveX: t.x, moveY: t.y }, 'engage');
             return 'success';
         },
+        reads: ['foes[]', 'self.dashCd'],
+        writes: ['special', 'drive'],
+        alwaysSucceeds: false,
     },
     'dash-away': {
         desc: () => 'dash away from foe',
@@ -431,6 +526,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('drive', { moveMode: 1, moveX: t.x, moveY: t.y }, 'retreat');
             return 'success';
         },
+        reads: ['foes[]', 'self.dashCd'],
+        writes: ['special', 'drive'],
+        alwaysSucceeds: false,
     },
     'emp': {
         desc: () => 'emp burst (foe in radius)',
@@ -441,6 +539,9 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('special', { emp: true }, 'engage');
             return 'success';
         },
+        reads: ['self.empCd', 'foes[].distance'],
+        writes: ['special'],
+        alwaysSucceeds: false,
     },
     'bank-charge': {
         desc: () => 'bank charge (slow drive, charged shot)',
@@ -449,5 +550,8 @@ export const ACTIONS: Record<string, ActionDef> = {
             out.claim('special', { charge: true }, 'engage');
             return 'success';
         },
+        reads: [],
+        writes: ['special'],
+        alwaysSucceeds: true,
     },
 };

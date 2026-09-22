@@ -18,7 +18,8 @@
     "tune": "npm run tune:build && node /tmp/robotarena-tune.mjs",
     "emit:showcase": "esbuild tools/eval/showcase.ts --bundle --platform=node --format=cjs --outfile=/tmp/robotarena-showcase.cjs --log-level=warning && node /tmp/robotarena-showcase.cjs",
     "verify:manifests": "esbuild tools/verify-manifest.ts --bundle --platform=node --format=cjs --outfile=/tmp/robotarena-verify.cjs --log-level=warning && node /tmp/robotarena-verify.cjs",
-    "art:qa": "node tools/art-qa.mjs"
+    "art:qa": "node tools/art-qa.mjs",
+    "test:bt": "esbuild tools/test-bt.ts --bundle --platform=node --format=esm --outfile=/tmp/robotarena-test-bt.mjs --log-level=warning && node /tmp/robotarena-test-bt.mjs"
   },
   "devDependencies": {
     "typescript": "~5.7.2",
