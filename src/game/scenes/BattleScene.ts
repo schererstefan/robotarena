@@ -3,7 +3,7 @@
 // is sprite transforms plus one small dynamic Graphics (cones + trails).
 
 import { BlendModes, Scene } from 'phaser';
-import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DASH_COOLDOWN_TICKS, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, HAZ_SCORCH_TICKS, HAZ_TELEGRAPH_TICKS, MAX_TICKS, PAD_RADIUS, ROBOT_RADIUS, TURRET_CAPTURE_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
+import { ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, DASH_COOLDOWN_TICKS, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, HAZ_SCORCH_TICKS, MAX_TICKS, PAD_RADIUS, ROBOT_RADIUS, TURRET_CAPTURE_RADIUS, isExhibition, modifierCodes, type ArenaObstacle } from '../../sim/constants';
 import { Match, type BulletSnapshot, type LineupEntry, type RobotSnapshot } from '../../sim/engine';
 import type { SensePadKind } from '../../sim/types';
 import { angleDiff, clamp, wrapAngle } from '../../sim/math';
@@ -903,16 +903,19 @@ export class BattleScene extends Scene {
 
         if (this.request.tutorial === true) this.buildTutorial();
 
-        // Headless mid-combat screenshots (?bgshot=seed in the page URL).
+        // Headless mid-combat screenshots (?bgshot=seed in the page URL,
+        // &bgtick=N pre-steps to tick N instead of the default 120).
         // Virtual-time rAF yields ~zero deltas, so the sim never advances via
         // update(): pre-step to a fixed tick here for a deterministic frame.
         try {
-            if (new URLSearchParams(window.location.search).get('bgshot') !== null) {
+            const shotParams = new URLSearchParams(window.location.search);
+            if (shotParams.get('bgshot') !== null) {
                 this.finishIntro();
                 // Tick 120: robots have left spawn and projectors are out,
                 // but no kill banners/flashes/damage numbers are live yet.
+                const preTick = Math.max(1, Number.parseInt(shotParams.get('bgtick') ?? '120', 10) || 120);
                 let guard = 0;
-                while (!this.match.result.over && this.match.result.tick < 120 && guard < 160) {
+                while (!this.match.result.over && this.match.result.tick < preTick && guard < preTick + 40) {
                     this.match.step();
                     guard += 1;
                 }
@@ -2689,7 +2692,7 @@ export class BattleScene extends Scene {
         // sim stays untouched.)
         if (!this.resultsShown) {
             for (const h of this.match.hazardSnapshots) {
-                const frac = Math.max(h.ticksToImpact, 0) / HAZ_TELEGRAPH_TICKS;
+                const frac = Math.max(h.ticksToImpact, 0) / h.totalTicks;
                 g.fillStyle(COLORS.danger, 0.08 + (1 - frac) * 0.08);
                 g.fillCircle(AX + h.x, AY + h.y, h.radius);
                 g.lineStyle(2, COLORS.danger, 0.9 - frac * 0.55);
@@ -2697,19 +2700,24 @@ export class BattleScene extends Scene {
                 g.lineStyle(2, COLORS.gold, 0.8);
                 g.strokeCircle(AX + h.x, AY + h.y, Math.max(h.radius * frac, 2));
             }
-            // Landed asteroid rocks (sprite-64): one pooled sprite per live
-            // telegraph, deterministic variant per slot, integer 2x (128px in
-            // the r=70 blast circle). Rings above stay the dodge read; extra
-            // telegraphs beyond the pool keep rings only.
+            // Asteroid rocks (sprite-64): one pooled sprite per live strike,
+            // riding the off-screen -> target flight path (fx/fy) with a slow
+            // tumble so the approach reads as motion, not a pop-in. Integer
+            // 2x (128px in the r=70 blast circle). Rings above stay the dodge
+            // read; extra strikes beyond the pool keep rings only.
             const live = this.match.hazardSnapshots;
             for (let r = 0; r < this.rockImgs.length; r += 1) {
                 const img = this.rockImgs[r] as Phaser.GameObjects.Image;
-                const h = live[r] as { x: number; y: number } | undefined;
+                const h = live[r] as { fx: number; fy: number } | undefined;
                 if (h === undefined) {
                     img.setVisible(false);
                     continue;
                 }
-                img.setPosition(AX + h.x, AY + h.y).setAlpha(0.9).setVisible(true);
+                img
+                    .setPosition(AX + h.fx, AY + h.fy)
+                    .setRotation(tickNow * 0.02 + r * 1.7)
+                    .setAlpha(0.9)
+                    .setVisible(true);
             }
         }
         if (this.resultsShown) {
