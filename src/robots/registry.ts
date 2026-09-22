@@ -21,7 +21,7 @@ import { create as createBrawlerHc1, loadout as brawlerHc1Loadout, meta as brawl
 import { create as createGhostHc1, loadout as ghostHc1Loadout, meta as ghostHc1Meta } from './ghost-hc1';
 import { create as createHunterHc2, loadout as hunterHc2Loadout, meta as hunterHc2Meta } from './hunter-hc2';
 import { create as createBtN1, loadout as btN1Loadout, meta as btN1Meta } from './btbot';
-
+import { create as createCoachpilot, loadout as coachpilotLoadout, meta as coachpilotMeta } from './coachpilot/coachpilot';
 
 export interface RobotEntry {
     meta: RobotMeta;
@@ -50,6 +50,7 @@ export const ROBOTS: RobotEntry[] = [
     { meta: ghostHc1Meta, loadout: ghostHc1Loadout, create: createGhostHc1 },
     { meta: hunterHc2Meta, loadout: hunterHc2Loadout, create: createHunterHc2 },
     { meta: btN1Meta, loadout: btN1Loadout, create: createBtN1 },
+    { meta: coachpilotMeta, loadout: coachpilotLoadout, create: createCoachpilot },
 ];
 
 export function getRobot(id: string): RobotEntry | undefined {

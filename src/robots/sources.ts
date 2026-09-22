@@ -19,7 +19,7 @@ import brawlerHc1Src from '../robots/brawler-hc1.ts?raw';
 import ghostHc1Src from '../robots/ghost-hc1.ts?raw';
 import hunterHc2Src from '../robots/hunter-hc2.ts?raw';
 import btN1Src from '../robots/btbot.ts?raw';
-
+import coachpilotSrc from '../robots/coachpilot/coachpilot.ts?raw';
 
 export const ROBOT_SOURCES: Record<string, string> = {
     brawler: brawlerSrc,
@@ -40,5 +40,5 @@ export const ROBOT_SOURCES: Record<string, string> = {
     'ghost-hc1': ghostHc1Src,
     'hunter-hc2': hunterHc2Src,
     'bt-n1': btN1Src,
-
+    'coachpilot': coachpilotSrc,
 };
