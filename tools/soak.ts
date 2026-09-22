@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BARRIER_COUNT, BARRIER_MIN_GAP, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_RADIUS, HAZ_SALT, HAZ_SCORCH_TICKS, HAZ_TELEGRAPH_TICKS, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_BAND, PAD_COUNT, PAD_MIN_GAP, PAD_MIN_SPAWN_DIST, PAD_MIN_TURRET_DIST, PAD_OBSTACLE_CLEAR, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, BARRIER_TURRET_CLEAR, CROSSFIRE_BARRIER_COUNT, FOUNDRY_BARRIER_COUNT, RUINS_BARRIER_COUNT, barriersForArena, barriersForSeed, isExhibition, sanitizeModifiers, turretSpotsForArena, type ArenaId, type ArenaObstacle, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BARRIER_COUNT, BARRIER_MIN_GAP, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_RADIUS, HAZ_SALT, HAZ_FLY_MAX_TICKS, HAZ_SCORCH_TICKS, HAZ_TARGET_MARGIN, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_BAND, PAD_COUNT, PAD_MIN_GAP, PAD_MIN_SPAWN_DIST, PAD_MIN_TURRET_DIST, PAD_OBSTACLE_CLEAR, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, BARRIER_TURRET_CLEAR, CROSSFIRE_BARRIER_COUNT, FOUNDRY_BARRIER_COUNT, RUINS_BARRIER_COUNT, barriersForArena, barriersForSeed, isExhibition, sanitizeModifiers, turretSpotsForArena, type ArenaId, type ArenaObstacle, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, sanitizeIntent, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayCompact, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
@@ -97,7 +97,7 @@ console.log('determinism');
     check('identical fingerprint on blocks arena', fingerprint(f) === fingerprint(g));
 }
 
-// --- 1b. Hazards: deterministic schedule, mirrored pairs, opt-out -------
+// --- 1b. Hazards: deterministic schedule, single-asteroid fly-in, opt-out -
 console.log('hazards');
 {
     // Passive robots never damage each other, so the match always survives
@@ -130,15 +130,34 @@ console.log('hazards');
         `strikes=${h1.hazardStrikes.length}`,
     );
     const strikes = h1.hazardStrikes;
-    let mirrored = strikes.length > 0 && strikes.length % 2 === 0;
-    for (let i = 0; i + 1 < strikes.length; i += 2) {
-        const a = strikes[i] as { x: number; y: number; announceTick: number; impactTick: number };
-        const b = strikes[i + 1] as { x: number; y: number; announceTick: number; impactTick: number };
-        if (a.announceTick !== b.announceTick || a.impactTick !== b.impactTick) mirrored = false;
-        if (Math.abs(a.x + b.x - ARENA_WIDTH) > 1e-6 || a.y !== b.y) mirrored = false;
-        if (a.impactTick - a.announceTick !== HAZ_TELEGRAPH_TICKS) mirrored = false;
+    // Single-asteroid fly-in behavior (mirrored pairs removed): every strike
+    // spawns at an off-screen edge point and flies to a seeded random target;
+    // the flight itself IS the telegraph (impact = announce + flight ticks).
+    // New strikes only land on the cooldown grid after the previous strike
+    // resolved, so live strikes never overlap.
+    type StrikeLog = { x: number; y: number; sx: number; sy: number; flyTicks: number; announceTick: number; impactTick: number };
+    let flyinOk = strikes.length > 0;
+    for (const s of strikes as Array<StrikeLog>) {
+        if (s.impactTick - s.announceTick !== s.flyTicks) flyinOk = false;
+        if (s.flyTicks < 1 || s.flyTicks > HAZ_FLY_MAX_TICKS) flyinOk = false;
+        const offScreen = s.sx < 0 || s.sx > ARENA_WIDTH || s.sy < 0 || s.sy > ARENA_HEIGHT;
+        if (!offScreen) flyinOk = false;
+        const inTargetBounds =
+            s.x >= HAZ_TARGET_MARGIN && s.x <= ARENA_WIDTH - HAZ_TARGET_MARGIN &&
+            s.y >= HAZ_TARGET_MARGIN && s.y <= ARENA_HEIGHT - HAZ_TARGET_MARGIN;
+        if (!inTargetBounds) flyinOk = false;
+        if ((s.announceTick - HAZ_FIRST_TICK) % HAZ_COOLDOWN_TICKS !== 0) flyinOk = false;
     }
-    check('strike pairs are center-column mirrored with full telegraph lead', mirrored);
+    check('single-asteroid strikes: off-screen fly-in to seeded target on cooldown grid', flyinOk, `strikes=${strikes.length}`);
+    let nonOverlapping = true;
+    for (let i = 0; i < strikes.length; i += 1) {
+        for (let j = i + 1; j < strikes.length; j += 1) {
+            const a = strikes[i] as StrikeLog;
+            const b = strikes[j] as StrikeLog;
+            if (a.announceTick < b.impactTick && b.announceTick < a.impactTick) nonOverlapping = false;
+        }
+    }
+    check('asteroid strikes never overlap: one asteroid at a time', nonOverlapping);
     check('announced strikes reach the hazards sense channel', seenHazards.some((n) => n > 0));
     const off = hazardMatch(42, { noHazards: true });
     check('noHazards opts out of all strikes', off.hazardStrikes.length === 0);
