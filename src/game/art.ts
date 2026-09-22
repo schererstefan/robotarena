@@ -20,19 +20,37 @@
 import { Scene } from 'phaser';
 import { isColorblind, teamColorFor } from './accessibility';
 import { bgThemeForSeed, paintBackground } from './art/background';
-import { BIG_MUZZLE, RECOIL_A, RECOIL_B, SPAWN_A, SPAWN_B, TREADS_A, TREADS_B, TREADS_C } from './art/anim';
+import { RECOIL_A, RECOIL_B, TREADS_A, TREADS_B, TREADS_C } from './art/anim';
 import { CHASSIS_V2 } from './art/chassis';
 import { DECOR_BARREL, DECOR_CRATE, DECOR_LAMP, DECOR_LAMP_B, DECOR_VENT } from './art/decor';
 import { CRATE_A, CRATE_B, CRATE_C } from './art/crates';
 import { FLOOR_A, FLOOR_B, FLOOR_C, FLOOR_D, FLOOR_E, FLOOR_F, FLOOR_G } from './art/floor';
-import { BOOM_1, BOOM_2, BOOM_3, BOOM_4, CHARGE_AURA, RING_FX } from './art/fx';
+import {
+    BOOM_1,
+    BOOM_2,
+    BOOM_3,
+    BOOM_4,
+    CHARGE_AURA,
+    IMPACT_BOT0_A,
+    IMPACT_BOT0_B,
+    IMPACT_BOT1_A,
+    IMPACT_BOT1_B,
+    IMPACT_DIRT_A,
+    IMPACT_DIRT_B,
+    IMPACT_WALL_A,
+    IMPACT_WALL_B,
+    RING_FX,
+    SPAWN_1,
+    SPAWN_2,
+    SPAWN_3,
+} from './art/fx';
 import { LOGO_BAR, PANEL_TILE, SKILL_ICONS, UI_ICONS } from './art/menu';
 import { PAD_AMP, PAD_OVERDRIVE, PAD_REPAIR, PAD_WARD } from './art/pads';
 import { ROCK_A, ROCK_B, ROCK_C } from './art/rocks';
 import { TURRET_A, TURRET_B, TURRET_C } from './art/turrets';
 import { validateArt } from './art/validate';
-import { BULLET_CHARGED, BULLET_V2, SPARK_V2, TRACER } from './art/projectiles';
-import { HUB_V2, MUZZLE_V2, TOWER_HEAVY, TOWER_LIGHT, TOWER_TWIN } from './art/towers';
+import { MUZZLE_MAPS, SHOT_MAPS, SHOT_WEAPONS, SPARK_V2, shotMap } from './art/projectiles';
+import { HUB_V2, TOWER_HEAVY, TOWER_LIGHT, TOWER_TWIN } from './art/towers';
 import { OBSTACLE_TOP, WALL_CORNER, WALL_GATE, WALL_GATE_B, WALL_V2 } from './art/walls';
 import { WRECKS } from './art/wrecks';
 
@@ -83,6 +101,8 @@ export function artRegistry(): ArtEntry[] {
     for (const [id, map] of Object.entries(WRECKS)) entries.push({ key: `wreck_${id}`, map, w: 16, h: 16 });
     for (const [id, map] of Object.entries(SKILL_ICONS)) entries.push({ key: `skill_${id}`, map: map as PixelMap, w: 8, h: 8 });
     for (const [id, map] of Object.entries(UI_ICONS)) entries.push({ key: `icon_${id}`, map: map as PixelMap, w: 8, h: 8 });
+    for (const [id, map] of Object.entries(SHOT_MAPS)) entries.push({ key: `shot_${id}`, map, w: 8, h: 6 });
+    for (const [id, map] of Object.entries(MUZZLE_MAPS)) entries.push({ key: `muzzle_${id}`, map, w: 12, h: 12 });
     // Reclaimed dead asset (Phase 5): corner chrome for makePanel.
     entries.push({ key: 'panel_tile', map: PANEL_TILE, w: 16, h: 16 });
     const fixed: Array<[string, PixelMap, number, number]> = [
@@ -103,12 +123,7 @@ export function artRegistry(): ArtEntry[] {
         ['rock_b', ROCK_B, 64, 64],
         ['rock_c', ROCK_C, 64, 64],
         ['hub', HUB_V2, 16, 16],
-        ['muzzle', MUZZLE_V2, 8, 8],
-        ['muzzle_big', BIG_MUZZLE, 8, 8],
-        ['bullet', BULLET_V2, 4, 4],
-        ['bullet_hot', BULLET_CHARGED, 6, 6],
         ['spark', SPARK_V2, 2, 2],
-        ['tracer', TRACER, 8, 2],
         ['tile_wall', WALL_V2, 16, 16],
         ['tile_wall_v', transposeMap(WALL_V2), 16, 16],
         ['wall_corner', WALL_CORNER, 16, 16],
@@ -127,8 +142,17 @@ export function artRegistry(): ArtEntry[] {
         ['decor_lamp', DECOR_LAMP, 16, 16],
         ['decor_lamp_b', DECOR_LAMP_B, 16, 16],
         ['decor_vent', DECOR_VENT, 16, 16],
-        ['spawn_a', SPAWN_A, 16, 16],
-        ['spawn_b', SPAWN_B, 16, 16],
+        ['impact_0_a', IMPACT_BOT0_A, 16, 16],
+        ['impact_0_b', IMPACT_BOT0_B, 16, 16],
+        ['impact_1_a', IMPACT_BOT1_A, 16, 16],
+        ['impact_1_b', IMPACT_BOT1_B, 16, 16],
+        ['impact_wall_a', IMPACT_WALL_A, 16, 16],
+        ['impact_wall_b', IMPACT_WALL_B, 16, 16],
+        ['impact_dirt_a', IMPACT_DIRT_A, 12, 12],
+        ['impact_dirt_b', IMPACT_DIRT_B, 12, 12],
+        ['spawn_1', SPAWN_1, 24, 24],
+        ['spawn_2', SPAWN_2, 24, 24],
+        ['spawn_3', SPAWN_3, 24, 24],
         ['recoil_a', RECOIL_A, 16, 16],
         ['recoil_b', RECOIL_B, 16, 16],
         ['treads_a', TREADS_A, 16, 4],
@@ -402,6 +426,33 @@ function bakeTeamChassis(scene: Scene): void {
     }
 }
 
+/** Bake per-team projectile variants (both palettes; `t` takes the team trim). */
+function bakeTeamShots(scene: Scene): void {
+    for (const weapon of SHOT_WEAPONS) {
+        for (const team of [0, 1] as const) {
+            const map = shotMap(weapon, team);
+            for (const cb of [false, true]) {
+                const recolor = { t: css(teamColorFor(team, cb)) };
+                bakeTinted(scene, `shot_${weapon}_${team}_${cb ? 'cb' : 'std'}`, map, recolor);
+            }
+        }
+    }
+}
+
+/** Bake per-team robot-hit flashes (both palettes; brackets take the trim). */
+function bakeTeamImpacts(scene: Scene): void {
+    const frames = { a: [IMPACT_BOT0_A, IMPACT_BOT1_A], b: [IMPACT_BOT0_B, IMPACT_BOT1_B] } as const;
+    for (const team of [0, 1] as const) {
+        for (const frame of ['a', 'b'] as const) {
+            const map = frames[frame][team] as PixelMap;
+            for (const cb of [false, true]) {
+                const recolor = { t: css(teamColorFor(team, cb)) };
+                bakeTinted(scene, `impact_${team}_${frame}_${cb ? 'cb' : 'std'}`, map, recolor);
+            }
+        }
+    }
+}
+
 /** Bake 8 direction frames for every other runtime-rotated sprite. */
 function bakeDir8Variants(scene: Scene): void {
     bakeDir8(scene, 'tower_light', TOWER_LIGHT, EMPTY_RECOLOR);
@@ -411,8 +462,7 @@ function bakeDir8Variants(scene: Scene): void {
     bakeDir8(scene, 'treads_b', TREADS_B, EMPTY_RECOLOR);
     bakeDir8(scene, 'treads_c', TREADS_C, EMPTY_RECOLOR);
     for (const [id, map] of Object.entries(WRECKS)) bakeDir8(scene, `wreck_${id}`, map, EMPTY_RECOLOR);
-    bakeDir8(scene, 'muzzle', MUZZLE_V2, EMPTY_RECOLOR);
-    bakeDir8(scene, 'muzzle_big', BIG_MUZZLE, EMPTY_RECOLOR);
+    for (const [id, map] of Object.entries(MUZZLE_MAPS)) bakeDir8(scene, `muzzle_${id}`, map, EMPTY_RECOLOR);
     bakeDir8(scene, 'charge_aura', CHARGE_AURA, EMPTY_RECOLOR);
 }
 
@@ -816,9 +866,14 @@ function nowMs(): number {
 export function ensureArtTextures(scene: Scene): void {
     const t0 = nowMs();
     // Purged dead keys (Phase 0): tile_floor, panel_tile, tower dup-key.
-    // tracer/ring_fx/treads_*/recoil_* stay: claimed by fidelity Phases 1-3.
+    // ring_fx/treads_*/recoil_* stay: claimed by fidelity Phases 1-3.
+    // Sprite-inventory-2 purge: tracer (dyn-graphics tracers own that job),
+    // bullet/bullet_hot (per-weapon shot_*), muzzle/muzzle_big (per-weapon
+    // muzzle_<id>_d*), spawn_a/spawn_b (spawn_1/2/3 materialize).
     for (const { key, map } of artRegistry()) bake(scene, key, map);
     bakeTeamChassis(scene);
+    bakeTeamShots(scene);
+    bakeTeamImpacts(scene);
     bakeDir8Variants(scene);
     bakeArenaFloor(scene);
     bakeScorch(scene);
@@ -864,9 +919,21 @@ export function wreckDirKey(robotId: string, dir: number): string {
     return `wreck_${robotId}_d${dir}`;
 }
 
-/** Nearest-direction muzzle key (standard or big charged variant). */
-export function muzzleDirKey(big: boolean, dir: number): string {
-    return `${big ? 'muzzle_big' : 'muzzle'}_d${dir}`;
+/** Team-baked per-weapon projectile key (trim-only tint, CB-correct). */
+export function shotKey(weapon: string, team: 0 | 1): string {
+    const known = (SHOT_WEAPONS as readonly string[]).includes(weapon) ? weapon : 'std';
+    return `shot_${known}_${team}_${isColorblind() ? 'cb' : 'std'}`;
+}
+
+/** Nearest-direction per-weapon muzzle key (team-neutral fire, never rotated). */
+export function muzzleWeaponDirKey(weapon: string, dir: number): string {
+    const known = Object.prototype.hasOwnProperty.call(MUZZLE_MAPS, weapon) ? weapon : 'brawler';
+    return `muzzle_${known}_d${dir}`;
+}
+
+/** Team-baked robot-hit flash key (frame a = solid core, b = hollow ring). */
+export function impactBotKey(team: 0 | 1, frame: 'a' | 'b'): string {
+    return `impact_${team}_${frame}_${isColorblind() ? 'cb' : 'std'}`;
 }
 
 /** Nearest-direction charge-aura key. */

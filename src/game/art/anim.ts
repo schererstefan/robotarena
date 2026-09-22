@@ -1,5 +1,7 @@
-// Animation-frame pixel-art drafts: tread roll, tower recoil, spawn pop, muzzle variant,
+// Animation-frame pixel-art drafts: tread roll, tower recoil,
 // death sequence (flash -> collapse -> ember fade).
+// (Spawn materialize lives in ./fx.ts as SPAWN_1/2/3; per-weapon muzzles in
+// ./projectiles.ts.)
 // Same string pixel-map format as src/game/art.ts. Palette chars:
 // '.' = transparent, k d m l w y o s (all in the base PALETTE).
 //
@@ -157,55 +159,6 @@ export const RECOIL_B: PixelMap = [
     '................',
 ];
 
-// Spawn rings, 16x16. SPAWN_A: small ring (8x8 outer, 4x4 hollow).
-// SPAWN_B: large ring (14x14 outer, 10x10 hollow). A -> B reads as pop.
-export const SPAWN_A: PixelMap = [
-    '................',
-    '................',
-    '................',
-    '................',
-    '......kkkk......',
-    '.....kwwwwk.....',
-    '....kw....wk....',
-    '....kw....wk....',
-    '....kw....wk....',
-    '....kw....wk....',
-    '.....kwwwwk.....',
-    '......kkkk......',
-    '................',
-    '................',
-    '................',
-    '................',
-];
-
-export const SPAWN_B: PixelMap = [
-    '................',
-    '.....kkkkkk.....',
-    '...kkwwwwwwkk...',
-    '..kw........wk..',
-    '..kw........wk..',
-    '.kw..........wk.',
-    '.kw..........wk.',
-    '.kw..........wk.',
-    '.kw..........wk.',
-    '.kw..........wk.',
-    '.kw..........wk.',
-    '..kw........wk..',
-    '..kw........wk..',
-    '...kkwwwwwwkk...',
-    '.....kkkkkk.....',
-    '................',
-];
-
-// Alternate muzzle flash, 8x8. Diagonal (X) starburst with amber core:
-// alternate with the plus-shaped MUZZLE in art.ts for flicker.
-export const BIG_MUZZLE: PixelMap = [
-    'ww....ww',
-    'www..www',
-    '.wwyyww.',
-    '..yyyy..',
-    '..yyyy..',
-    '.wwyyww.',
-    'www..www',
-    'ww....ww',
-];
+// (Sprite-inventory-2: the 16px SPAWN_A/B pop rings were replaced by the
+// 24px SPAWN_1/2/3 floor-materialize sequence in ./fx.ts, and the BIG_MUZZLE
+// X-flash by the per-weapon muzzle_<id> flashes in ./projectiles.ts.)

@@ -11,7 +11,7 @@ import { loadoutCode, type SkillLoadout } from '../../sim/skills';
 import { decodeReplay, encodeReplay } from '../../sim/replay';
 import { getRobot } from '../../robots/registry';
 import { ROBOT_SOURCES } from '../../robots/sources';
-import { SD_RING_R, auraDirKey, bakedTextureCount, blockKey, chassisTeamKey, crateKey, dir8ForHeading, ensureArtTextures, ensureBlockTexture, mapTurretKey, muzzleDirKey, padSpriteKey, repaintArenaFloor, rockKey, towerDirKey, towerKey, treadsDirKey, uiIconKey, wreckDirKey } from '../art';
+import { SD_RING_R, auraDirKey, bakedTextureCount, blockKey, chassisTeamKey, crateKey, dir8ForHeading, ensureArtTextures, ensureBlockTexture, impactBotKey, mapTurretKey, muzzleWeaponDirKey, padSpriteKey, repaintArenaFloor, rockKey, shotKey, towerDirKey, towerKey, treadsDirKey, uiIconKey, wreckDirKey } from '../art';
 import {
     playBattleStart,
     playClick,
@@ -225,6 +225,33 @@ export class BattleScene extends Scene {
     private hurtT: number[] = [];
     private punchT: number[] = [];
     private punchOn: boolean[] = [];
+    /**
+     * Hit knockback cue (render-only): frame-counted positional jolt away
+     * from the attributed attacker, paired with the white hurt blink. Small
+     * (≤6 px) so it reads at full speed without shoving the sim's layout.
+     */
+    private knockT: number[] = [];
+    private knockDX: number[] = [];
+    private knockDY: number[] = [];
+    /**
+     * Per-weapon projectile attribution (render-only inference): BulletSnapshot
+     * carries no weapon id (sim-frozen), so each shotsFired edge posts a
+     * pending fire event and newborn bullet slots claim the nearest one.
+     * Unclaimed slots (map-turret shots, pool warmup) keep the generic 'std'.
+     */
+    private firePending: Array<{ x: number; y: number; id: string; ttl: number }> = [];
+    private bulletWeapon: string[] = [];
+    /**
+     * Seated impact-flash pool (render-only): 2-frame robot/wall/ground
+     * flashes at 64px-hull scale. impactLife counts 0.16 s down
+     * (frame a first 0.08 s, frame b after).
+     */
+    private impacts: Phaser.GameObjects.Image[] = [];
+    private impactA: string[] = [];
+    private impactB: string[] = [];
+    private impactLife: number[] = [];
+    /** Spawn-materialize images (one per robot, staged-intro only). */
+    private spawnFx: Phaser.GameObjects.Image[] = [];
     private healAcc: number[] = [];
     private lastHealTick: number[] = [];
     /**
@@ -376,6 +403,16 @@ export class BattleScene extends Scene {
         this.hurtT = [];
         this.punchT = [];
         this.punchOn = [];
+        this.knockT = [];
+        this.knockDX = [];
+        this.knockDY = [];
+        this.firePending = [];
+        this.bulletWeapon = [];
+        this.impacts = [];
+        this.impactA = [];
+        this.impactB = [];
+        this.impactLife = [];
+        this.spawnFx = [];
         this.healAcc = [];
         this.lastHealTick = [];
         this.prevWallTouch = [];
@@ -590,6 +627,11 @@ export class BattleScene extends Scene {
             this.hurtT.push(0);
             this.punchT.push(0);
             this.punchOn.push(false);
+            this.knockT.push(0);
+            this.knockDX.push(0);
+            this.knockDY.push(0);
+            // Spawn-materialize image: floor-anchored glow under the chassis.
+            this.spawnFx.push(this.add.image(0, 0, 'spawn_1').setScale(2).setDepth(3).setVisible(false));
             this.healAcc.push(0);
             this.lastHealTick.push(-9999);
             this.prevWallTouch.push(false);
@@ -650,8 +692,8 @@ export class BattleScene extends Scene {
             this.prevEmpReady.push(true);
             this.iconDash.push(this.add.image(0, 0, uiIconKey('dash')).setDepth(9).setAlpha(0.9));
             this.iconEmp.push(this.add.image(0, 0, uiIconKey('emp')).setDepth(9).setAlpha(0.9));
-            const muzzle = this.add.image(0, 0, 'muzzle').setScale(2).setDepth(8).setVisible(false);
-            muzzle.setTint(skin.paint);
+            // Per-weapon muzzle flash (team-neutral fire; the trim carries team).
+            const muzzle = this.add.image(0, 0, muzzleWeaponDirKey(robotId, 0)).setScale(2).setDepth(8).setVisible(false);
             this.muzzles.push(muzzle);
             this.recoil.push(0);
             this.muzzleLife.push(0);
@@ -692,13 +734,22 @@ export class BattleScene extends Scene {
 
         // Bullet + particle + explosion-flash pools (no mid-fight allocation).
         for (let i = 0; i < BULLET_POOL; i += 1) {
-            this.bullets.push(this.add.image(-50, -50, 'bullet').setScale(2).setDepth(7).setVisible(false));
+            this.bullets.push(this.add.image(-50, -50, shotKey('std', 0)).setScale(2).setDepth(7).setVisible(false));
             this.bulletTeam.push(null);
+            this.bulletWeapon.push('std');
             this.curBX.push(-9999);
             this.curBY.push(-9999);
             this.prevBX.push(-9999);
             this.prevBY.push(-9999);
             this.hotSlot.push(false);
+        }
+        // Seated impact-flash pool: 10 slots cover worst-case simultaneous
+        // hits (6 robots) + wall/ground fizzles with headroom.
+        for (let i = 0; i < 10; i += 1) {
+            this.impacts.push(this.add.image(-50, -50, 'impact_wall_a').setScale(3).setDepth(8).setVisible(false));
+            this.impactA.push('impact_wall_a');
+            this.impactB.push('impact_wall_b');
+            this.impactLife.push(0);
         }
         for (let i = 0; i < RING_POOL; i += 1) {
             this.rings.push(this.add.image(-50, -50, 'ring_fx').setScale(2).setDepth(8).setVisible(false));
@@ -708,7 +759,8 @@ export class BattleScene extends Scene {
             this.particles.push({ img, vx: 0, vy: 0, life: 0, maxLife: 1, gravity: 0 });
         }
         for (let i = 0; i < BOOM_POOL; i += 1) {
-            this.booms.push(this.add.image(-50, -50, 'boom_1').setScale(3).setDepth(8).setVisible(false));
+            // Boom frames re-seated for 64px hulls: 16px art at 4x = 64px.
+            this.booms.push(this.add.image(-50, -50, 'boom_1').setScale(4).setDepth(8).setVisible(false));
         }
         // Scorch decals (impact record, oldest recycled) + skull markers.
         for (let i = 0; i < SCORCH_POOL; i += 1) {
@@ -1282,9 +1334,20 @@ export class BattleScene extends Scene {
                 // Muzzle size latches here; the per-frame sync picks the
                 // matching nearest-direction frame (never rotated).
                 this.muzzleBig[i] = p.charge > 0.4;
-                (this.muzzles[i] as Phaser.GameObjects.Image).setScale(2 + Math.random() * 0.8);
+                (this.muzzles[i] as Phaser.GameObjects.Image).setScale(
+                    (this.muzzleBig[i] as boolean ? 2.8 : 2) + Math.random() * 0.5,
+                );
                 this.burst(cx + Math.cos(s.tower) * 34, cy + Math.sin(s.tower) * 34, 0xffe28a, 4, 120, 0);
                 playShoot(p.charge > 0.4, s.x);
+                // Projectile attribution (render-only): the newborn bullet
+                // spawns at the muzzle next sync and claims this event.
+                this.firePending.push({
+                    x: s.x + Math.cos(s.tower) * (ROBOT_RADIUS + 4),
+                    y: s.y + Math.sin(s.tower) * (ROBOT_RADIUS + 4),
+                    id: this.robotIds[i] as string,
+                    ttl: 0.25,
+                });
+                if (this.firePending.length > 16) this.firePending.shift();
             }
             if (s.health < p.health) {
                 const dmg = Math.round(p.health - s.health);
@@ -1314,6 +1377,29 @@ export class BattleScene extends Scene {
                     this.burst(cx, cy, COLORS.danger, 6, 170, 300);
                     this.burst(cx, cy, COLORS.white, 4, 130, 120);
                     playHit(dmg, s.x);
+                }
+                if (s.alive) {
+                    // Seated hit flash (victim-team brackets) + knockback
+                    // jolt away from the attributed attacker. Skipped for
+                    // unattributed SD ticks (no dealer, no direction).
+                    const charged = dmg > this.normalDamage;
+                    this.showImpact(
+                        cx,
+                        cy,
+                        impactBotKey(s.team, 'a'),
+                        impactBotKey(s.team, 'b'),
+                        charged ? 3.5 : 2.5,
+                    );
+                    if (topDealer >= 0 && topDealer !== i) {
+                        const a = snaps[topDealer] as RobotSnapshot;
+                        const dx = s.x - a.x;
+                        const dy = s.y - a.y;
+                        const len = Math.hypot(dx, dy) || 1;
+                        const mag = charged ? 6 : 3;
+                        this.knockDX[i] = (dx / len) * mag;
+                        this.knockDY[i] = (dy / len) * mag;
+                        this.knockT[i] = charged ? 6 : 4;
+                    }
                 }
                 if (topDealer >= 0 && topDealer !== i) {
                     const a = snaps[topDealer] as RobotSnapshot;
@@ -1570,6 +1656,7 @@ export class BattleScene extends Scene {
         if (nearBlock) {
             this.burst(AX + x, AY + y, COLORS.faintNum, 4, 120, 160);
             this.burst(AX + x, AY + y, COLORS.team[0], 3, 90, 120);
+            this.showImpact(AX + x, AY + y, 'impact_wall_a', 'impact_wall_b', 2.5);
             playHit(8, x);
             const decal = this.scorches[this.scorchCursor] as Phaser.GameObjects.Image;
             this.scorchCursor = (this.scorchCursor + 1) % this.scorches.length;
@@ -1579,8 +1666,9 @@ export class BattleScene extends Scene {
                 .setScale(0.8 + Math.random() * 0.5)
                 .setVisible(true);
         } else {
-            // Range-expiry fizzle: a 2-spark shrink-out, no decal.
+            // Range-expiry fizzle: a 2-spark shrink-out + dust kick, no decal.
             this.burst(AX + x, AY + y, COLORS.faintNum, 2, 40, 0);
+            this.showImpact(AX + x, AY + y, 'impact_dirt_a', 'impact_dirt_b', 1.5);
         }
     }
 
@@ -1785,7 +1873,7 @@ export class BattleScene extends Scene {
             this.time.delayedCall(260, () => pooled.setTexture('boom_4'));
             this.time.delayedCall(430, () => pooled.setVisible(false));
         } else {
-            const boom = this.add.image(cx, cy, 'boom_1').setScale(3).setDepth(8);
+            const boom = this.add.image(cx, cy, 'boom_1').setScale(4).setDepth(8);
             this.time.delayedCall(60, () => boom.setTexture('boom_2'));
             this.time.delayedCall(160, () => boom.setTexture('boom_3'));
             this.time.delayedCall(260, () => boom.setTexture('boom_4'));
@@ -1875,6 +1963,50 @@ export class BattleScene extends Scene {
         g.lineTo(px, py + r);
         g.lineTo(px - r, py);
         g.closePath();
+    }
+
+    /**
+     * Seated impact flash from the pool (render-only, motion-gated): frame a
+     * (solid core) swaps to frame b (hollow ring) in decayEffects. Pool of 10
+     * never allocates; a busy pool reuses slot 0 (oldest) instead of dropping.
+     */
+    private showImpact(x: number, y: number, keyA: string, keyB: string, scale: number): void {
+        if (this.reducedMotion) return;
+        let slot = this.impactLife.findIndex((life) => life <= 0);
+        if (slot < 0) slot = 0;
+        this.impactA[slot] = keyA;
+        this.impactB[slot] = keyB;
+        this.impactLife[slot] = 0.16;
+        (this.impacts[slot] as Phaser.GameObjects.Image)
+            .setPosition(x, y)
+            .setTexture(keyA)
+            .setScale(scale)
+            .setAlpha(1)
+            .setVisible(true);
+    }
+
+    /**
+     * Claim a pending fire event for a newborn bullet slot (render-only).
+     * Nearest event within 60 sim-px wins; anything else keeps 'std' so a
+     * missed attribution degrades to the generic bolt, never a wrong weapon.
+     */
+    private attributeBullet(slot: number, x: number, y: number): void {
+        let best = -1;
+        let bestDist = 60;
+        for (let k = 0; k < this.firePending.length; k += 1) {
+            const pending = this.firePending[k] as { x: number; y: number; id: string; ttl: number };
+            const dist = Math.hypot(pending.x - x, pending.y - y);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = k;
+            }
+        }
+        if (best < 0) {
+            this.bulletWeapon[slot] = 'std';
+            return;
+        }
+        const claimed = this.firePending.splice(best, 1)[0] as { x: number; y: number; id: string; ttl: number };
+        this.bulletWeapon[slot] = claimed.id;
     }
 
     /** Shockwave ring from the pool: scale-out + fade (motion-gated). */
@@ -2094,6 +2226,27 @@ export class BattleScene extends Scene {
             if ((this.empRingT[i] as number) > 0) this.empRingT[i] = (this.empRingT[i] as number) - dt;
             if ((this.punchT[i] as number) > 0) this.punchT[i] = (this.punchT[i] as number) - dt;
         }
+        // Impact flashes: frame a (solid) swaps to frame b (hollow) past
+        // 0.08 s, then fade out. Stale fire attributions expire silently.
+        for (let i = 0; i < this.impactLife.length; i += 1) {
+            const life = this.impactLife[i] as number;
+            if (life <= 0) continue;
+            const next = life - dt;
+            this.impactLife[i] = next;
+            const img = this.impacts[i] as Phaser.GameObjects.Image;
+            if (next <= 0) {
+                img.setVisible(false);
+                continue;
+            }
+            const want = next > 0.08 ? (this.impactA[i] as string) : (this.impactB[i] as string);
+            if (img.texture.key !== want) img.setTexture(want);
+            img.setAlpha(Math.min(next / 0.08, 1));
+        }
+        for (let i = this.firePending.length - 1; i >= 0; i -= 1) {
+            const pending = this.firePending[i] as { ttl: number };
+            pending.ttl -= dt;
+            if (pending.ttl <= 0) this.firePending.splice(i, 1);
+        }
         for (let i = this.indicators.length - 1; i >= 0; i -= 1) {
             const ind = this.indicators[i] as EdgeIndicator;
             ind.ttl -= dt;
@@ -2123,6 +2276,10 @@ export class BattleScene extends Scene {
             let introAlpha = 1;
             let introScale = 1;
             let auraFlash = 0;
+            // Spawn materialize (floor-anchored, 24px art at 2x): dust ring
+            // forms during the drop, column rises, arrival flash holds
+            // through power-on. Analytic in lt, so skip/pauses snap cleanly.
+            let spawnTex: string | null = null;
             if (this.introActive && !this.reducedMotion) {
                 const lt = this.introElapsed - i * 0.12;
                 if (lt < 0) {
@@ -2131,6 +2288,7 @@ export class BattleScene extends Scene {
                     const t = lt / 0.25;
                     dropY = -46 * (1 - t * t * t);
                     introAlpha = t;
+                    spawnTex = lt < 0.12 ? 'spawn_1' : 'spawn_2';
                 } else {
                     if (!(this.introLanded[i] as boolean)) {
                         this.introLanded[i] = true;
@@ -2140,7 +2298,14 @@ export class BattleScene extends Scene {
                     const e = 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
                     introScale = 0.6 + 0.4 * e;
                     auraFlash = 1 - t;
+                    spawnTex = t < 1 ? 'spawn_3' : null;
                 }
+            }
+            const spawnImg = this.spawnFx[i] as Phaser.GameObjects.Image;
+            spawnImg.setVisible(spawnTex !== null);
+            if (spawnTex !== null) {
+                if (spawnImg.texture.key !== spawnTex) spawnImg.setTexture(spawnTex);
+                spawnImg.setPosition(cx, cy + 30).setAlpha(0.9);
             }
             // Step delta (render-side, from position deltas): drives treads,
             // lean, and bob. Correct under pause/slow-mo by construction.
@@ -2161,6 +2326,15 @@ export class BattleScene extends Scene {
             }
             let px = cx + ox;
             let py = cy + oy + dropY;
+            // Hit knockback jolt (frame-counted decay, ≤6 px): the struck
+            // hull rides out from the attacker while the blink runs.
+            const knock = this.knockT[i] as number;
+            if (knock > 0) {
+                const k = knock / 6;
+                px += (this.knockDX[i] as number) * k;
+                py += (this.knockDY[i] as number) * k;
+                this.knockT[i] = knock - 1;
+            }
             // Death-throes jitter: ±2.5 px shake (throes only run unreduced).
             if (throes) {
                 px += (Math.random() * 2 - 1) * 2.5;
@@ -2278,7 +2452,7 @@ export class BattleScene extends Scene {
                 const hx = cx + Math.cos(aim) * 30;
                 const hy = cy + Math.sin(aim) * 30;
                 muzzle.setPosition(hx, hy);
-                const wantMuzzle = muzzleDirKey(this.muzzleBig[i] as boolean, dir8ForHeading(aim));
+                const wantMuzzle = muzzleWeaponDirKey(this.robotIds[i] as string, dir8ForHeading(aim));
                 if (muzzle.texture.key !== wantMuzzle) muzzle.setTexture(wantMuzzle);
                 halo.setPosition(hx, hy);
                 halo.setAlpha(0.8);
@@ -2369,22 +2543,28 @@ export class BattleScene extends Scene {
                 if (lx > -9998 && this.match.result.tick > 0) this.bulletGone(lx, ly);
                 img.setVisible(false);
                 this.bulletTeam[i] = null;
+                this.bulletWeapon[i] = 'std';
                 this.hotSlot[i] = false;
                 this.curBX[i] = -9999;
                 this.curBY[i] = -9999;
                 continue;
             }
+            const wasGone = (this.curBX[i] as number) < -9000;
             this.curBX[i] = b.x;
             this.curBY[i] = b.y;
             this.hotSlot[i] = b.hot;
             if (b.hot) hot = true;
+            if (wasGone) this.attributeBullet(i, b.x, b.y);
             img.setVisible(!this.resultsShown).setPosition(AX + b.x, AY + b.y);
-            const want = b.hot ? 'bullet_hot' : 'bullet';
+            // Team-baked per-weapon texture (no runtime tint: role colors
+            // stay as drawn). Hot rounds read bigger + carry tracer streaks.
+            const want = shotKey(this.bulletWeapon[i] as string, b.team);
             if (this.bulletTeam[i] !== b.team || img.texture.key !== want) {
                 this.bulletTeam[i] = b.team;
+                img.clearTint();
                 img.setTexture(want);
-                img.setTint(bulletColor(b.team));
             }
+            img.setScale(b.hot ? 3 : 2);
         }
         this.hotLive = hot;
     }
