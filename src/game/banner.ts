@@ -85,7 +85,14 @@ export class MenuBanner {
     private readonly embers: Ember[] = [];
     private readonly reduced: boolean;
 
-    constructor(scene: Scene, parent: Phaser.GameObjects.Container, x: number, y: number, reduced: boolean) {
+    constructor(
+        scene: Scene,
+        parent: Phaser.GameObjects.Container,
+        x: number,
+        y: number,
+        reduced: boolean,
+        title: string = APP.title,
+    ) {
         this.reduced = reduced;
         ensureGlowTexture(scene);
         ensureDotTexture(scene);
@@ -103,11 +110,11 @@ export class MenuBanner {
         const titleStyle = { ...FONTS.title, fontSize: '40px', letterSpacing: 12 };
         for (let i = EXTRUDE.length - 1; i >= 0; i -= 1) {
             const layer = scene.add
-                .text(0, (i + 1) * 2, APP.title, { ...titleStyle, color: EXTRUDE[i] as string })
+                .text(0, (i + 1) * 2, title, { ...titleStyle, color: EXTRUDE[i] as string })
                 .setOrigin(0.5);
             this.root.add(layer);
         }
-        const face = scene.add.text(0, 0, APP.title, { ...titleStyle, color: COLORS.goldCss }).setOrigin(0.5);
+        const face = scene.add.text(0, 0, title, { ...titleStyle, color: COLORS.goldCss }).setOrigin(0.5);
         face.setShadow(0, 3, '#000', 8, true, true);
         this.root.add(face);
 
@@ -115,7 +122,7 @@ export class MenuBanner {
         // a narrow crop window that glides across the word. Cropping (not
         // masking) keeps the shine exactly on the letterforms.
         const shine = scene.add
-            .text(0, 0, APP.title, { ...titleStyle, color: '#fff6d8' })
+            .text(0, 0, title, { ...titleStyle, color: '#fff6d8' })
             .setOrigin(0.5)
             .setAlpha(0.8)
             .setBlendMode(BlendModes.ADD);

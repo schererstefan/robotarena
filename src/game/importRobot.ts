@@ -25,6 +25,8 @@ export interface ImportedRobot {
     meta: RobotMeta;
     loadout: SkillLoadout;
     create: RobotFactory;
+    /** Base-chassis sprite id for session robots (e.g. league fighters); must be a registry id. */
+    displayId?: string;
 }
 
 export type ImportResult = { ok: true; id: string; robot: ImportedRobot } | { ok: false; error: string };
@@ -50,6 +52,11 @@ export function resolveLineupEntry(id: string): RobotEntry {
 
 /** Sprite id for menus/battles: imports reuse a generic scout look. */
 export function displayRobotId(id: string): string {
+    // Session robots (e.g. league fighters) can pin a base chassis sprite.
+    const imported = getImported(id);
+    if (imported?.displayId !== undefined && getRobot(imported.displayId) !== undefined) {
+        return imported.displayId;
+    }
     // Hillclimb variants (e.g. hunter-hc1) share base chassis art:
     // the registry only bakes the 8 base chassis, so map -hcN -> base.
     const base = id.replace(/-hc\d+$/, "");
@@ -221,6 +228,16 @@ export function validateAndRegister(module: unknown): ImportResult {
     const robot: ImportedRobot = { meta, loadout, create };
     registry.set(id, robot);
     return { ok: true, id, robot };
+}
+
+/**
+ * Register a session-only robot under a fully-qualified id (must start
+ * with `custom:`). Used by the League view for its curated fighters.
+ * Idempotent: re-registering an existing id is a no-op.
+ */
+export function registerSessionRobot(id: string, robot: ImportedRobot): void {
+    if (!id.startsWith(IMPORT_PREFIX)) throw new Error(`session robot id must start with ${IMPORT_PREFIX}`);
+    if (!registry.has(id)) registry.set(id, robot);
 }
 
 /**

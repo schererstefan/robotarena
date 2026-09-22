@@ -117,6 +117,31 @@ export const MENU = {
     daily: 'DAILY',
     dailyDone: 'DAILY (DONE)',
     showcase: 'SHOWCASE',
+    league: 'LEAGUE',
+} as const;
+
+/** League scene copy (Season 1). All content is data-driven from
+ * data/league/season1.json; these are just chrome labels. */
+export const LEAGUE = {
+    title: 'LEAGUE',
+    subtitle: 'SEASON 1 | DOUBLE ROUND ROBIN | 240 DUELS',
+    standings: 'STANDINGS',
+    fighters: 'FIGHTERS',
+    rivalries: 'RIVALRIES',
+    highlights: 'HIGHLIGHTS',
+    back: '< BACK',
+    watch: 'WATCH',
+    viewMatchup: 'MATCHUP',
+    readMind: 'BEHAVIOR TREE - READ ITS MIND',
+    matches: 'SEASON MATCHES',
+    leg1: 'LEG 1',
+    leg2: 'LEG 2',
+    colRank: '#',
+    colFighter: 'FIGHTER',
+    colW: 'W',
+    colL: 'L',
+    colD: 'D',
+    colElo: 'ELO',
 } as const;
 
 /** Mode/size button: active choice gets "> ... <" brackets. */
@@ -438,6 +463,8 @@ export const BATTLE = {
     rematch: 'REMATCH',
     /** Reel navigation: NEXT steps the reel, EXIT returns to the showcase. */
     exitShowcase: 'EXIT',
+    /** Results/menu exit for league replay watches. */
+    exitLeague: 'LEAGUE',
 } as const;
 
 /** HUD tag for a showcase battle, with reel position when in a reel. */

@@ -104,6 +104,12 @@ export interface BattleRequest {
      * in history like any bot-vs-bot battle.
      */
     tournament?: { round: number; index: number; label: string };
+    /**
+     * League replay watch (Season 1). Excluded from history like
+     * replay/pilot; results and the exit button return to the League
+     * scene instead of the menu.
+     */
+    league?: boolean;
 }
 
 const CX = 512;
@@ -572,6 +578,7 @@ export class MenuScene extends Scene {
         this.homeItem(mx, 418, MENU.pilot, () => this.startPilot());
         this.homeItem(mx, 476, MENU.watchReplay, () => this.openReplayDialog());
         this.homeItem(mx, 534, 'TOURNAMENT', () => this.scene.start('Tournament'));
+        this.homeItem(mx, 592, MENU.league, () => this.scene.start('League'));
 
         // Slim footer: flow links first, settings second.
         this.layoutFooterRow1();
