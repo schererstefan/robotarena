@@ -68,7 +68,7 @@ y grows downward). The sim ticks at 60 Hz.
 | `match`        | Match state: `arena`, `modifiers`, `tickCap`, `killsYou`, `killsTeam`, `aliveFoes`. |
 | `pickups`      | All 4 powerup pads in canonical pad order (sorted by x, then y; public map knowledge, same for every robot): `{x, y, kind, active, respawnIn}`. `kind` is `amp`, `repair`, or `overdrive`; `active` is false while the pad is dark; `respawnIn` counts down to reactivation (`0` when active). |
 | `turrets`      | Both map turrets in fixed turret order (public map knowledge, same for every robot): `{x, y, state, owner, progress}`. `state` is `disabled` while neutral, `active` once owned; `owner` is the owning team (`-1` while neutral, persists until recaptured); `progress` is capture lean in `[-1, +1]` (`+` = team 0, `-` = team 1). |
-| `hazards`      | Announced asteroid strikes (empty when none, or all match with `noHazards`): live telegraphs counting down plus the impact-tick frame (`ticksToImpact` 0), sorted by countdown then position — `x`, `y`, `ticksToImpact`, `radius` (70), `damage` (25). World-public: every living robot sees every strike. |
+| `hazards`      | Announced asteroid strikes (empty when none, or all match with `noHazards`): at most one live asteroid at a time — it flies in from off-screen to its announced impact point over up to ~3 seconds. `x`, `y` is the impact target, `ticksToImpact` counts down to impact (0 on the impact frame), `radius` (70), `damage` (25); sorted by countdown then position. World-public: every living robot sees the strike. |
 | `inbox`        | Teammates' radio from exactly 6 ticks ago, sorted (`sent`, `from`), capped at 4. Never your own echo, never from the dead, never cross-team. Empty in 1v1. |
 
 Sensor cone: 540 units range, ~63° wide, centered on your `tower` angle. You only
@@ -93,9 +93,10 @@ available after the foe leaves the cone, flagged with `seenNow: false`.
 `blocked.ahead` whisker for steering; `zone` is the sudden-death circle with
 your distance to safety; `grid` is your team's coarse 12×8 heat-map of foe
 presence and recent damage; `match` carries kills and the living-foe count;
-`hazards` lists announced asteroid strikes (90-tick telegraph, 70-radius
-blast for 25 damage, mirrored across the center column) so you can dodge —
-empty when none are announced or the match runs `noHazards`.
+`hazards` lists announced asteroid strikes (a single asteroid at a time:
+a rock flies in from off-screen over up to ~3 seconds to a fixed announced
+target, 70-radius blast for 25 damage) so you can dodge — empty when none is
+live or the match runs `noHazards`.
 All of these channels are fresh copies every tick — mutate them freely,
 nothing leaks back into the sim. They are typed optional (treat them as
 possibly absent), but the engine always provides them.

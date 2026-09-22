@@ -1,7 +1,7 @@
 // Deterministic battle simulation. No Phaser imports here: this module runs
 // identically in the browser and in headless Node soak tests.
 
-import { AMP_MULT, AMP_TICKS, ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_RADIUS, HAZ_SALT, HAZ_SCORCH_TICKS, HAZ_TELEGRAPH_TICKS, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_MULT, OVERDRIVE_TICKS, PAD_RADIUS, PAD_RESPAWN_TICKS, REPAIR_HP, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SPAWN_HEADING_JITTER, SPAWN_SALT, SPAWN_X, SPAWN_X_JITTER, SPAWN_Y_JITTER, SPAWN_Y_SHIFT, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, ARENA_IDS, barriersForArena, padSpotsForSeed, sanitizeModifiers, turretSpotsForArena, type ArenaId, type ArenaObstacle, type MatchModifiers, type TurretSpot } from './constants';
+import { AMP_MULT, AMP_TICKS, ARENA_HEIGHT, ARENA_WIDTH, BULLET_DAMAGE, BULLET_RADIUS, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, DASH_DURATION_TICKS, DASH_SPEED_MULT, DT, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_MULT, EMP_SLOW_TICKS, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_FLY_MAX_TICKS, HAZ_FLY_SPEED, HAZ_RADIUS, HAZ_SALT, HAZ_SCORCH_TICKS, HAZ_SPAWN_MARGIN, HAZ_TARGET_MARGIN, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_MULT, OVERDRIVE_TICKS, PAD_RADIUS, PAD_RESPAWN_TICKS, REPAIR_HP, REVERSE_FACTOR, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_SHARE_DELAY, SPAWN_HEADING_JITTER, SPAWN_SALT, SPAWN_X, SPAWN_X_JITTER, SPAWN_Y_JITTER, SPAWN_Y_SHIFT, STRAFE_FACTOR, SUDDEN_DEATH_DAMAGE, SUDDEN_DEATH_PERIOD, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, ARENA_IDS, barriersForArena, padSpotsForSeed, sanitizeModifiers, turretSpotsForArena, type ArenaId, type ArenaObstacle, type MatchModifiers, type TurretSpot } from './constants';
 import { angleDiff, assistSteer, clamp, dist, toNumber, wrapAngle } from './math';
 import { createRng } from './rng';
 import { computeStats, loadoutCode, sanitizeLoadout, type RobotStats, type SkillLoadout } from './skills';
@@ -52,12 +52,18 @@ export interface TurretSnapshot {
     shotsFired: number;
 }
 
-/** One live asteroid telegraph (announced, not yet resolved). */
+/** One live asteroid strike (announced, not yet resolved). */
 export interface HazardSnapshot {
+    /** Impact target. */
     x: number;
     y: number;
     /** Ticks until impact (0 = impacting on this step). */
     ticksToImpact: number;
+    /** Current flight position (off-screen during the approach). */
+    fx: number;
+    fy: number;
+    /** Total flight ticks from announce to impact (ring-fraction denominator). */
+    totalTicks: number;
     radius: number;
     damage: number;
 }
@@ -181,10 +187,16 @@ interface SharedSighting {
     y: number;
 }
 
-/** One announced asteroid strike: a telegraph counting down to impact. */
+/** One announced asteroid strike: fly-in from off-screen, then impact. */
 interface Strike {
+    /** Impact target. */
     x: number;
     y: number;
+    /** Off-screen spawn point; the rock flies sx,sy -> x,y. */
+    sx: number;
+    sy: number;
+    /** Flight ticks from announce to impact. */
+    flyTicks: number;
     announceTick: number;
     impactTick: number;
     resolved: boolean;
@@ -525,15 +537,21 @@ export class Match {
         return this.bullets.map((b) => ({ x: b.x, y: b.y, team: b.team, hot: b.damage > BULLET_DAMAGE }));
     }
 
-    /** Live asteroid telegraphs, sorted by countdown then position. */
+    /** Live asteroid strikes: flight position + target, sorted by countdown then position. */
     get hazardSnapshots(): HazardSnapshot[] {
-        return this.liveHazards().map((s) => ({
-            x: s.x,
-            y: s.y,
-            ticksToImpact: s.impactTick - this.tick,
-            radius: HAZ_RADIUS,
-            damage: HAZ_DAMAGE,
-        }));
+        return this.liveHazards().map((s) => {
+            const pos = this.strikePos(s);
+            return {
+                x: s.x,
+                y: s.y,
+                ticksToImpact: s.impactTick - this.tick,
+                fx: pos.x,
+                fy: pos.y,
+                totalTicks: s.flyTicks,
+                radius: HAZ_RADIUS,
+                damage: HAZ_DAMAGE,
+            };
+        });
     }
 
     /** Strike impact marks (pruned past HAZ_SCORCH_TICKS), oldest first. */
@@ -545,8 +563,24 @@ export class Match {
      * Full strike log for the fingerprint: every announced impact point in
      * announce order. Copies: mutating the result never touches the sim.
      */
-    get hazardStrikes(): Array<{ x: number; y: number; announceTick: number; impactTick: number }> {
-        return this.strikes.map((s) => ({ x: s.x, y: s.y, announceTick: s.announceTick, impactTick: s.impactTick }));
+    get hazardStrikes(): Array<{
+        x: number;
+        y: number;
+        sx: number;
+        sy: number;
+        flyTicks: number;
+        announceTick: number;
+        impactTick: number;
+    }> {
+        return this.strikes.map((s) => ({
+            x: s.x,
+            y: s.y,
+            sx: s.sx,
+            sy: s.sy,
+            flyTicks: s.flyTicks,
+            announceTick: s.announceTick,
+            impactTick: s.impactTick,
+        }));
     }
 
     step(): void {
@@ -1421,7 +1455,7 @@ export class Match {
         });
     }
 
-    /** Unresolved strikes, sorted by impact tick then position. */
+    /** Unresolved strikes (at most one), sorted by impact tick then position. */
     private liveHazards(): Strike[] {
         return this.strikes
             .filter((s) => !s.resolved)
@@ -1429,21 +1463,27 @@ export class Match {
     }
 
     /**
-     * Asteroid strikes (complexity/W1). Seed-scheduled mirrored pairs in the
-     * pre-sudden-death window: announce on the cooldown grid, resolve after
-     * the telegraph lead. Determinism: one draw from a dedicated stream
-     * (seed ^ HAZ_SALT ^ announce tick) per pair — robot RNG streams and
-     * brain behavior never shift the schedule, and no Math.random anywhere.
+     * Asteroid strikes (complexity/W1, fly-in rework). Seed-scheduled single
+     * strikes in the pre-sudden-death window: at most one asteroid is live
+     * at a time — the next one is announced on the cooldown grid only after
+     * the previous strike has fully resolved. Each asteroid flies in from a
+     * random off-screen edge point to a uniform-random target; the fly-in
+     * IS the telegraph (no separate lead phase). Determinism: four draws
+     * from a dedicated stream (seed ^ HAZ_SALT ^ announce tick) per strike
+     * — robot RNG streams and brain behavior never shift the schedule, and
+     * no Math.random anywhere.
      */
     private stepHazards(): void {
         if (this.mods.noHazards === true) return;
         if (this.tick >= MAX_TICKS) return;
+        const live = this.strikes.some((s) => !s.resolved);
         if (
+            !live &&
             this.tick >= HAZ_FIRST_TICK &&
             (this.tick - HAZ_FIRST_TICK) % HAZ_COOLDOWN_TICKS === 0 &&
-            this.tick + HAZ_TELEGRAPH_TICKS < MAX_TICKS
+            this.tick + HAZ_FLY_MAX_TICKS < MAX_TICKS
         ) {
-            this.announceStrikePair();
+            this.announceStrike();
         }
         for (const strike of this.strikes) {
             if (!strike.resolved && strike.impactTick === this.tick) this.resolveStrike(strike);
@@ -1454,21 +1494,53 @@ export class Match {
     }
 
     /**
-     * Target one uniform-random living robot's current position plus its
-     * mirror across the center column (x=480). Announce-time positions are
-     * fixed, so the impact is dodgeable; the mirror keeps every strike
-     * team-symmetric whatever the target pick does.
+     * One asteroid, one random target. The spawn point is a random position
+     * along a random arena edge, pushed HAZ_SPAWN_MARGIN off-screen; the
+     * target is uniform-random inside the target margin. Flight time is
+     * distance / HAZ_FLY_SPEED, so the rock visibly crosses the arena edge
+     * instead of popping in. The impact target is fixed at announce time,
+     * so the strike stays dodgeable.
      */
-    private announceStrikePair(): void {
-        const living = this.robots.filter((r) => r.alive);
-        if (living.length === 0) return;
+    private announceStrike(): void {
         const rand = createRng((this.seed ^ HAZ_SALT ^ this.tick) >>> 0);
-        const target = living[Math.floor(rand() * living.length)] as (typeof living)[number];
-        const impactTick = this.tick + HAZ_TELEGRAPH_TICKS;
-        this.strikes.push(
-            { x: target.x, y: target.y, announceTick: this.tick, impactTick, resolved: false },
-            { x: ARENA_WIDTH - target.x, y: target.y, announceTick: this.tick, impactTick, resolved: false },
-        );
+        const edge = Math.floor(rand() * 4);
+        const along = rand() * (edge < 2 ? ARENA_WIDTH : ARENA_HEIGHT);
+        const m = HAZ_SPAWN_MARGIN;
+        let sx: number;
+        let sy: number;
+        if (edge === 0) {
+            sx = along;
+            sy = -m;
+        } else if (edge === 1) {
+            sx = along;
+            sy = ARENA_HEIGHT + m;
+        } else if (edge === 2) {
+            sx = -m;
+            sy = along;
+        } else {
+            sx = ARENA_WIDTH + m;
+            sy = along;
+        }
+        const tm = HAZ_TARGET_MARGIN;
+        const x = tm + rand() * (ARENA_WIDTH - 2 * tm);
+        const y = tm + rand() * (ARENA_HEIGHT - 2 * tm);
+        const flyTicks = Math.max(1, Math.ceil(dist(sx, sy, x, y) / HAZ_FLY_SPEED));
+        this.strikes.push({
+            x,
+            y,
+            sx,
+            sy,
+            flyTicks,
+            announceTick: this.tick,
+            impactTick: this.tick + flyTicks,
+            resolved: false,
+        });
+    }
+
+    /** Current rock position along the sx,sy -> x,y flight path (linear). */
+    private strikePos(strike: Strike): { x: number; y: number } {
+        const p = Math.min(1, Math.max(0, (this.tick - strike.announceTick) / strike.flyTicks));
+        return { x: strike.sx + (strike.x - strike.sx) * p, y: strike.sy + (strike.y - strike.sy) * p };
     }
 
     /**

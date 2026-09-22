@@ -23,14 +23,22 @@ export const MAX_TICKS_TOTAL = MAX_TICKS + SUDDEN_DEATH_TICKS + TICK_HZ * 10;
 // Balance (tuned against 1v1 medians ~390 ticks): the first pair lands ~5 s
 // in, then one pair per ~12.5 s, so short duels usually see 0-1 pairs and
 // long/team games see several. 25 damage (~2 bullets) punishes campers
-// without deciding healthy duels; 1.5 s telegraph vs 70 px radius lets any
-// moving robot escape (192 px reachable in the window from a standstill).
+// without deciding healthy duels; the visible fly-in (up to ~3 s) vs 70 px
+// radius lets any moving robot escape the announced target in time.
 /** First strike announcement tick. */
 export const HAZ_FIRST_TICK = 300;
-/** Ticks between strike-pair announcements. */
+/** Ticks between strike announcements (one live asteroid at a time). */
 export const HAZ_COOLDOWN_TICKS = 750;
-/** Telegraph lead: ticks from announcement to impact. */
+/** @deprecated Fixed telegraph lead (pre-fly-in W1 model); kept for test imports only. */
 export const HAZ_TELEGRAPH_TICKS = 90;
+/** Asteroid fly-in speed: pixels per tick along spawn -> target. */
+export const HAZ_FLY_SPEED = 7;
+/** Off-screen spawn margin: asteroids enter from this far past each edge. */
+export const HAZ_SPAWN_MARGIN = 200;
+/** Impact-target margin from arena edges so blasts stay mostly in play. */
+export const HAZ_TARGET_MARGIN = 80;
+/** Conservative upper bound on flight ticks (bounds the pre-sudden-death window). */
+export const HAZ_FLY_MAX_TICKS = 200;
 /** Blast radius in arena units (center-distance, exact). */
 export const HAZ_RADIUS = 70;
 /** Flat damage inside the radius (no double-damage interaction). */
