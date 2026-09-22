@@ -851,16 +851,19 @@ export class BattleScene extends Scene {
 
         if (this.request.tutorial === true) this.buildTutorial();
 
-        // Headless mid-combat screenshots (?bgshot=seed in the page URL).
+        // Headless mid-combat screenshots (?bgshot=seed in the page URL,
+        // &bgtick=N pre-steps to tick N instead of the default 120).
         // Virtual-time rAF yields ~zero deltas, so the sim never advances via
         // update(): pre-step to a fixed tick here for a deterministic frame.
         try {
-            if (new URLSearchParams(window.location.search).get('bgshot') !== null) {
+            const shotParams = new URLSearchParams(window.location.search);
+            if (shotParams.get('bgshot') !== null) {
                 this.finishIntro();
                 // Tick 120: robots have left spawn and projectors are out,
                 // but no kill banners/flashes/damage numbers are live yet.
+                const preTick = Math.max(1, Number.parseInt(shotParams.get('bgtick') ?? '120', 10) || 120);
                 let guard = 0;
-                while (!this.match.result.over && this.match.result.tick < 120 && guard < 160) {
+                while (!this.match.result.over && this.match.result.tick < preTick && guard < preTick + 40) {
                     this.match.step();
                     guard += 1;
                 }
