@@ -20,6 +20,7 @@ import { create as createSniperHc1, loadout as sniperHc1Loadout, meta as sniperH
 import { create as createBrawlerHc1, loadout as brawlerHc1Loadout, meta as brawlerHc1Meta } from './brawler-hc1';
 import { create as createGhostHc1, loadout as ghostHc1Loadout, meta as ghostHc1Meta } from './ghost-hc1';
 import { create as createHunterHc2, loadout as hunterHc2Loadout, meta as hunterHc2Meta } from './hunter-hc2';
+import { create as createRlChampion, loadout as rlChampionLoadout, meta as rlChampionMeta } from './rl-champion';
 
 export interface RobotEntry {
     meta: RobotMeta;
@@ -47,6 +48,7 @@ export const ROBOTS: RobotEntry[] = [
     { meta: brawlerHc1Meta, loadout: brawlerHc1Loadout, create: createBrawlerHc1 },
     { meta: ghostHc1Meta, loadout: ghostHc1Loadout, create: createGhostHc1 },
     { meta: hunterHc2Meta, loadout: hunterHc2Loadout, create: createHunterHc2 },
+    { meta: rlChampionMeta, loadout: rlChampionLoadout, create: createRlChampion },
 ];
 
 export function getRobot(id: string): RobotEntry | undefined {
