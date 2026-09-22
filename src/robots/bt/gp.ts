@@ -55,7 +55,7 @@ export interface Fitness {
 export function compareFitness(a: Fitness, b: Fitness): number {
     if (a.score !== b.score) return b.score - a.score;
     if (a.kills !== b.kills) return b.kills - a.kills;
-    if (a.damage !== b.damage) return a.damage > b.damage ? 1 : -1;
+    if (a.damage !== b.damage) return a.damage > b.damage ? -1 : 1;
     return a.nodes - b.nodes;
 }
 

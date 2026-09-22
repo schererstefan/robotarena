@@ -4,49 +4,68 @@
 // 24 generations, opponents hunter/rusher/ghost x2 seeds on open+blocks,
 // selection on score = wins + 3.0*novelty with a minimal criterion
 // (drive >= 15% of ticks; stationary turrets ineligible).
-// Champion: score=5.78 wins=4 nov=0.59 kills=3 dmg=636 nodes=21.
+// Champion: score=6.59 wins=4 nov=0.86 kills=3 dmg=576 nodes=15.
 //
-// The raw 21-node champion's effective behavior was verified identical to
-// the 3-node core below (probe on 12 fixed matches: wins, meanDistToFoe,
-// dashes, emps, padPickups, shots all exactly equal — see
-// /private/tmp/bt-evolve-3.log). This file registers the core: the mind
-// the tree actually runs, with nothing unreachable to misread.
+// NOTE (Sep 22, 2026): the damage tie-break in the comparator was inverted
+// (it preferred LOWER damage on ties). After the fix, the same seeded run
+// produces this different champion (deterministic: two runs, same champion
+// JSON MD5 6fff1d74c7316a33a673223f3af2f383). The earlier 3-node "Dervish"
+// champion was an artifact of the buggy comparator and is retired.
 //
-// Raw champion (what GP printed):
+// Champion tree (pruned of unreachable nodes; pruned == raw here, 15 nodes):
 //   Sequence (4)
-//   ├─ Selector (3)
-//   │  ├─ Sequence (3)
-//   │  │  ├─ DO aim at nearest foe (lead, hold-to-fire)
-//   │  │  ├─ DO orbit foe counter-clockwise
-//   │  │  └─ IF pad within 120u
-//   │  ├─ IF just got hit
-//   │  └─ DO orbit foe clockwise
+//   ├─ Sequence (3)
+//   │  ├─ DO aim at nearest foe (lead, hold-to-fire)
+//   │  ├─ Sequence (4)
+//   │  │  ├─ DO drive to any pad
+//   │  │  ├─ DO drive to safe-circle center
+//   │  │  ├─ DO sweep tower (0.7)
+//   │  │  └─ IF pad within 380u
+//   │  └─ IF pad within 120u
 //   ├─ DO dash at foe
 //   ├─ IF hp below 35%
 //   └─ Sequence (3)
 //      ├─ DO aim at nearest foe (lead, hold-to-fire)
 //      ├─ DO orbit foe counter-clockwise
-//      └─ Sequence (3)
-//         ├─ Inverter
-//         │  └─ IF full charge banked
-//         ├─ DO orbit foe counter-clockwise
-//         └─ Sequence (3)
-//            ├─ DO aim at nearest foe (lead, hold-to-fire)
-//            ├─ DO orbit foe counter-clockwise
-//            └─ IF pad within 120u
+//      └─ IF pad within 120u
 //
-// The mind, in words: circle the nearest foe counter-clockwise at close
-// range (~138u) with the gun tracking them, and dash straight through them
-// whenever the dash is ready. A dervish, not a turret.
+// The mind, in words: hunt powerup pads (33 pickups / 12 probe matches),
+// keep the gun tracking the nearest foe, and dash straight at them whenever
+// the dash is ready. When hurt (hp < 35%) it drops into a tight
+// counter-clockwise orbit instead. Probe: 7/12 wins, meanDistToFoe=303u,
+// dashes=14, shots/match=24.5 — a pad-hunting skirmisher, not a turret.
 
 import type { BTNode } from './tree';
 
-/** The effective champion: what the evolved tree actually does each tick. */
+/** The champion: what the evolved tree actually does each tick. */
 export const CHAMPION_TREE: BTNode = {
     kind: 'sequence',
     children: [
-        { kind: 'action', name: 'aim-nearest', params: [] },
-        { kind: 'action', name: 'orbit-foe', params: [-1] },
+        {
+            kind: 'sequence',
+            children: [
+                { kind: 'action', name: 'aim-nearest', params: [] },
+                {
+                    kind: 'sequence',
+                    children: [
+                        { kind: 'action', name: 'drive-to-pad', params: [0] },
+                        { kind: 'action', name: 'drive-to-safety', params: [] },
+                        { kind: 'action', name: 'scan', params: [0.7] },
+                        { kind: 'condition', name: 'pad-nearby', params: [380] },
+                    ],
+                },
+                { kind: 'condition', name: 'pad-nearby', params: [120] },
+            ],
+        },
         { kind: 'action', name: 'dash-at-foe', params: [] },
+        { kind: 'condition', name: 'hp-below', params: [0.35] },
+        {
+            kind: 'sequence',
+            children: [
+                { kind: 'action', name: 'aim-nearest', params: [] },
+                { kind: 'action', name: 'orbit-foe', params: [-1] },
+                { kind: 'condition', name: 'pad-nearby', params: [120] },
+            ],
+        },
     ],
 };
