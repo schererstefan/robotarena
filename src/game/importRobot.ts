@@ -1,22 +1,19 @@
-// Imported (exhibition-only) robots: load a robot file or URL through a
-// guarded dynamic import, validate its shape, and dry-run one pure update()
-// call. Imports live in a session-only registry: they never touch ROBOTS
-// (compact replay codes index into that array), never enter tournaments or
-// leaderboards, and any failure rejects with a message instead of breaking
-// the shell (validate shape, try/catch every boundary, timeout-free single
-// synchronous dry-run call — no timers, no workers).
+// Imported (exhibition-only) robots: load a robot file or URL string,
+// validate it inside a Web Worker sandbox (never executed in the page
+// realm), and register a worker-hosted controller. Imports live in a
+// session-only registry: they never touch ROBOTS (compact replay codes
+// index into that array), never enter tournaments or leaderboards, and any
+// failure rejects with a message instead of breaking the shell.
 
 import { getRobot, ROBOTS, type RobotEntry } from '../robots/registry';
-import { computeStats, sanitizeLoadout, type SkillLoadout } from '../sim/skills';
-import { IDLE_INTENT, type RobotController, type RobotFactory, type RobotMeta, type SenseState } from '../sim/types';
+import type { SkillLoadout } from '../sim/skills';
+import type { RobotFactory, RobotMeta } from '../sim/types';
+import { createSandboxHandle, createSandboxedController, validateRobotSourceInWorker } from './sandboxedRobot';
 import {
     checkFailureLine,
     IMPORT_ERROR,
     importBlockedApi,
-    importCreateThrew,
     importFetchHttp,
-    importLoadFailed,
-    importUpdateThrew,
     importValueImports,
 } from './strings';
 import { checkRobotSource } from './workshop';
@@ -27,6 +24,15 @@ export interface ImportedRobot {
     create: RobotFactory;
     /** Base-chassis sprite id for session robots (e.g. league fighters); must be a registry id. */
     displayId?: string;
+    /**
+     * Provenance: true for string-derived user imports (their bytes only
+     * ever execute inside the worker sandbox), false for trusted in-repo
+     * factory registrations (league/capture bridges, which close over
+     * reviewed code and never touch user strings).
+     */
+    sandboxed: boolean;
+    /** Original user source (sandboxed entries only; replayed to match workers). */
+    source?: string;
 }
 
 export type ImportResult = { ok: true; id: string; robot: ImportedRobot } | { ok: false; error: string };
@@ -64,74 +70,6 @@ export function displayRobotId(id: string): string {
     return getRobot(id) !== undefined ? id : 'wanderer';
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null;
-}
-
-function validMeta(raw: unknown): RobotMeta | null {
-    if (!isRecord(raw)) return null;
-    const fields: Array<keyof RobotMeta> = ['id', 'name', 'author', 'version', 'description'];
-    for (const field of fields) {
-        const value = raw[field];
-        if (typeof value !== 'string' || value.length === 0 || value.length > 120) return null;
-    }
-    const meta = raw as unknown as RobotMeta;
-    if (!/^[a-z0-9-]+$/.test(meta.id)) return null;
-    return { id: meta.id, name: meta.name, author: meta.author, version: meta.version, description: meta.description };
-}
-
-function validIntent(raw: unknown): boolean {
-    if (!isRecord(raw)) return false;
-    // Every Intent field is optional-with-default: missing is fine, present
-    // must be the right type (the engine clamps ranges downstream).
-    for (const field of ['throttle', 'turn', 'towerTurn', 'strafe', 'moveX', 'moveY', 'moveMode', 'aimMode', 'aimTarget', 'fireMode']) {
-        const value = raw[field];
-        if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value))) return false;
-    }
-    for (const field of ['fire', 'charge', 'dash', 'emp', 'aimLead']) {
-        const value = raw[field];
-        if (value !== undefined && typeof value !== 'boolean') return false;
-    }
-    const radio = raw['radio'];
-    if (radio !== undefined && radio !== null && typeof radio !== 'object') return false;
-    return true;
-}
-
-/** Minimal synthetic sense for the one-call dry run (never live engine state). */
-function dryRunSense(): SenseState {
-    return {
-        tick: 0,
-        time: 0,
-        self: {
-            id: 0,
-            team: 0,
-            x: 0,
-            y: 0,
-            heading: 0,
-            tower: 0,
-            speed: 0,
-            health: 100,
-            cooldown: 0,
-            stats: computeStats({}),
-            charge: 0,
-            charged: false,
-            dashCd: 0,
-            empCd: 0,
-            slowed: false,
-            loadout: {},
-            lastDamage: null,
-            blocked: { ahead: 0 },
-        },
-        foes: [],
-        allies: [],
-        scout: [],
-        shared: [],
-        walls: { left: 0, right: 0, top: 0, bottom: 0 },
-        rand: () => 0.5,
-        inbox: [],
-    };
-}
-
 /**
  * Strip type-only imports (the workshop template's `import type` lines) so a
  * dependency-free module can load from a blob URL. Value imports cannot be
@@ -163,69 +101,16 @@ function safetyError(source: string): string | null {
 }
 
 /**
- * Validate a dynamically imported module and register it. Every boundary is
- * guarded: bad shapes reject, create() and the single dry-run update() run
- * inside try/catch, and the stored factory wraps update() so a per-tick
- * throw degrades to an idle intent (mirroring the engine's own guard).
+ * Register user source validated inside the worker sandbox. The stored
+ * factory never executes user bytes in the page realm: every controller it
+ * creates is worker-hosted (see sandboxedRobot.ts).
  */
-export function validateAndRegister(module: unknown): ImportResult {
-    if (!isRecord(module) || typeof module['create'] !== 'function') {
-        return { ok: false, error: IMPORT_ERROR.noCreate };
-    }
-    const meta = validMeta(module['meta']);
-    if (!meta) {
-        return { ok: false, error: IMPORT_ERROR.badMeta };
-    }
-    let loadout: SkillLoadout = {};
-    try {
-        loadout = sanitizeLoadout(module['loadout'] ?? {});
-    } catch {
-        return { ok: false, error: IMPORT_ERROR.badLoadout };
-    }
-    let controller: RobotController;
-    try {
-        controller = (module['create'] as RobotFactory)();
-    } catch (error) {
-        return { ok: false, error: importCreateThrew(error instanceof Error ? error.message : IMPORT_ERROR.unknown) };
-    }
-    if (!isRecord(controller) || typeof controller['update'] !== 'function') {
-        return { ok: false, error: IMPORT_ERROR.noUpdate };
-    }
-    const update = controller['update'] as RobotController['update'];
-    try {
-        // Timeout-free pure call: one synchronous tick against synthetic sense.
-        const intent = update(dryRunSense());
-        if (!validIntent(intent)) return { ok: false, error: IMPORT_ERROR.badIntent };
-    } catch (error) {
-        return { ok: false, error: importUpdateThrew(error instanceof Error ? error.message : IMPORT_ERROR.unknown) };
-    }
-    const create: RobotFactory = () => {
-        let inner: RobotController;
-        try {
-            inner = (module['create'] as RobotFactory)();
-        } catch {
-            // A factory that passed the dry run but throws at match time
-            // degrades to a parked robot instead of breaking battle setup.
-            return { meta, loadout: { ...loadout }, update: () => ({ ...IDLE_INTENT }) };
-        }
-        const innerUpdate = inner.update.bind(inner);
-        return {
-            ...inner,
-            meta,
-            loadout: { ...loadout },
-            update: (sense: SenseState) => {
-                try {
-                    const intent = innerUpdate(sense);
-                    return validIntent(intent) ? intent : { ...IDLE_INTENT };
-                } catch {
-                    return { ...IDLE_INTENT };
-                }
-            },
-        };
-    };
+function registerSandboxedRobot(meta: RobotMeta, loadout: SkillLoadout, source: string): ImportResult {
+    const handle = createSandboxHandle(meta, loadout, source);
+    const create: RobotFactory = () => createSandboxedController(handle);
     let id = `${IMPORT_PREFIX}${meta.id}`;
     for (let n = 2; registry.has(id); n += 1) id = `${IMPORT_PREFIX}${meta.id}-${n}`;
-    const robot: ImportedRobot = { meta, loadout, create };
+    const robot: ImportedRobot = { meta, loadout, create, sandboxed: true, source };
     registry.set(id, robot);
     return { ok: true, id, robot };
 }
@@ -240,43 +125,23 @@ export function registerSessionRobot(id: string, robot: ImportedRobot): void {
     if (!registry.has(id)) registry.set(id, robot);
 }
 
-/**
- * Leftover TypeScript after import-type stripping (annotations, interfaces,
- * return types). Runs only on the blob-import failure path, so plain
- * JavaScript never reaches it — a match upgrades a cryptic SyntaxError into
- * an actionable message.
- */
-export function looksLikeTypescript(code: string): boolean {
-    return (
-        /^\s*interface\s+\w+/m.test(code) ||
-        /:\s*[A-Z][\w$]*(<[\w\s,[\]<>|&?.]+>)?\s*[=;,)]/.test(code) ||
-        /\)\s*:\s*[\w$[\]<>|&?. ]+\s*\{/.test(code)
-    );
-}
-
-/** Guarded dynamic import of prepared source via a blob module URL. */
-async function importPrepared(code: string): Promise<ImportResult> {
-    const url = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
-    try {
-        const module = (await import(/* @vite-ignore */ url)) as unknown;
-        return validateAndRegister(module);
-    } catch (error) {
-        if (error instanceof SyntaxError && looksLikeTypescript(code)) {
-            return { ok: false, error: IMPORT_ERROR.typescript };
-        }
-        const message = error instanceof Error ? error.message : IMPORT_ERROR.unknown;
-        return { ok: false, error: importLoadFailed(message) };
-    } finally {
-        URL.revokeObjectURL(url);
-    }
-}
-
 export async function importRobotFromText(source: string): Promise<ImportResult> {
+    // Defense in depth only: the worker sandbox is the security boundary,
+    // this static scan just fails fast with a clear message.
     const blocked = safetyError(source);
     if (blocked !== null) return { ok: false, error: importBlockedApi(blocked) };
     const prepared = prepareModuleSource(source);
     if (!prepared.ok) return prepared;
-    return importPrepared(prepared.code);
+    // The page realm never executes this code: validation (load, shape
+    // checks, dry-run update) happens inside the worker. The worker maps
+    // failures (including leftover TypeScript) to the same UI messages.
+    let validated: { meta: RobotMeta; loadout: SkillLoadout };
+    try {
+        validated = await validateRobotSourceInWorker(prepared.code);
+    } catch (error) {
+        return { ok: false, error: error instanceof Error ? error.message : IMPORT_ERROR.unknown };
+    }
+    return registerSandboxedRobot(validated.meta, validated.loadout, prepared.code);
 }
 
 export async function importRobotFromFile(file: File): Promise<ImportResult> {

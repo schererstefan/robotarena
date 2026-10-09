@@ -374,6 +374,19 @@ export class Match {
         this.pads = Match.padLayout(seed, this.barriers, padTurrets);
         // Per-arena turret layout (public map knowledge): disabled until captured.
         this.turrets = Match.turretLayout(this.arena);
+        // Worker-hosted (sandboxed) controllers rebuild the exact per-tick
+        // rand stream inside the worker from this seed. Built-in controllers
+        // lack the method and behave exactly as before.
+        for (const robot of this.robots) {
+            const maybeSeeded = robot.controller as unknown as { setMatchSeed?: unknown };
+            if (typeof maybeSeeded.setMatchSeed === 'function') {
+                try {
+                    (maybeSeeded.setMatchSeed as (seed: number) => void)(this.seed);
+                } catch {
+                    robot.errors += 1;
+                }
+            }
+        }
         // Aim towers at the nearest foe and fire spawn hooks in fixed order.
         for (const robot of this.robots) {
             const foe = this.nearestFoe(robot);

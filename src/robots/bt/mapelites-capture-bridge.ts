@@ -48,6 +48,8 @@ export function registerP1CaptureLineup(ids: string[]): string[] {
                     const brain = createBTTreeBrain(tree);
                     return { meta, update: (sense) => brain.update(sense).intent };
                 },
+                // Trusted in-repo factory (no user strings): keeps the sync path.
+                sandboxed: false,
             };
             registerCaptureRobot(cid, entry);
             registered.add(cid);
