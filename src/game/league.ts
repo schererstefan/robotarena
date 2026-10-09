@@ -231,6 +231,8 @@ export function ensureLeagueFighters(): void {
             loadout: { ...BT_LOADOUT } as SkillLoadout,
             create,
             displayId: CHASSIS[f.id] ?? 'wanderer',
+            // Trusted in-repo factory (no user strings): keeps the sync path.
+            sandboxed: false,
         };
         registerSessionRobot(lineupId, robot);
     }
