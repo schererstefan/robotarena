@@ -71,8 +71,24 @@ function blockGlobal(name: string): void {
  * including inside direct eval, which inherits this realm's globals.
  */
 function neuterApis(): void {
-    // Network and off-thread exfiltration.
-    for (const name of ['fetch', 'WebSocket', 'EventSource', 'XMLHttpRequest', 'Worker']) {
+    // Capture function prototypes BEFORE replacing the Function binding:
+    // `(function(){}).constructor` (plus async/generator siblings) reaches
+    // the original compiler even after the global is stubbed.
+    const fnProtos: object[] = [];
+    try {
+        fnProtos.push(
+            Object.getPrototypeOf(function () {}) as object,
+            Object.getPrototypeOf(async function () {}) as object,
+            Object.getPrototypeOf(function* () {}) as object,
+            Object.getPrototypeOf(async function* () {}) as object,
+        );
+    } catch {
+        // Prototypes unavailable: the global binding stub still stands.
+    }
+    // Network and off-thread exfiltration. importScripts is absent in
+    // module workers per spec, but stub it anyway: if present and callable
+    // it would load unvalidated code into this realm outside the protocol.
+    for (const name of ['fetch', 'WebSocket', 'EventSource', 'XMLHttpRequest', 'Worker', 'importScripts']) {
         blockGlobal(name);
     }
     // Storage: localStorage/sessionStorage do not exist in workers;
@@ -85,16 +101,33 @@ function neuterApis(): void {
     for (const name of ['Function', 'eval']) {
         blockGlobal(name);
     }
-    // Beacon exfiltration.
-    try {
-        const nav = globalThis.navigator as unknown as { sendBeacon?: unknown };
-        if (typeof nav.sendBeacon === 'function') {
-            nav.sendBeacon = (..._args: never[]): never => {
-                throw new Error('blocked API: sendBeacon');
-            };
+    // Same for the inherited path: every function prototype's constructor
+    // compiles code strings, so stub them all.
+    for (const proto of fnProtos) {
+        try {
+            Object.defineProperty(proto, 'constructor', {
+                value: (..._args: never[]): never => {
+                    throw new Error('blocked API: Function constructor');
+                },
+                writable: true,
+                configurable: true,
+            });
+        } catch {
+            // Leave it (documented residual).
         }
+    }
+    // Beacon exfiltration. Plain assignment silently fails (the native
+    // method is read-only), so shadow it with an own property instead.
+    try {
+        Object.defineProperty(globalThis.navigator as object, 'sendBeacon', {
+            value: (..._args: never[]): never => {
+                throw new Error('blocked API: sendBeacon');
+            },
+            writable: true,
+            configurable: true,
+        });
     } catch {
-        // Navigator is read-only here: sendBeacon stays (documented residual).
+        // Navigator is non-extensible here: sendBeacon stays (documented residual).
     }
     // Timer string-eval (`setTimeout("code")`) is implicit eval: reject
     // string callbacks, delegate everything else untouched.

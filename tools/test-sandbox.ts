@@ -204,6 +204,8 @@ console.log('page-realm');
     check('worker neuters network APIs', worker.includes("'fetch'") && worker.includes("'WebSocket'"));
     check('worker neuters storage APIs', worker.includes("'indexedDB'"));
     check('worker neuters nested workers', worker.includes("'Worker'"));
+    check('worker neuters beacons and script loaders', worker.includes('sendBeacon') && worker.includes("'importScripts'"));
+    check('worker neuters inherited constructors', worker.includes('fnProtos'));
 }
 
 // --- 2. Static screens ------------------------------------------------------
