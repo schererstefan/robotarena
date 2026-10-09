@@ -1,0 +1,67 @@
+# CI gates: install -> typecheck -> build -> fast deterministic tests.
+#
+# Node version is pinned in .nvmrc (22 LTS) and consumed via
+# `node-version-file` below. The repo previously had no version pin; 22 was
+# derived from the dependency ranges already in package.json
+# (vite ^6 requires Node ^18 || ^20 || >=22; typescript ~5.7 is happy on 22).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # HARD GATE (passes clean on main: 0 errors). tsconfig already sets
+      # noEmit and typescript is already a devDependency, so no extra flags
+      # or installs are needed. `vite build` never typechecks, which is why
+      # this explicit step exists.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      # NOTE: uses `build-nolog`, NOT `build`. `npm run build` also spawns
+      # `node log.js` (a background logger for local dev); CI must not launch
+      # background loggers, so it builds with the logger-free variant.
+      - name: Build
+        run: npm run build-nolog
+
+      # Fastest deterministic test suite (~0.5s locally): behavior-tree
+      # substrate tests. Explicitly free of Math.random / Date.now.
+      - name: Test (behavior-tree)
+        run: npm run test:bt
+
+      # Fast static checks over procedural pixel art (~0.1s, plain node).
+      - name: Art QA
+        run: npm run art:qa
+
+      # EXCLUDED: `npm run test:sim` (tools/soak.ts) is a long soak, not a
+      # CI gate. It runs pairwise bot-vs-bot matches across every bot x seed
+      # x arena (~32s locally and growing with the roster) and currently has
+      # 4 pre-existing failures on main (1v1 regression vs pre-brain hunter,
+      # featured-code re-sims, RA1/RA2 pinned codes). Run it locally/nightly,
+      # not per-PR.
+      #
+      # EXCLUDED: `npm run eval:*` (smoke/rr/ladder/full) are long-running
+      # balance/evolution harnesses (rr defaults to 50 seeds per pairing,
+      # full to 200) that also write to eval/out-*. Keep them manual/nightly.
+      #
+      # EXCLUDED: `npm run verify:manifests` is fast but currently fails on
+      # main (11 pre-existing showcase-code mismatches in
+      # public/data/showcase.json: re-simmed loss vs claimed win). It gates
+      # on checked-in data that has drifted from the sim, not on code, so it
+      # stays out of CI until the manifests are regenerated.
