@@ -1,0 +1,66 @@
+# Nightly baseline recorder (not a PR gate).
+#
+# This workflow records the known baseline on main:
+# - test:sim has 4 pre-existing failures on main
+# - verify:manifests has 11 pre-existing showcase mismatches
+# Both are documented as excluded in ci.yml. This workflow runs daily and
+# via manual dispatch to track them; it is not a PR gate. The red signal on
+# known failures is intentional.
+
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  soak:
+    name: Sim soak (test:sim)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sim soak (test:sim)
+        run: set -o pipefail; npm run test:sim 2>&1 | tee nightly-soak.log
+
+      - name: Upload soak log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-soak-log
+          path: nightly-soak.log
+
+  manifests:
+    name: Verify manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify manifests
+        run: set -o pipefail; npm run verify:manifests 2>&1 | tee nightly-manifests.log
+
+      - name: Upload manifests log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-manifests-log
+          path: nightly-manifests.log
