@@ -53,7 +53,6 @@ its replay code).
 | `npm run dev`         | Start the dev server (port 8080)          |
 | `npm run build`       | Production build into `dist/`             |
 | `npm run test:sim`    | Headless sim checks (no browser needed)   |
-| `npm run *-nolog`     | Same as above without the log banner; Vercel uses `build-nolog` |
 
 ## Fairness model
 

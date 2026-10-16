@@ -34,11 +34,8 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
-      # NOTE: uses `build-nolog`, NOT `build`. `npm run build` also spawns
-      # `node log.js` (a background logger for local dev); CI must not launch
-      # background loggers, so it builds with the logger-free variant.
       - name: Build
-        run: npm run build-nolog
+        run: npm run build
 
       # Fastest deterministic test suite (~0.5s locally): behavior-tree
       # substrate tests. Explicitly free of Math.random / Date.now.
