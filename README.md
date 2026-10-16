@@ -28,9 +28,14 @@ Your input flows through the same Intent pipeline as AI controllers, so the pilo
 robot gets no special physics. Pilot matches stay out of the match history so
 human games can't skew per-robot win rates.
 
-Also from the menu: TOURNEY (bracket), SHOWCASE (champion gallery), WORKSHOP
+Also from the menu: TOURNEY (bracket), SHOWCASE (champion gallery), LEAGUE
+(Season 1 standings, fighter cards, and replay watching), WORKSHOP
 (robot editor), DAILY (daily challenge), and WATCH REPLAY (replay a match from
 its replay code).
+
+**Not yet on main:** the RL Champion — an exported PPO policy bot
+(`src/robots/rl-champion.ts`) — exists only on the `rl-bot-in-app` branch
+and is not part of main.
 
 ## Project layout
 
@@ -39,6 +44,8 @@ its replay code).
   conditions. Runs headless.
 - `src/robots/` — one file per robot plus `registry.ts`. Each robot exports its
   `meta`, a default `loadout`, and a `create()` factory returning a `RobotController`.
+- `src/robots/bt/` — the behavior-tree substrate and the MAP-Elites genomes
+  the League fighters run.
 - `src/game/` — Phaser app shell: menu + loadout editor, pixel-art battle
   renderer (`art.ts` holds the procedural sprite maps), results, export.
 - `tools/soak.ts` — headless checks: determinism, intent clamping, error isolation,
@@ -48,11 +55,22 @@ its replay code).
 
 ## Scripts
 
-| Command               | What it does                              |
-| --------------------- | ----------------------------------------- |
-| `npm run dev`         | Start the dev server (port 8080)          |
-| `npm run build`       | Production build into `dist/`             |
-| `npm run test:sim`    | Headless sim checks (no browser needed)   |
+| Command                    | What it does |
+| -------------------------- | ------------ |
+| `npm run dev`              | Start the dev server (port 8080) |
+| `npm run build`            | Production build into `dist/` |
+| `npm run test:sim`         | Headless sim checks: determinism, intent clamping, error isolation, bot-vs-bot soak across 1v1/2v2/3v3 (`tools/soak.ts`) |
+| `npm run eval:build`       | Bundle the eval harness (`tools/eval.ts`) |
+| `npm run eval:smoke`       | Eval harness, smoke mode |
+| `npm run eval:rr`          | Eval harness, round-robin mode |
+| `npm run eval:ladder`      | Eval harness, ladder mode |
+| `npm run eval:full`        | Eval harness, full mode |
+| `npm run tune:build`       | Bundle the hillclimb tuner (`tools/hillclimb/tune.ts`) |
+| `npm run tune`             | Run the hillclimb tuner |
+| `npm run emit:showcase`    | Emit the public showcase gallery manifest from the frozen champion records (`tools/eval/showcase.ts`) |
+| `npm run verify:manifests` | Re-sim every replay code carried by the public manifests and verify claimed outcomes (`tools/verify-manifest.ts`) |
+| `npm run art:qa`           | Static checks over the procedural pixel art: palette membership, banned hexes, rectangular maps, per-sprite color budgets (`tools/art-qa.mjs`) |
+| `npm run test:bt`          | Behavior-tree substrate tests: interpreter robustness, genome round-trips, champion pinning, determinism (`tools/test-bt.ts`) |
 
 ## Fairness model
 
