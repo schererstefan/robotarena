@@ -1,11 +1,21 @@
-# Nightly baseline recorder (not a PR gate).
+# Nightly known-failure baseline check (not a PR gate).
 #
-# This workflow records the known baseline on main:
-# - test:sim has 4 pre-existing failures on main
-# - verify:manifests has 11 pre-existing showcase mismatches
-# Both are documented as excluded in ci.yml. This workflow runs daily and
-# via manual dispatch to track them; it is not a PR gate. The red signal on
-# known failures is intentional.
+# test:sim (4 pre-existing failures) and verify:manifests (11 pre-existing
+# showcase mismatches) are excluded from PR CI (see ci.yml), so this workflow
+# is the only place they run. The soak/manifests jobs below only record logs
+# (their test steps use continue-on-error so the known failures do not fail
+# those jobs); the baseline-check job is the workflow's pass/fail.
+#
+# Nightly is green iff tonight's failure set exactly matches
+# tools/nightly-baseline.json as multisets (order ignored, duplicates count):
+# a NEW failure, a heal+new swap, OR a healed known failure all turn it red
+# via tools/nightly-baseline-check.mjs. To update the baseline deliberately:
+# run `npm run test:sim` and `npm run verify:manifests` on a verified-good
+# main, capture the FAIL names (detail after ' -- ' stripped) and MISMATCH
+# messages (text after 'MISMATCH '), replace the arrays in
+# tools/nightly-baseline.json, keep tools/fixtures/nightly-baseline/ in sync,
+# run `node tools/nightly-baseline-check.mjs --self-test`, and review the
+# diff like code.
 
 name: Nightly
 
@@ -31,6 +41,7 @@ jobs:
         run: npm ci
 
       - name: Sim soak (test:sim)
+        continue-on-error: true
         run: set -o pipefail; npm run test:sim 2>&1 | tee nightly-soak.log
 
       - name: Upload soak log
@@ -56,6 +67,7 @@ jobs:
         run: npm ci
 
       - name: Verify manifests
+        continue-on-error: true
         run: set -o pipefail; npm run verify:manifests 2>&1 | tee nightly-manifests.log
 
       - name: Upload manifests log
@@ -64,3 +76,29 @@ jobs:
         with:
           name: nightly-manifests-log
           path: nightly-manifests.log
+
+  baseline-check:
+    name: Baseline check
+    needs: [soak, manifests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Download soak log
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-soak-log
+
+      - name: Download manifests log
+        uses: actions/download-artifact@v4
+        with:
+          name: nightly-manifests-log
+
+      - name: Compare against known-failure baseline
+        run: node tools/nightly-baseline-check.mjs --soak nightly-soak.log --manifests nightly-manifests.log

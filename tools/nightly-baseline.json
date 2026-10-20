@@ -1,0 +1,22 @@
+{
+  "description": "Known-failure baseline for the nightly workflow (.github/workflows/nightly.yml). Nightly is green iff the soak FAIL names and manifest MISMATCH messages exactly match the multisets below (order does not matter, counts and duplicates do). A new failure OR a healed known failure turns nightly red via tools/nightly-baseline-check.mjs. To update deliberately: run `npm run test:sim` and `npm run verify:manifests` on a verified-good main, capture the FAIL names (detail after ' -- ' stripped) and MISMATCH messages (text after 'MISMATCH '), replace the arrays below, keep the fixtures under tools/fixtures/nightly-baseline/ in sync, run `node tools/nightly-baseline-check.mjs --self-test`, and review the diff like code. Captured on origin/main 3948e89, 2026-10-20.",
+  "soakFailures": [
+    "no 1v1 regression vs pre-brain hunter",
+    "featured codes re-sim to claimed outcomes",
+    "RA2 pinned code re-sims exactly",
+    "RA1 pinned code re-sims exactly"
+  ],
+  "manifestMismatches": [
+    "public/data/showcase.json brawler-hc1 \"vs rusher (open, seed 1725761109)\": re-simmed loss, claimed win",
+    "public/data/showcase.json brawler-hc1 \"vs rusher (open, seed 1725761109)\": re-simmed loss, claimed win",
+    "public/data/showcase.json brawler-hc1 \"vs rusher (blocks, seed 1725761109)\": re-simmed loss, claimed win",
+    "public/data/showcase.json brawler-hc1 \"vs rusher (blocks, seed 1725761109)\": re-simmed loss, claimed win",
+    "public/data/showcase.json rusher-hc1 \"vs turret (open, seed 1725761109)\": re-simmed loss, claimed win",
+    "public/data/showcase.json rusher-hc1 \"vs turret (open, seed 1725761109)\": re-simmed loss, claimed win",
+    "public/data/showcase.json sniper-hc1 \"vs rusher (blocks, seed 1725761109)\": re-simmed loss, claimed win",
+    "public/data/showcase.json turret-hc1 \"vs rusher (open, seed 1725761109)\": re-simmed loss, claimed win",
+    "public/data/showcase.json turret-hc1 \"vs rusher (open, seed 1725761109)\": re-simmed loss, claimed win",
+    "public/data/showcase.json wanderer-hc1 \"vs rusher (open, seed 1725761109)\": re-simmed loss, claimed win",
+    "public/data/showcase.json wanderer-hc1 \"vs rusher (open, seed 1725761109)\": re-simmed loss, claimed win"
+  ]
+}

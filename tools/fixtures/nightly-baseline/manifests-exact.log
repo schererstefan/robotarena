@@ -1,0 +1,17 @@
+> robotarena@0.1.0 verify:manifests
+> esbuild tools/verify-manifest.ts --bundle --platform=node --format=cjs --outfile=/tmp/robotarena-verify.cjs --log-level=warning && node /tmp/robotarena-verify.cjs
+
+public/leaderboard.json: board schema ok, 0/8 showcase codes re-sim
+  MISMATCH public/data/showcase.json brawler-hc1 "vs rusher (open, seed 1725761109)": re-simmed loss, claimed win
+  MISMATCH public/data/showcase.json brawler-hc1 "vs rusher (open, seed 1725761109)": re-simmed loss, claimed win
+  MISMATCH public/data/showcase.json brawler-hc1 "vs rusher (blocks, seed 1725761109)": re-simmed loss, claimed win
+  MISMATCH public/data/showcase.json brawler-hc1 "vs rusher (blocks, seed 1725761109)": re-simmed loss, claimed win
+  MISMATCH public/data/showcase.json rusher-hc1 "vs turret (open, seed 1725761109)": re-simmed loss, claimed win
+  MISMATCH public/data/showcase.json rusher-hc1 "vs turret (open, seed 1725761109)": re-simmed loss, claimed win
+  MISMATCH public/data/showcase.json sniper-hc1 "vs rusher (blocks, seed 1725761109)": re-simmed loss, claimed win
+  MISMATCH public/data/showcase.json turret-hc1 "vs rusher (open, seed 1725761109)": re-simmed loss, claimed win
+  MISMATCH public/data/showcase.json turret-hc1 "vs rusher (open, seed 1725761109)": re-simmed loss, claimed win
+  MISMATCH public/data/showcase.json wanderer-hc1 "vs rusher (open, seed 1725761109)": re-simmed loss, claimed win
+  MISMATCH public/data/showcase.json wanderer-hc1 "vs rusher (open, seed 1725761109)": re-simmed loss, claimed win
+public/data/showcase.json: showcase schema ok, 32 featured codes checked
+verify-manifests: FAILURES

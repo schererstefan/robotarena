@@ -1,0 +1,17 @@
+> robotarena@0.1.0 test:sim
+> esbuild tools/soak.ts --bundle --platform=node --format=esm --outfile=/tmp/robotarena-soak.mjs --log-level=warning && node /tmp/robotarena-soak.mjs
+
+== determinism ==
+  ok   same seed, same match
+  ok   intent clamping keeps robots in bounds
+== 1v1 regression ==
+  FAIL no 1v1 regression vs pre-brain hunter -- brawler (2<4)
+  ok   hunter still beats wanderer
+== featured codes ==
+  FAIL featured codes re-sim to claimed outcomes -- 32 codes
+== pinned codes ==
+  FAIL RA2 pinned code re-sims exactly
+  FAIL RA1 pinned code re-sims exactly
+  ok   showcase schema parses
+
+4 CHECK(S) FAILED

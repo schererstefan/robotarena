@@ -6,6 +6,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+# Nightly baseline fixture logs are checked in (nightly-baseline-check --self-test)
+!tools/fixtures/nightly-baseline/*.log
 
 node_modules
 dist

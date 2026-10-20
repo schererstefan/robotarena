@@ -1,0 +1,17 @@
+> robotarena@0.1.0 test:sim
+
+== determinism ==
+  ok   same seed, same match
+  ok   intent clamping keeps robots in bounds
+== 1v1 regression ==
+  FAIL no 1v1 regression vs pre-brain hunter -- brawler (2<4)
+  ok   hunter still beats wanderer
+== featured codes ==
+  FAIL featured codes re-sim to claimed outcomes -- 32 codes
+== pinned codes ==
+  FAIL RA2 pinned code re-sims exactly
+  FAIL RA1 pinned code re-sims exactly
+  FAIL a brand new regression -- fixture-only extra failure
+  ok   showcase schema parses
+
+5 CHECK(S) FAILED
