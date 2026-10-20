@@ -34,6 +34,7 @@ export type ImportResult = { ok: true; id: string; robot: ImportedRobot } | { ok
 /** Registry ids are namespaced so they can never collide with ROBOTS ids. */
 export const IMPORT_PREFIX = 'custom:';
 const MAX_SOURCE_BYTES = 256 * 1024;
+const IMPORT_FETCH_TIMEOUT_MS = 5000;
 
 const registry = new Map<string, ImportedRobot>();
 
@@ -272,6 +273,9 @@ async function importPrepared(code: string): Promise<ImportResult> {
 }
 
 export async function importRobotFromText(source: string): Promise<ImportResult> {
+    // Size first: never run the full-source safety scan over an oversized
+    // input (prepareModuleSource keeps its own check as defence in depth).
+    if (source.length > MAX_SOURCE_BYTES) return { ok: false, error: IMPORT_ERROR.tooLarge };
     const blocked = safetyError(source);
     if (blocked !== null) return { ok: false, error: importBlockedApi(blocked) };
     const prepared = prepareModuleSource(source);
@@ -289,6 +293,53 @@ export async function importRobotFromFile(file: File): Promise<ImportResult> {
     return importRobotFromText(source);
 }
 
+/**
+ * Read a response body under the size cap: stream chunks and abort as soon
+ * as the byte total crosses MAX_SOURCE_BYTES, so an oversized download is
+ * rejected before it is fully buffered or scanned. Falls back to text()
+ * plus a length check where streaming is unavailable. Network/abort
+ * errors propagate to the caller.
+ */
+async function readResponseTextCapped(
+    response: Response,
+    ctrl: AbortController,
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
+    const body = response.body;
+    if (body !== null && typeof body.getReader === 'function') {
+        const reader = body.getReader();
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value === undefined) continue;
+            total += value.byteLength;
+            if (total > MAX_SOURCE_BYTES) {
+                try {
+                    await reader.cancel();
+                } catch {
+                    // Best effort: the download is being abandoned anyway.
+                }
+                ctrl.abort();
+                return { ok: false, error: IMPORT_ERROR.tooLarge };
+            }
+            chunks.push(value);
+        }
+        const merged = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+            merged.set(chunk, offset);
+            offset += chunk.byteLength;
+        }
+        return { ok: true, text: new TextDecoder().decode(merged) };
+    }
+    const text = await response.text();
+    if (text.length > MAX_SOURCE_BYTES || new TextEncoder().encode(text).byteLength > MAX_SOURCE_BYTES) {
+        return { ok: false, error: IMPORT_ERROR.tooLarge };
+    }
+    return { ok: true, text };
+}
+
 export async function importRobotFromUrl(url: string): Promise<ImportResult> {
     let parsed: URL;
     try {
@@ -299,13 +350,28 @@ export async function importRobotFromUrl(url: string): Promise<ImportResult> {
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
         return { ok: false, error: IMPORT_ERROR.badProtocol };
     }
+    // Mirror onlineBoard's fetchWithTimeout; the timer also covers the
+    // capped body read so a slow-drip body cannot hang the import either.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), IMPORT_FETCH_TIMEOUT_MS);
     let source: string;
     try {
-        const response = await fetch(parsed.toString());
+        const response = await fetch(parsed.toString(), { signal: ctrl.signal });
         if (!response.ok) return { ok: false, error: importFetchHttp(response.status) };
-        source = await response.text();
+        const contentLength = response.headers.get('content-length');
+        if (contentLength !== null) {
+            const declared = Number(contentLength);
+            if (Number.isFinite(declared) && declared > MAX_SOURCE_BYTES) {
+                return { ok: false, error: IMPORT_ERROR.tooLarge };
+            }
+        }
+        const body = await readResponseTextCapped(response, ctrl);
+        if (!body.ok) return body;
+        source = body.text;
     } catch {
         return { ok: false, error: IMPORT_ERROR.fetchFailed };
+    } finally {
+        clearTimeout(timer);
     }
     return importRobotFromText(source);
 }
