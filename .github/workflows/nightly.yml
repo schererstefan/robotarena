@@ -1,11 +1,31 @@
-# Nightly baseline recorder (not a PR gate).
+# Nightly expected-failure gate (not a PR gate).
 #
-# This workflow records the known baseline on main:
-# - test:sim has 4 pre-existing failures on main
-# - verify:manifests has 11 pre-existing showcase mismatches
-# Both are documented as excluded in ci.yml. This workflow runs daily and
-# via manual dispatch to track them; it is not a PR gate. The red signal on
-# known failures is intentional.
+# Protocol: the known failure baseline on main is recorded verbatim in
+# .github/nightly-expected-soak.txt (test:sim) and
+# .github/nightly-expected-manifests.txt (verify:manifests). This workflow
+# runs both commands daily and via manual dispatch, extracts their failure
+# lines, and diffs them against those expected files.
+#
+# - Green Nightly = baseline unchanged: tonight's failure lines match the
+#   expected file exactly.
+# - Red Nightly = baseline changed: the compare step prints a diff for a
+#   new failure, a disappeared failure (a fix), or a changed figure.
+#
+# The raw run steps below intentionally ignore their command's exit code
+# (|| true): the compare step is each job's verdict. Both raw commands
+# currently exit 1 on main, so a raw red/green signal cannot distinguish
+# baseline-unchanged from a regression or a fix. Intentional baseline
+# changes update the matching .github/nightly-expected-*.txt file in the
+# same PR. This workflow does not fix or re-pin anything; whether to
+# re-baseline the underlying checks is a separate decision.
+#
+# Failure-line formats were inspected from the actual command output:
+# tools/soak.ts prints "  FAIL <check>[ -- <detail>]" and
+# tools/verify-manifest.ts prints "  MISMATCH <detail>". Summary lines
+# such as "4 CHECK(S) FAILED" do not match the anchored patterns. The
+# current failure lines contain no durations, absolute paths, or memory
+# figures, so normalisation is extraction by anchored prefix plus
+# LC_ALL=C sort, preserving duplicates and stable figures verbatim.
 
 name: Nightly
 
@@ -30,8 +50,25 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Sim soak (test:sim)
-        run: set -o pipefail; npm run test:sim 2>&1 | tee nightly-soak.log
+      - name: Sim soak (test:sim) (raw exit ignored; compare step is the verdict)
+        run: set -o pipefail; npm run test:sim 2>&1 | tee nightly-soak.log || true
+
+      - name: Compare soak failures to expected baseline (job verdict)
+        run: |
+          # The trailing "|| true" matters under bash -eo pipefail: grep
+          # exits 1 when it finds no lines (for example, every baseline
+          # failure was fixed), and that must reach the diff below instead
+          # of aborting the step before a diff can be shown.
+          grep -E '^  FAIL ' nightly-soak.log | LC_ALL=C sort > nightly-soak-actual.txt || true
+          grep -E '^  FAIL ' .github/nightly-expected-soak.txt | LC_ALL=C sort > nightly-soak-expected.txt || true
+          if diff -u nightly-soak-expected.txt nightly-soak-actual.txt; then
+            echo "baseline unchanged: test:sim failures match .github/nightly-expected-soak.txt"
+          else
+            echo "baseline changed: test:sim failures differ from .github/nightly-expected-soak.txt"
+            echo "In the diff above, '-' lines are expected-only (disappeared or changed) and '+' lines are actual-only (new or changed)."
+            echo "If this change is intentional, update .github/nightly-expected-soak.txt in the same PR and explain it there."
+            exit 1
+          fi
 
       - name: Upload soak log
         if: always()
@@ -55,8 +92,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify manifests
-        run: set -o pipefail; npm run verify:manifests 2>&1 | tee nightly-manifests.log
+      - name: Verify manifests (raw exit ignored; compare step is the verdict)
+        run: set -o pipefail; npm run verify:manifests 2>&1 | tee nightly-manifests.log || true
+
+      - name: Compare manifest mismatches to expected baseline (job verdict)
+        run: |
+          # See the soak job: "|| true" lets a zero-match grep (every
+          # baseline mismatch fixed) reach the diff under -eo pipefail.
+          grep -E '^  MISMATCH ' nightly-manifests.log | LC_ALL=C sort > nightly-manifests-actual.txt || true
+          grep -E '^  MISMATCH ' .github/nightly-expected-manifests.txt | LC_ALL=C sort > nightly-manifests-expected.txt || true
+          if diff -u nightly-manifests-expected.txt nightly-manifests-actual.txt; then
+            echo "baseline unchanged: verify:manifests mismatches match .github/nightly-expected-manifests.txt"
+          else
+            echo "baseline changed: verify:manifests mismatches differ from .github/nightly-expected-manifests.txt"
+            echo "In the diff above, '-' lines are expected-only (disappeared or changed) and '+' lines are actual-only (new or changed)."
+            echo "If this change is intentional, update .github/nightly-expected-manifests.txt in the same PR and explain it there."
+            exit 1
+          fi
 
       - name: Upload manifests log
         if: always()
