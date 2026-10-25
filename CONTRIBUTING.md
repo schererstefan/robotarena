@@ -6,7 +6,7 @@
 2. Copy an existing robot (e.g. `src/robots/rusher.ts`) to `src/robots/<your-id>.ts`.
    Keep the id lowercase and matching the filename. Strip the internal-only
    `./brain` and `./genome` imports the shipped bots use — user robots may only
-   import from `../sim/*`, `./common.ts`, `./comms.ts`, and `./roles.ts`
+   import from `../sim/*`, `./common.ts`, and `./comms.ts`
    (see `docs/ROBOT_API.md` §Rules for robot code).
 3. Write your strategy against `docs/ROBOT_API.md`. One file, deterministic, fast.
 4. Register it in `src/robots/registry.ts` (one import + one entry) and
