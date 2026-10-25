@@ -21,6 +21,7 @@
     "test:import": "esbuild tools/test-import.ts --bundle --platform=node --format=esm --outfile=/tmp/robotarena-test-import.mjs --log-level=warning && node /tmp/robotarena-test-import.mjs"
   },
   "devDependencies": {
+    "esbuild": "^0.25.2",
     "typescript": "~5.7.2",
     "vite": "^6.3.1"
   },
