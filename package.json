@@ -27,6 +27,6 @@
   },
   "dependencies": {
     "phaser": "4.2.1",
-    "terser": "^5.39.0"
+    "terser": "^5.51.2"
   }
 }
