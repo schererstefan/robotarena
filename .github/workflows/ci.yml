@@ -15,6 +15,7 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -26,6 +27,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Audit (high)
+        run: npm audit --audit-level=high
 
       # HARD GATE (passes clean on main: 0 errors). tsconfig already sets
       # noEmit and typescript is already a devDependency, so no extra flags
@@ -41,6 +45,9 @@ jobs:
       # substrate tests. Explicitly free of Math.random / Date.now.
       - name: Test (behavior-tree)
         run: npm run test:bt
+
+      - name: Test (import)
+        run: npm run test:import
 
       # Fast static checks over procedural pixel art (~0.1s, plain node).
       - name: Art QA
