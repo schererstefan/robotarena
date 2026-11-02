@@ -13,11 +13,17 @@
    `src/robots/sources.ts` (one `?raw` import + one entry). Append at the end:
    registry order is append-only (replay codes index into it), so never reorder
    or remove existing entries.
-5. Run the checks:
+5. Run the checks CI gates on (same set as `.github/workflows/ci.yml`):
    ```sh
-   npm run test:sim
+   npm ci
+   npm audit --audit-level=high
+   npx tsc --noEmit
    npm run build
+   npm run test:bt
+   npm run test:import
+   npm run art:qa
    ```
+   `npm run test:sim` is NOT a PR gate — it is a long soak with 4 pre-existing failures on main (see the EXCLUDED note in `.github/workflows/ci.yml`); run it locally, but a test:sim failure alone does not block a PR.
 6. Open a pull request. Include: robot name, what strategy it plays, and which
    built-in robot(s) you tested it against. A maintainer reviews the code, runs the
    soak, and merges — your robot ships in the next deploy.

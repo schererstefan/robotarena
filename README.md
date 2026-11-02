@@ -71,6 +71,8 @@ and is not part of main.
 | `npm run verify:manifests` | Re-sim every replay code carried by the public manifests and verify claimed outcomes (`tools/verify-manifest.ts`) |
 | `npm run art:qa`           | Static checks over the procedural pixel art: palette membership, banned hexes, rectangular maps, per-sprite color budgets (`tools/art-qa.mjs`) |
 | `npm run test:bt`          | Behavior-tree substrate tests: interpreter robustness, genome round-trips, champion pinning, determinism (`tools/test-bt.ts`) |
+| `npm run test:import`      | Importer tests: in-game robot import, safety pre-scan, and error paths (`tools/test-import.ts`) |
+| `npx tsc --noEmit`         | Typecheck (CI gate; `vite build` never typechecks) |
 
 ## Fairness model
 

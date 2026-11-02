@@ -366,6 +366,14 @@ Modded matches replay exactly via the same replay codes.
    helpers you need, and strip type annotations (the importer runs the file
    untranspiled; the workshop `.ts` download is for pull-request
    submission);
+
+   **Trust warning:** imported code executes in the page realm (it is
+   loaded as a blob module, not run in a sandbox); imports are capped
+   at 256KB with a 5-second fetch timeout and guarded only by a
+   source-text safety pre-scan. Therefore only import code and URLs
+   you trust, and never import a robot file or link from an
+   untrusted source.
+
    (b) `./brain.ts`, `./genome.ts`, and sibling-robot imports
    (`./hunter`, …) are internal-only: shipped robots are multi-file, user
    robots stay within `../sim/*` + `./common.ts` + `./comms.ts`.
