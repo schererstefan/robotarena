@@ -7,6 +7,7 @@
     "dev": "vite --config vite/config.dev.mjs",
     "build": "vite build --config vite/config.prod.mjs",
     "test:sim": "esbuild tools/soak.ts --bundle --platform=node --format=esm --outfile=/tmp/robotarena-soak.mjs --log-level=warning && node /tmp/robotarena-soak.mjs",
+    "test:sim:fast": "esbuild tools/soak.ts --bundle --platform=node --format=esm --outfile=/tmp/robotarena-soak.mjs --log-level=warning && node tools/soak-fast.mjs",
     "eval:build": "esbuild tools/eval.ts --bundle --platform=node --format=cjs --outfile=/tmp/robotarena-eval.cjs --log-level=warning",
     "eval:smoke": "npm run eval:build && node /tmp/robotarena-eval.cjs --mode smoke --out eval/out-smoke",
     "eval:rr": "npm run eval:build && node /tmp/robotarena-eval.cjs --mode rr --jobs 8 --out eval/out-rr",

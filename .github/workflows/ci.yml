@@ -49,16 +49,26 @@ jobs:
       - name: Test (import)
         run: npm run test:import
 
+      # Fast pinned-sim subset (determinism, brain, pinned-codes):
+      # baseline-diff verdict vs .github/ci-expected-soak-fast.txt.
+      - name: Test (sim fast pins)
+        run: npm run test:sim:fast
+
       # Fast static checks over procedural pixel art (~0.1s, plain node).
       - name: Art QA
         run: npm run art:qa
 
-      # EXCLUDED: `npm run test:sim` (tools/soak.ts) is a long soak, not a
-      # CI gate. It runs pairwise bot-vs-bot matches across every bot x seed
-      # x arena (~32s locally and growing with the roster) and currently has
-      # 4 pre-existing failures on main (1v1 regression vs pre-brain hunter,
-      # featured-code re-sims, RA1/RA2 pinned codes). Run it locally/nightly,
-      # not per-PR.
+      # EXCLUDED: `npm run test:sim` (tools/soak.ts, full soak) is a long
+      # soak, not a PR gate. It runs pairwise bot-vs-bot matches across
+      # every bot x seed x arena (~32s locally and growing with the
+      # roster) and currently has 4 pre-existing failures on main (1v1
+      # regression vs pre-brain hunter, featured-code re-sims, RA1/RA2
+      # pinned codes). Run the full soak locally/nightly, not per-PR.
+      # The fast pinned subset above (`npm run test:sim:fast`) does gate
+      # PRs: it runs only determinism, brain, and pinned-codes and is
+      # green iff its failure lines are unchanged vs
+      # .github/ci-expected-soak-fast.txt. The full soak (incl. the
+      # manifests/featured-code re-sims) stays Nightly-only.
       #
       # EXCLUDED: `npm run eval:*` (smoke/rr/ladder/full) are long-running
       # balance/evolution harnesses (rr defaults to 50 seeds per pairing,

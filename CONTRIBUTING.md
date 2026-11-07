@@ -21,9 +21,10 @@
    npm run build
    npm run test:bt
    npm run test:import
+   npm run test:sim:fast
    npm run art:qa
    ```
-   `npm run test:sim` is NOT a PR gate — it is a long soak with 4 pre-existing failures on main (see the EXCLUDED note in `.github/workflows/ci.yml`); run it locally, but a test:sim failure alone does not block a PR.
+   `npm run test:sim` is NOT a PR gate — it is a long soak with 4 pre-existing failures on main (see the EXCLUDED note in `.github/workflows/ci.yml`); run it locally, but a test:sim failure alone does not block a PR. Its fast subset `npm run test:sim:fast` IS a PR gate (baseline-diff vs `.github/ci-expected-soak-fast.txt`).
 6. Open a pull request. Include: robot name, what strategy it plays, and which
    built-in robot(s) you tested it against. A maintainer reviews the code, runs the
    soak, and merges — your robot ships in the next deploy.

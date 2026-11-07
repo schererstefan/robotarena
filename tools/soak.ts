@@ -45,6 +45,33 @@ import { initialRound, nextRound, roundName, tiebreakWinner } from '../src/game/
 
 let failures = 0;
 
+// Section filter for the fast PR-CI subset (npm run test:sim:fast).
+// SOAK_SECTIONS is a comma-separated list of section-header names (e.g.
+// "determinism,brain,pinned-codes"); when set, only those sections run.
+// When unset, the full soak runs exactly as before. A "--only=<list>"
+// argument (or "--only <list>") is also accepted and wins over the
+// environment variable.
+const _onlyArg = ((): string | undefined => {
+    const args = process.argv.slice(2);
+    for (let i = 0; i < args.length; i += 1) {
+        const arg = args[i] as string;
+        if (arg.startsWith('--only=')) return arg.slice('--only='.length);
+        if (arg === '--only') return args[i + 1];
+    }
+    return undefined;
+})();
+const _soakSections: Set<string> | null = ((): Set<string> | null => {
+    const raw = _onlyArg ?? process.env.SOAK_SECTIONS;
+    if (raw === undefined) return null;
+    const parsed = new Set(raw.split(',').map((s) => s.trim()).filter(Boolean));
+    return parsed.size === 0 ? null : parsed;
+})();
+const _seenSections = new Set<string>();
+function shouldRun(name: string): boolean {
+    _seenSections.add(name);
+    return _soakSections === null || _soakSections.has(name);
+}
+
 function check(name: string, condition: boolean, detail = ''): void {
     if (condition) {
         console.log(`  ok   ${name}`);
@@ -83,8 +110,8 @@ function fingerprint(match: Match): string {
 }
 
 // --- 1. Determinism: same seed, same everything ------------------------------
-console.log('determinism');
-{
+if (shouldRun('determinism')) {
+    console.log('determinism');
     const a = runMatch(['hunter', 'orbiter'], [0, 1], 1234);
     const b = runMatch(['hunter', 'orbiter'], [0, 1], 1234);
     check('identical fingerprint for identical seed', fingerprint(a) === fingerprint(b));
@@ -98,8 +125,8 @@ console.log('determinism');
 }
 
 // --- 1b. Hazards: deterministic schedule, single-asteroid fly-in, opt-out -
-console.log('hazards');
-{
+if (shouldRun('hazards')) {
+    console.log('hazards');
     // Passive robots never damage each other, so the match always survives
     // past the first strike announcement (tick 300) into the telegraph.
     const seenHazards: number[] = [];
@@ -168,8 +195,8 @@ console.log('hazards');
 }
 
 // --- 2. Intent clamping: a cheating robot cannot break physics ---------------
-console.log('clamping');
-{
+if (shouldRun('clamping')) {
+    console.log('clamping');
     const cheater: RobotController = {
         meta: { id: 'cheater', name: 'Cheater', author: 'test', version: '0', description: '' },
         update: (): Intent => ({ throttle: 99, turn: -99, towerTurn: 99, fire: true, charge: true }),
@@ -231,8 +258,8 @@ console.log('clamping');
 }
 
 // --- 3. Error isolation: throwing robots idle instead of killing the match --
-console.log('isolation');
-{
+if (shouldRun('isolation')) {
+    console.log('isolation');
     const thrower: RobotController = {
         meta: { id: 'thrower', name: 'Thrower', author: 'test', version: '0', description: '' },
         update: (_sense: SenseState): Intent => {
@@ -285,8 +312,8 @@ console.log('isolation');
 }
 
 // --- 4. Skills: sanitize, stats, charge ---------------------------------------
-console.log('skills');
-{
+if (shouldRun('skills')) {
+    console.log('skills');
     const stats = computeStats({ overdrive: 3, trigger: 3, charger: 2, plating: 2 });
     check('overdrive 3 = +24% speed', Math.abs(stats.maxSpeed - MAX_SPEED * 1.24) < 0.001);
     check('trigger 3 = 15t cooldown', stats.cooldownTicks === 15);
@@ -513,8 +540,8 @@ console.log('skills');
 }
 
 // --- 4b. Actives: dash burst + EMP slow, exact cooldowns, determinism -----
-console.log('actives');
-{
+if (shouldRun('actives')) {
+    console.log('actives');
     const idleMeta = (id: string): RobotController['meta'] => ({ id, name: id, author: 'test', version: '0', description: '' });
     const sitter: RobotController = {
         meta: idleMeta('sitter'),
@@ -734,8 +761,8 @@ console.log('actives');
 }
 
 // --- 4c. Contract hardening: API version, runToEnd, catalog ceilings, perf --
-console.log('contract');
-{
+if (shouldRun('contract')) {
+    console.log('contract');
     check('robot API version exports as 1', ROBOT_API_VERSION === 1);
     check(
         'skill catalog within the 15-skill codec ceiling',
@@ -821,8 +848,8 @@ console.log('contract');
 }
 
 // --- 5. Soak: 1v1 round-robin, 2v2, 3v3 (every arena) -----------------------
-console.log('soak');
-{
+if (shouldRun('soak')) {
+    console.log('soak');
     const ids = ROBOTS.map((r) => r.meta.id);
     const seeds = [11, 22, 33];
     console.log(`       baseline: ${ids.length} bots x ${seeds.length} seeds x ${ARENA_IDS.length} arenas (counts dynamic)`);
@@ -879,8 +906,8 @@ console.log('soak');
 }
 
 // --- 5b. Arena: mirrored layout, safe spawns, solid blocks --------------------
-console.log('arena');
-{
+if (shouldRun('arena')) {
+    console.log('arena');
     const open = new Match(
         [
             { team: 0, controller: ROBOTS[0]!.create() },
@@ -973,8 +1000,8 @@ console.log('arena');
 }
 
 // --- 5b2. Spawn variation: seeded, mirrored, constrained -------------------
-console.log('spawn-variation');
-{
+if (shouldRun('spawn-variation')) {
+    console.log('spawn-variation');
     const dummy = (id: string): RobotController => ({
         meta: { id, name: id, author: 'test', version: '0', description: '' },
         update: (): Intent => ({}),
@@ -1058,8 +1085,8 @@ console.log('spawn-variation');
 }
 
 // --- 5b3. Barriers: seed-derived, symmetric, solid, playable ----------------
-console.log('barriers');
-{
+if (shouldRun('barriers')) {
+    console.log('barriers');
     const dummy = (id: string): RobotController => ({
         meta: { id, name: id, author: 'test', version: '0', description: '' },
         update: (): Intent => ({}),
@@ -1254,8 +1281,8 @@ console.log('barriers');
 }
 
 // --- 5b4. Asymmetric arenas: ruins / foundry / crossfire --------------------
-console.log('asymmetric-arenas');
-{
+if (shouldRun('asymmetric-arenas')) {
+    console.log('asymmetric-arenas');
     const NEW_ARENAS: ArenaId[] = ['ruins', 'foundry', 'crossfire'];
     const expectedCount = (arena: ArenaId): number =>
         arena === 'ruins' ? RUINS_BARRIER_COUNT : arena === 'foundry' ? FOUNDRY_BARRIER_COUNT : CROSSFIRE_BARRIER_COUNT;
@@ -1402,8 +1429,8 @@ console.log('asymmetric-arenas');
 }
 
 // --- 5c. Sudden death: circle shrinks, outsiders pulse, draws vanish ------
-console.log('sudden-death');
-{
+if (shouldRun('sudden-death')) {
+    console.log('sudden-death');
     const dummy = (id: string): RobotController => ({
         meta: { id, name: id, author: 'test', version: '0', description: '' },
         update: (): Intent => ({ throttle: 0, turn: 0, towerTurn: 0, fire: false, charge: false }),
@@ -1478,8 +1505,8 @@ console.log('sudden-death');
 }
 
 // --- 6. Replay codes: round-trip + same code => identical fingerprint ------
-console.log('replay');
-{
+if (shouldRun('replay')) {
+    console.log('replay');
     const specs: ReplaySpec[] = [
         {
             seed: 4242,
@@ -1563,8 +1590,8 @@ console.log('replay');
 }
 
 // --- 7. Match history: record/load/aggregate over a storage stub ----------
-console.log('history');
-{
+if (shouldRun('history')) {
+    console.log('history');
     const store = new Map<string, string>();
     (globalThis as unknown as { localStorage: Storage }).localStorage = {
         getItem: (key: string) => (store.has(key) ? (store.get(key) as string) : null),
@@ -1621,8 +1648,8 @@ console.log('history');
 }
 
 // --- 8. Tournament: bracket helpers + full 8-bot headless run ------------
-console.log('tournament');
-{
+if (shouldRun('tournament')) {
+    console.log('tournament');
     try {
         initialRound(['a', 'b', 'c']);
         check('rejects non-4/8 entrants', false);
@@ -1675,8 +1702,8 @@ console.log('tournament');
 }
 
 // --- Workshop: template passes, violations fail, comments don't count -----
-console.log('workshop');
-{
+if (shouldRun('workshop')) {
+    console.log('workshop');
     const failed = (source: string, id: string): boolean =>
         checkRobotSource(source).some((check) => check.id === id && !check.pass);
     check('template passes every check', workshopPassed(checkRobotSource(WORKSHOP_TEMPLATE)));
@@ -1718,8 +1745,8 @@ console.log('workshop');
 }
 
 // --- 9. Team sensor sharing: 30-tick delayed position-only blips ---------
-console.log('sharing');
-{
+if (shouldRun('sharing')) {
+    console.log('sharing');
     interface Fix {
         id: number;
         x: number;
@@ -1829,8 +1856,8 @@ console.log('sharing');
 }
 
 // --- 10. Exhibition modifiers: each flips a scripted matchup -------------
-console.log('modifiers');
-{
+if (shouldRun('modifiers')) {
+    console.log('modifiers');
     // Sim core: fingerprint minus the arena+mods tags, so "flips" means the
     // sim itself diverged, not just the label.
     const simCore = (match: Match): string => fingerprint(match).split('|').slice(2).join('|');
@@ -1958,8 +1985,8 @@ console.log('modifiers');
 }
 
 // --- P1. Powerup pads: layout, pickup effects, respawn, expiry, stacking --
-console.log('powerups');
-{
+if (shouldRun('powerups')) {
+    console.log('powerups');
     const idle: RobotController = {
         meta: { id: 'idle', name: 'Idle', author: 'test', version: '0', description: '' },
         update: (): Intent => ({}),
@@ -2347,8 +2374,8 @@ console.log('powerups');
 }
 
 // --- T1. Map turrets: layout, capture, contest, decay, recapture, combat --
-console.log('turrets');
-{
+if (shouldRun('turrets')) {
+    console.log('turrets');
     const idle: RobotController = {
         meta: { id: 'idle', name: 'Idle', author: 'test', version: '0', description: '' },
         update: (): Intent => ({}),
@@ -2691,8 +2718,8 @@ console.log('turrets');
 }
 
 // --- Tutorial: first-run flag with guarded storage -------------------------
-console.log('tutorial');
-{
+if (shouldRun('tutorial')) {
+    console.log('tutorial');
     const store = new Map<string, string>();
     (globalThis as unknown as { localStorage: Storage }).localStorage = {
         getItem: (key: string) => (store.has(key) ? (store.get(key) as string) : null),
@@ -2737,8 +2764,8 @@ console.log('tutorial');
 }
 
 // --- Genome schema + parameterized factories -------------------------------
-console.log('genome');
-{
+if (shouldRun('genome')) {
+    console.log('genome');
     const hunterDef = genomeDefFor('hunter');
     const orbiterDef = genomeDefFor('orbiter');
     check('hunter genome def exists', hunterDef !== undefined && hunterDef.genome_version === 1);
@@ -2947,8 +2974,8 @@ console.log('genome');
 }
 
 // --- 11. Sense expansion: events, bullets, tracks, arena, zone, grid, match -
-console.log('senses');
-{
+if (shouldRun('senses')) {
+    console.log('senses');
     interface SenseDigest {
         tick: number;
         events: Array<{ kind: string; amount: number; bearing: number; fromId: number }>;
@@ -3393,8 +3420,8 @@ console.log('senses');
 }
 
 // --- 12. Intent expansion: strafe, move/aim/fire assists, radio sanitize ---
-console.log('intent');
-{
+if (shouldRun('intent')) {
+    console.log('intent');
     // sanitizeIntent unit checks: every new field clamped day one.
     const idle = sanitizeIntent(null);
     check(
@@ -3711,8 +3738,8 @@ console.log('intent');
 }
 
 // --- 13. Comms: exact-delay mailbox, team isolation, helpers, wired bots ----
-console.log('comms');
-{
+if (shouldRun('comms')) {
+    console.log('comms');
     check('comms delay is 6 ticks', COMMS_DELAY === 6);
     check('inbox cap is 4 (both names)', COMMS_INBOX_MAX === 4 && INBOX_MAX === 4);
     interface MailboxEntry {
@@ -4198,8 +4225,8 @@ console.log('comms');
 }
 
 // --- 14. Adaptive brain: modes, hysteresis, presets, no 1v1 regression ----
-console.log('brain');
-{
+if (shouldRun('brain')) {
+    console.log('brain');
     type Self = SenseState['self'];
     const mkSelf = (over: Partial<Self>): Self => ({
         id: 0, team: 0, x: 480, y: 320, heading: 0, tower: 0, speed: 0, health: 100,
@@ -4417,8 +4444,8 @@ console.log('brain');
 }
 
 // --- Leaderboard + showcase manifests (Phase A static board) ---------------
-console.log('manifests');
-{
+if (shouldRun('manifests')) {
+    console.log('manifests');
     const board = parseOnlineBoard(JSON.parse(readFileSync('public/leaderboard.json', 'utf8')) as unknown);
     check('leaderboard.json parses', board !== null);
     if (board) {
@@ -4456,8 +4483,8 @@ console.log('manifests');
 }
 
 // --- Pinned replay codes: semantic-drift tripwire per format ---------------
-console.log('pinned-codes');
-{
+if (shouldRun('pinned-codes')) {
+    console.log('pinned-codes');
     // rusher vs turret, seed 4242, open, default builds — one code per
     // format, both describing the same match (winner 1 @ tick 290).
     // Re-pinned for complexity/spawn seeded variation (deterministic
@@ -4503,8 +4530,8 @@ console.log('pinned-codes');
 // center-mark variant, edge glow, vignette) are pure functions of explicit
 // inputs (no Math.random/Date.now), so replays repaint identically while
 // distinct seeds diverge.
-console.log('backgrounds');
-{
+if (shouldRun('backgrounds')) {
+    console.log('backgrounds');
     check('menu hero cover scale fits the 384x288 bake', coverScale(384, 288, 1024, 768) === 8 / 3);
     check('cover scale takes the width-bound max', coverScale(64, 96, 1024, 768) === 16);
     check('cover scale takes the height-bound max', coverScale(256, 96, 1024, 768) === 8);
@@ -4544,6 +4571,12 @@ console.log('backgrounds');
         check(`seed hash in [0,1) for seed ${s}`, h >= 0 && h < 1);
     }
     check('seed hash deterministic', hashSeed01(1234) === hashSeed01(1234));
+}
+
+if (_soakSections !== null) {
+    for (const name of _soakSections) {
+        if (!_seenSections.has(name)) check(`unknown SOAK_SECTIONS entry ${name}`, false);
+    }
 }
 
 console.log(failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`);
