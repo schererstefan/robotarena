@@ -6,6 +6,7 @@ import { decodeReplay } from '../sim/replay';
 import { sanitizeLoadout, type SkillLoadout } from '../sim/skills';
 
 export const SHOWCASE_MANIFEST_URL = 'data/showcase.json';
+export const SHOWCASE_MANIFEST_TIMEOUT_MS = 4000;
 
 export type ShowcaseOutcome = 'win' | 'draw' | 'loss';
 
@@ -115,22 +116,31 @@ export function parseShowcaseManifest(raw: unknown): ShowcaseManifest | null {
     return { season: raw['season'] as string, version: raw['version'] as string, champions };
 }
 
-/** Fetch the manifest; null when absent, unreachable, or invalid. */
+/** Fetch the manifest; null when absent, unreachable, invalid, or timed out. */
 export async function fetchShowcaseManifest(url: string = SHOWCASE_MANIFEST_URL): Promise<ShowcaseManifest | null> {
     if (typeof fetch === 'undefined') return null;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), SHOWCASE_MANIFEST_TIMEOUT_MS);
     try {
-        const res = await fetch(url);
+        const res = await fetch(url, { signal: ctrl.signal });
         if (!res.ok) return null;
         return parseShowcaseManifest((await res.json()) as unknown);
     } catch {
         return null;
+    } finally {
+        clearTimeout(timer);
     }
 }
 
 let cachedPromise: Promise<ShowcaseManifest | null> | null = null;
 
-/** Memoized fetch: the menu button, ticker, and scene share one request. */
+/** Memoized fetch: the menu button, ticker, and scene share one request. Failed fetches are not memoized, so a later call retries. */
 export function loadShowcase(url: string = SHOWCASE_MANIFEST_URL): Promise<ShowcaseManifest | null> {
-    if (!cachedPromise) cachedPromise = fetchShowcaseManifest(url);
+    if (!cachedPromise) {
+        cachedPromise = fetchShowcaseManifest(url).then((manifest) => {
+            if (manifest === null) cachedPromise = null;
+            return manifest;
+        });
+    }
     return cachedPromise;
 }
