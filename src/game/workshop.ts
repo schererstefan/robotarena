@@ -73,27 +73,201 @@ export interface WorkshopCheck {
     detail: string;
 }
 
-/** Strip comments and string literals so scans only see real code. */
+/**
+ * Strip comments and string literals so scans only see real code.
+ *
+ * Template-literal literal text stays hidden, but code inside `${...}`
+ * interpolations stays visible (recursively, including nested templates).
+ * Regex literals are hidden whole so a `//` inside one is not mistaken for
+ * a comment start.
+ */
 function stripCode(source: string): string {
     let out = '';
     let i = 0;
     const n = source.length;
-    let quote: string | null = null;
+
+    // Template/interpolation stack. Empty means top-level code.
+    // A 'template' frame skips literal text until ` or ${. An 'interp'
+    // frame is code until its matching } (depth counts nested braces).
+    type Frame = { kind: 'template' } | { kind: 'interp'; depth: number };
+    const stack: Frame[] = [];
+
+    // Previous significant token (for regex-vs-division). lastWord is the
+    // trailing identifier/keyword; lastSig is the last non-space code char
+    // not inside a stripped string/comment/regex/template-text. A value
+    // (string/regex/template/number) marks lastSig as ')' so a following
+    // `/` reads as division.
+    let lastWord = '';
+    let lastSig = '';
+
+    const REGEX_KEYWORDS = new Set([
+        'return',
+        'typeof',
+        'case',
+        'delete',
+        'void',
+        'in',
+        'instanceof',
+        'throw',
+        'new',
+        'yield',
+        'await',
+        'of',
+        'else',
+        'do',
+    ]);
+    // After one of these a `/` starts an expression, so it can be a regex.
+    const REGEX_OPS = new Set([
+        '(',
+        ',',
+        '=',
+        ':',
+        ';',
+        '!',
+        '&',
+        '|',
+        '?',
+        '{',
+        '}',
+        '[',
+        '+',
+        '-',
+        '*',
+        '/',
+        '%',
+        '<',
+        '>',
+        '^',
+        '~',
+    ]);
+
+    const top = (): Frame | undefined => stack[stack.length - 1];
+    const inTemplate = (): boolean => top()?.kind === 'template';
+
+    function regexAllowed(): boolean {
+        if (lastWord !== '' && REGEX_KEYWORDS.has(lastWord)) return true;
+        if (lastSig === '') return true;
+        return REGEX_OPS.has(lastSig);
+    }
+
+    function markValue(): void {
+        lastWord = '';
+        lastSig = ')';
+    }
+
+    function emitWord(word: string): void {
+        out += word;
+        lastWord = word;
+        lastSig = word[word.length - 1] as string;
+    }
+
+    function emitChar(ch: string): void {
+        out += ch;
+        lastWord = '';
+        lastSig = ch;
+    }
+
+    const isWordStart = (c: string): boolean =>
+        (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c === '_' || c === '$';
+    const isWordChar = (c: string): boolean => isWordStart(c) || (c >= '0' && c <= '9');
+    const isDigit = (c: string): boolean => c >= '0' && c <= '9';
+    const isSpace = (c: string): boolean =>
+        c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f' || c === '\v';
+
+    /** True when the token before the current position is a value (not an
+     * operator/keyword), so a following `++`/`--` is postfix. */
+    function prevIsValue(): boolean {
+        if (lastWord !== '') return !REGEX_KEYWORDS.has(lastWord);
+        if (lastSig === ')' || lastSig === ']') return true;
+        if (lastSig !== '' && (isWordChar(lastSig) || isDigit(lastSig))) return true;
+        return false;
+    }
+
+    // Try to skip a regex literal at index `start` (source[start] === '/').
+    // Returns the index just past the flags on success, null when the
+    // literal is unterminated (caller then treats `/` as division code).
+    function regexEnd(start: number): number | null {
+        let j = start + 1;
+        let inClass = false;
+        while (j < n) {
+            const c = source[j] as string;
+            if (c === '\\') {
+                j += 2;
+                continue;
+            }
+            if (c === '\n') return null;
+            if (c === '[' && !inClass) {
+                inClass = true;
+                j += 1;
+                // A `]` first in the class (after an optional `^`) is a
+                // literal, not the close.
+                if (source[j] === '^') j += 1;
+                if (source[j] === ']') j += 1;
+                continue;
+            }
+            if (c === ']' && inClass) {
+                inClass = false;
+                j += 1;
+                continue;
+            }
+            if (c === '/' && !inClass) {
+                j += 1;
+                while (j < n && 'gimsuyd'.includes(source[j] as string)) j += 1;
+                return j;
+            }
+            j += 1;
+        }
+        return null;
+    }
+
     while (i < n) {
-        const ch = source[i];
-        const next = i + 1 < n ? source[i + 1] : '';
-        if (quote !== null) {
+        const ch = source[i] as string;
+        const next = i + 1 < n ? (source[i + 1] as string) : '';
+
+        if (inTemplate()) {
             if (ch === '\\') {
                 i += 2;
                 continue;
             }
-            if (ch === quote) quote = null;
+            if (ch === '`') {
+                stack.pop();
+                i += 1;
+                markValue();
+                continue;
+            }
+            if (ch === '$' && next === '{') {
+                stack.push({ kind: 'interp', depth: 0 });
+                i += 2;
+                // Fresh expression inside the interpolation.
+                lastWord = '';
+                lastSig = '';
+                continue;
+            }
             i += 1;
             continue;
         }
-        if (ch === '"' || ch === "'" || ch === '`') {
-            quote = ch;
+
+        // Code mode (top-level, or inside a template interpolation).
+        if (ch === '`') {
+            stack.push({ kind: 'template' });
             i += 1;
+            continue;
+        }
+        if (ch === '"' || ch === "'") {
+            i += 1;
+            while (i < n) {
+                const c = source[i] as string;
+                if (c === '\\') {
+                    i += 2;
+                    continue;
+                }
+                if (c === ch) {
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+            markValue();
             continue;
         }
         if (ch === '/' && next === '/') {
@@ -106,7 +280,78 @@ function stripCode(source: string): string {
             i += 2;
             continue;
         }
-        out += ch;
+        if (ch === '/') {
+            if (regexAllowed()) {
+                const end = regexEnd(i);
+                if (end !== null) {
+                    i = end;
+                    markValue();
+                    continue;
+                }
+            }
+            emitChar(ch);
+            i += 1;
+            continue;
+        }
+        if (isSpace(ch)) {
+            out += ch;
+            i += 1;
+            continue;
+        }
+        if (isWordStart(ch)) {
+            const start = i;
+            i += 1;
+            while (i < n && isWordChar(source[i] as string)) i += 1;
+            emitWord(source.slice(start, i));
+            continue;
+        }
+        if (isDigit(ch)) {
+            const start = i;
+            i += 1;
+            while (i < n) {
+                const c = source[i] as string;
+                if (isDigit(c) || c === '.' || c === '_' || c === 'x' || c === 'X') i += 1;
+                else break;
+            }
+            out += source.slice(start, i);
+            lastWord = '';
+            lastSig = source[i - 1] as string;
+            continue;
+        }
+        if ((ch === '+' || ch === '-') && next === ch) {
+            const postfix = prevIsValue();
+            out += ch + ch;
+            lastWord = '';
+            // Postfix `++`/`--` ends a value; prefix starts an expression.
+            lastSig = postfix ? ')' : ch;
+            i += 2;
+            continue;
+        }
+        if (ch === '{') {
+            const frame = top();
+            if (frame?.kind === 'interp') frame.depth += 1;
+            emitChar(ch);
+            i += 1;
+            continue;
+        }
+        if (ch === '}') {
+            const frame = top();
+            if (frame?.kind === 'interp') {
+                if (frame.depth > 0) {
+                    frame.depth -= 1;
+                    emitChar(ch);
+                } else {
+                    // Closing delimiter: resume the enclosing template text.
+                    stack.pop();
+                }
+                i += 1;
+                continue;
+            }
+            emitChar(ch);
+            i += 1;
+            continue;
+        }
+        emitChar(ch);
         i += 1;
     }
     return out;
@@ -114,6 +359,57 @@ function stripCode(source: string): string {
 
 function tokenPresent(code: string, token: string): boolean {
     return new RegExp(`\\b${token.replace(/\./g, '\\.')}\\b`).test(code);
+}
+
+/**
+ * File-level heuristic for the `self` host global.
+ *
+ * `self` is the documented game-API idiom (`const self = sense.self;` plus
+ * later `self.y` uses, and direct `sense.self.*` property reads). A bare
+ * `self` reference is `window.self`, while a property access (`sense.self`)
+ * can never be the global.
+ *
+ * Limitation: this is a file-level heuristic. A file that declares `self`
+ * inside one nested function while using the bare global at module level
+ * could slip through. Accepted because the scanner is heuristic, the other
+ * host globals (`globalThis`, `window`, `top`, `parent`, `frames`,
+ * `constructor`, `document`) remain blocked, and banning the token outright
+ * breaks the repo's own template and bundled robots.
+ */
+function hasLocalSelfBinding(code: string): boolean {
+    if (/\b(?:const|let|var)\s+self\b/.test(code)) return true;
+    if (/\bfunction\s+self\b/.test(code)) return true;
+    if (/\bfunction\s*(?:\w+\s*)?\([^)]*\bself\b/.test(code)) return true;
+    if (/\bcatch\s*\(\s*self\b/.test(code)) return true;
+    // A parenthesized group only counts as a parameter list when it is
+    // arrow-function params (`(self) =>`, `(x, self) =>`) or a method
+    // definition (`name(self) { ... }`, with an optional `: ReturnType`).
+    // A call like `foo(self)` or a parenthesized value like `(self).foo`
+    // must not count — those are bare uses of the global.
+    if (/\(\s*self\b[^)]*\)\s*=>/.test(code)) return true;
+    if (/\(\s*[^)]*,\s*self\b[^)]*\)\s*=>/.test(code)) return true;
+    if (/\b(?!if\b|while\b|for\b|switch\b|catch\b)\w+\s*\(\s*self\b[^)]*\)\s*(?::\s*[^,{]*)?\s*\{/.test(code)) return true;
+    if (/\b(?!if\b|while\b|for\b|switch\b|catch\b)\w+\s*\(\s*[^)]*,\s*self\b[^)]*\)\s*(?::\s*[^,{]*)?\s*\{/.test(code)) return true;
+    if (/(^|[^\w$.])self\s*=>/.test(code)) return true;
+    return false;
+}
+
+function isBareSelfGlobal(code: string): boolean {
+    if (hasLocalSelfBinding(code)) return false;
+    const re = /\bself\b/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(code)) !== null) {
+        const idx = m.index;
+        if (idx > 0 && code[idx - 1] === '.') continue;
+        // Property/type name definition `self:` (e.g. `interface RoleSense { self: ... }`
+        // or `shouldBank(self: ...)`) is not a reference to window.self.
+        const after = code.slice(idx + 'self'.length).trimStart();
+        if (after.startsWith(':')) {
+            continue;
+        }
+        return true;
+    }
+    return false;
 }
 
 /** First meta id string: id: 'mybot' (double quotes accepted). */
@@ -175,10 +471,18 @@ const BANNED_HOST = [
     'confirm',
     'prompt',
     'Worker',
+    'self',
+    'top',
+    'parent',
+    'frames',
+    'constructor',
 ];
 
 function offenders(code: string, names: string[]): string[] {
-    return names.filter((name) => tokenPresent(code, name));
+    return names.filter((name) => {
+        if (name === 'self') return isBareSelfGlobal(code);
+        return tokenPresent(code, name);
+    });
 }
 
 /** Run every static sanity check over a robot draft. Never executes it. */

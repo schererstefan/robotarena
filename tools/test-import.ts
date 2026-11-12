@@ -177,6 +177,174 @@ async function main(): Promise<void> {
             check('HTTP error still surfaces status', !http.ok && http.error === importFetchHttp(404), http.ok ? 'ok' : http.error);
         }
 
+        // ---- denylist scanner bypasses ------------------------------------
+        console.log('[import: denylist bypasses]');
+        {
+            const templateFetch = "const u = `${fetch('https://evil.example/x')}`;";
+            const templateResult = await importRobotFromText(templateFetch);
+            check(
+                'template interpolation fetch is blocked',
+                !templateResult.ok && templateResult.error.startsWith('blocked API:'),
+                templateResult.ok ? 'unexpected ok' : templateResult.error,
+            );
+
+            const regexFetch = 'const r = /https:\\/\\//; fetch(\'https://evil.example/x\');';
+            const regexResult = await importRobotFromText(regexFetch);
+            check(
+                'regex-hidden fetch is blocked',
+                !regexResult.ok && regexResult.error.startsWith('blocked API:'),
+                regexResult.ok ? 'unexpected ok' : regexResult.error,
+            );
+
+            const computedGlobal = "const d = globalThis['doc'+'ument'];";
+            const computedGlobalResult = await importRobotFromText(computedGlobal);
+            check(
+                'computed globalThis document access is blocked',
+                !computedGlobalResult.ok && computedGlobalResult.error.startsWith('blocked API:'),
+                computedGlobalResult.ok ? 'unexpected ok' : computedGlobalResult.error,
+            );
+
+            const ctorAccess = 'const c = (()=>{}).constructor;';
+            const ctorResult = await importRobotFromText(ctorAccess);
+            check(
+                'constructor access is blocked',
+                !ctorResult.ok && ctorResult.error.startsWith('blocked API:'),
+                ctorResult.ok ? 'unexpected ok' : ctorResult.error,
+            );
+
+            for (const banned of ['self', 'top', 'parent', 'frames']) {
+                const hostResult = await importRobotFromText(`const x = ${banned};`);
+                check(
+                    `${banned} is blocked`,
+                    !hostResult.ok && hostResult.error.startsWith('blocked API:'),
+                    hostResult.ok ? 'unexpected ok' : hostResult.error,
+                );
+            }
+
+            // `self` refinement: the documented game-API idiom must pass while
+            // bare `window.self` remains blocked.
+            {
+                const selfAlias = [
+                    "export const meta = { id: 'testbot', name: 'TestBot', author: 'x', version: '1.0.0', description: 'x' };",
+                    'export const loadout = {};',
+                    'export function create() {',
+                    '  function update(sense) {',
+                    '    const self = sense.self;',
+                    '    const y = self.y;',
+                    '    const tower = self.tower;',
+                    '    return { throttle: 1 };',
+                    '  }',
+                    '  return { meta, loadout, update };',
+                    '}',
+                    '',
+                ].join('\n');
+                const selfAliasResult = await importRobotFromText(selfAlias);
+                check(
+                    'self alias idiom (const self = sense.self) imports successfully',
+                    selfAliasResult.ok || (selfAliasResult.error !== IMPORT_ERROR.tooLarge && !selfAliasResult.error.startsWith('blocked API:')),
+                    selfAliasResult.ok ? '' : selfAliasResult.error,
+                );
+
+                const senseSelfProperty = [
+                    "export const meta = { id: 'testbot', name: 'TestBot', author: 'x', version: '1.0.0', description: 'x' };",
+                    'export const loadout = {};',
+                    'export function create() {',
+                    '  function update(sense) {',
+                    '    const y = sense.self.y;',
+                    '    const stats = sense.self.stats;',
+                    '    return { throttle: 1 };',
+                    '  }',
+                    '  return { meta, loadout, update };',
+                    '}',
+                    '',
+                ].join('\n');
+                const senseSelfPropertyResult = await importRobotFromText(senseSelfProperty);
+                check(
+                    'sense.self property access imports successfully',
+                    senseSelfPropertyResult.ok || (senseSelfPropertyResult.error !== IMPORT_ERROR.tooLarge && !senseSelfPropertyResult.error.startsWith('blocked API:')),
+                    senseSelfPropertyResult.ok ? '' : senseSelfPropertyResult.error,
+                );
+
+                const bareSelfCases: Array<[string, string]> = [
+                    ['bare self assignment', 'const x = self;'],
+                    ['bare self method call', "self.fetch('https://evil.example/x');"],
+                    ['bare self property read', 'const x = self.foo;'],
+                    ['parenthesized bare self property read', 'const x = (self).foo;'],
+                    ['bare self passed as call argument', 'foo(self);'],
+                ];
+                for (const [label, snippet] of bareSelfCases) {
+                    const bareResult = await importRobotFromText(snippet);
+                    check(
+                        `${label} is blocked`,
+                        !bareResult.ok && bareResult.error.startsWith('blocked API:'),
+                        bareResult.ok ? 'unexpected ok' : bareResult.error,
+                    );
+                }
+
+                // Parameter declarations named `self` must still count as
+                // bindings, in both positions: arrow params and methods.
+                const arrowParam = [
+                    "export const meta = { id: 'testbot', name: 'TestBot', author: 'x', version: '1.0.0', description: 'x' };",
+                    'export const loadout = {};',
+                    'export function create() {',
+                    '  function update(sense) {',
+                    '    const first = (self, foe) => self.y + foe.y;',
+                    '    const second = (foe, self) => self.y + foe.y;',
+                    '    return { throttle: first(sense.self, sense.foes[0]) + second(sense.foes[0], sense.self) };',
+                    '  }',
+                    '  return { meta, loadout, update };',
+                    '}',
+                    '',
+                ].join('\n');
+                const arrowParamResult = await importRobotFromText(arrowParam);
+                check(
+                    'arrow params named self still import successfully',
+                    arrowParamResult.ok || (arrowParamResult.error !== IMPORT_ERROR.tooLarge && !arrowParamResult.error.startsWith('blocked API:')),
+                    arrowParamResult.ok ? '' : arrowParamResult.error,
+                );
+
+                const methodParam = [
+                    "export const meta = { id: 'testbot', name: 'TestBot', author: 'x', version: '1.0.0', description: 'x' };",
+                    'export const loadout = {};',
+                    'export function create() {',
+                    '  const api = {',
+                    '    readFirst(self) { return self.y; },',
+                    '    readSecond(foe, self) { return self.y + foe.y; },',
+                    '  };',
+                    '  function update(sense) {',
+                    '    return { throttle: api.readFirst(sense.self) + api.readSecond(sense.foes[0], sense.self) };',
+                    '  }',
+                    '  return { meta, loadout, update };',
+                    '}',
+                    '',
+                ].join('\n');
+                const methodParamResult = await importRobotFromText(methodParam);
+                check(
+                    'method params named self still import successfully',
+                    methodParamResult.ok || (methodParamResult.error !== IMPORT_ERROR.tooLarge && !methodParamResult.error.startsWith('blocked API:')),
+                    methodParamResult.ok ? '' : methodParamResult.error,
+                );
+            }
+
+            // The same tokens in comments/strings/template text must not
+            // block: the scanner only sees real code.
+            const commentOnly = [
+                '// fetch Math.random document globalThis self top parent frames constructor eval',
+                '/* fetch document eval("x") */',
+                'const a = "fetch document globalThis constructor self top";',
+                "const b = 'Math.random fetch eval';",
+                'const c = `fetch document constructor`;',
+                'const x = 1;',
+                '',
+            ].join('\n');
+            const passResult = await importRobotFromText(commentOnly);
+            check(
+                'tokens in comments/strings are not blocked',
+                passResult.ok || (passResult.error !== IMPORT_ERROR.tooLarge && !passResult.error.startsWith('blocked API:')),
+                passResult.ok ? '' : passResult.error,
+            );
+        }
+
         // ---- d. slow URL times out (kept last: the only slow test) ----------
         console.log('[url: timeout]');
         {

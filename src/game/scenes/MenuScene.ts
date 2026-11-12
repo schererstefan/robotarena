@@ -125,6 +125,15 @@ function menuBackdropCover(scene: Scene): number {
     if (frame.width <= 0 || frame.height <= 0) return 1;
     return coverScale(frame.width, frame.height, 1024, 768);
 }
+/** HTML-escape a robot name for innerHTML interpolation (import dialog). */
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 /** Persisted separately from the a11y bundle: battle-trail rendering. */
 const TRAILS_KEY = 'robotarena_trails';
 
@@ -1371,7 +1380,9 @@ export class MenuScene extends Scene {
         const slotOptions = this.lineupIds
             .map((id, i) => {
                 const name = getRobot(id)?.meta.name ?? IMPORT_DIALOG.unknownName;
-                return `<option value="${i}">${importSlotOption(i, i < this.teamSize ? 1 : 2, name)}</option>`;
+                // Escape after importSlotOption uppercases: entities must
+                // stay lowercase (`&lt;`, not `&LT;`).
+                return `<option value="${i}">${escapeHtml(importSlotOption(i, i < this.teamSize ? 1 : 2, name))}</option>`;
             })
             .join('');
         panel.innerHTML =
