@@ -58,6 +58,25 @@ jobs:
       - name: Art QA
         run: npm run art:qa
 
+      # Manifest verifier (baseline-diff): re-sims showcase/leaderboard
+      # replay codes, green iff the `  MISMATCH ` line set is unchanged
+      # vs .github/nightly-expected-manifests.txt (11 baselined
+      # re-simmed-loss vs claimed-win mismatches on main). The raw
+      # verify exit code is ignored (|| true); the diff is the verdict.
+      - name: Verify manifests (baseline-diff)
+        run: |
+          set -o pipefail; npm run verify:manifests 2>&1 | tee ci-manifests.log || true
+          grep -E '^  MISMATCH ' ci-manifests.log | LC_ALL=C sort > ci-manifests-actual.txt || true
+          grep -E '^  MISMATCH ' .github/nightly-expected-manifests.txt | LC_ALL=C sort > ci-manifests-expected.txt || true
+          if diff -u ci-manifests-expected.txt ci-manifests-actual.txt; then
+            echo "baseline unchanged: verify:manifests mismatches match .github/nightly-expected-manifests.txt"
+          else
+            echo "baseline changed: verify:manifests mismatches differ from .github/nightly-expected-manifests.txt"
+            echo "In the diff above, '-' lines are expected-only (disappeared or changed) and '+' lines are actual-only (new or changed)."
+            echo "If this change is intentional, update .github/nightly-expected-manifests.txt in the same PR and explain it there."
+            exit 1
+          fi
+
       # EXCLUDED: `npm run test:sim` (tools/soak.ts, full soak) is a long
       # soak, not a PR gate. It runs pairwise bot-vs-bot matches across
       # every bot x seed x arena (~32s locally and growing with the
@@ -74,8 +93,10 @@ jobs:
       # balance/evolution harnesses (rr defaults to 50 seeds per pairing,
       # full to 200) that also write to eval/out-*. Keep them manual/nightly.
       #
-      # EXCLUDED: `npm run verify:manifests` is fast but currently fails on
-      # main (11 pre-existing showcase-code mismatches in
-      # public/data/showcase.json: re-simmed loss vs claimed win). It gates
-      # on checked-in data that has drifted from the sim, not on code, so it
-      # stays out of CI until the manifests are regenerated.
+      # `npm run verify:manifests` IS a PR gate via the baseline-diff step
+      # above (green iff its `  MISMATCH ` lines are unchanged vs
+      # .github/nightly-expected-manifests.txt). It currently has 11
+      # pre-existing showcase-code mismatches on main (re-simmed loss vs
+      # claimed win in public/data/showcase.json); the gate stays green
+      # until that set changes. Showcase regeneration (`emit:showcase`,
+      # separate PR) will update the baseline when the drift is fixed.
