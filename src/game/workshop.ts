@@ -361,6 +361,51 @@ function tokenPresent(code: string, token: string): boolean {
     return new RegExp(`\\b${token.replace(/\./g, '\\.')}\\b`).test(code);
 }
 
+/**
+ * File-level heuristic for the `self` host global.
+ *
+ * `self` is the documented game-API idiom (`const self = sense.self;` plus
+ * later `self.y` uses, and direct `sense.self.*` property reads). A bare
+ * `self` reference is `window.self`, while a property access (`sense.self`)
+ * can never be the global.
+ *
+ * Limitation: this is a file-level heuristic. A file that declares `self`
+ * inside one nested function while using the bare global at module level
+ * could slip through. Accepted because the scanner is heuristic, the other
+ * host globals (`globalThis`, `window`, `top`, `parent`, `frames`,
+ * `constructor`, `document`) remain blocked, and banning the token outright
+ * breaks the repo's own template and bundled robots.
+ */
+function hasLocalSelfBinding(code: string): boolean {
+    if (/\b(?:const|let|var)\s+self\b/.test(code)) return true;
+    if (/\bfunction\s+self\b/.test(code)) return true;
+    if (/\bfunction\s*(?:\w+\s*)?\([^)]*\bself\b/.test(code)) return true;
+    if (/\bcatch\s*\(\s*self\b/.test(code)) return true;
+    if (/\(\s*self\s*(?:,|:|\)|\s*=)/.test(code)) return true;
+    if (/\(\s*[^)]*,\s*self\s*(?:,|:|\)|\s*=)/.test(code)) return true;
+    if (/(^|[^\w$.])self\s*=>/.test(code)) return true;
+    if (/\b\w+\s*\(\s*self\s*(?:,|:|\)|\s*=)/.test(code)) return true;
+    return false;
+}
+
+function isBareSelfGlobal(code: string): boolean {
+    if (hasLocalSelfBinding(code)) return false;
+    const re = /\bself\b/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(code)) !== null) {
+        const idx = m.index;
+        if (idx > 0 && code[idx - 1] === '.') continue;
+        // Property/type name definition `self:` (e.g. `interface RoleSense { self: ... }`
+        // or `shouldBank(self: ...)`) is not a reference to window.self.
+        const after = code.slice(idx + 'self'.length).trimStart();
+        if (after.startsWith(':')) {
+            continue;
+        }
+        return true;
+    }
+    return false;
+}
+
 /** First meta id string: id: 'mybot' (double quotes accepted). */
 export function extractMetaId(source: string): string | null {
     const match = /id\s*:\s*['"]([^'"]+)['"]/.exec(source);
@@ -428,7 +473,10 @@ const BANNED_HOST = [
 ];
 
 function offenders(code: string, names: string[]): string[] {
-    return names.filter((name) => tokenPresent(code, name));
+    return names.filter((name) => {
+        if (name === 'self') return isBareSelfGlobal(code);
+        return tokenPresent(code, name);
+    });
 }
 
 /** Run every static sanity check over a robot draft. Never executes it. */

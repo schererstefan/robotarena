@@ -221,6 +221,65 @@ async function main(): Promise<void> {
                 );
             }
 
+            // `self` refinement: the documented game-API idiom must pass while
+            // bare `window.self` remains blocked.
+            {
+                const selfAlias = [
+                    "export const meta = { id: 'testbot', name: 'TestBot', author: 'x', version: '1.0.0', description: 'x' };",
+                    'export const loadout = {};',
+                    'export function create() {',
+                    '  function update(sense) {',
+                    '    const self = sense.self;',
+                    '    const y = self.y;',
+                    '    const tower = self.tower;',
+                    '    return { throttle: 1 };',
+                    '  }',
+                    '  return { meta, loadout, update };',
+                    '}',
+                    '',
+                ].join('\n');
+                const selfAliasResult = await importRobotFromText(selfAlias);
+                check(
+                    'self alias idiom (const self = sense.self) imports successfully',
+                    selfAliasResult.ok || (selfAliasResult.error !== IMPORT_ERROR.tooLarge && !selfAliasResult.error.startsWith('blocked API:')),
+                    selfAliasResult.ok ? '' : selfAliasResult.error,
+                );
+
+                const senseSelfProperty = [
+                    "export const meta = { id: 'testbot', name: 'TestBot', author: 'x', version: '1.0.0', description: 'x' };",
+                    'export const loadout = {};',
+                    'export function create() {',
+                    '  function update(sense) {',
+                    '    const y = sense.self.y;',
+                    '    const stats = sense.self.stats;',
+                    '    return { throttle: 1 };',
+                    '  }',
+                    '  return { meta, loadout, update };',
+                    '}',
+                    '',
+                ].join('\n');
+                const senseSelfPropertyResult = await importRobotFromText(senseSelfProperty);
+                check(
+                    'sense.self property access imports successfully',
+                    senseSelfPropertyResult.ok || (senseSelfPropertyResult.error !== IMPORT_ERROR.tooLarge && !senseSelfPropertyResult.error.startsWith('blocked API:')),
+                    senseSelfPropertyResult.ok ? '' : senseSelfPropertyResult.error,
+                );
+
+                const bareSelfCases: Array<[string, string]> = [
+                    ['bare self assignment', 'const x = self;'],
+                    ['bare self method call', "self.fetch('https://evil.example/x');"],
+                    ['bare self property read', 'const x = self.foo;'],
+                ];
+                for (const [label, snippet] of bareSelfCases) {
+                    const bareResult = await importRobotFromText(snippet);
+                    check(
+                        `${label} is blocked`,
+                        !bareResult.ok && bareResult.error.startsWith('blocked API:'),
+                        bareResult.ok ? 'unexpected ok' : bareResult.error,
+                    );
+                }
+            }
+
             // The same tokens in comments/strings/template text must not
             // block: the scanner only sees real code.
             const commentOnly = [
