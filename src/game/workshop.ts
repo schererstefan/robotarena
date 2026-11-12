@@ -381,10 +381,16 @@ function hasLocalSelfBinding(code: string): boolean {
     if (/\bfunction\s+self\b/.test(code)) return true;
     if (/\bfunction\s*(?:\w+\s*)?\([^)]*\bself\b/.test(code)) return true;
     if (/\bcatch\s*\(\s*self\b/.test(code)) return true;
-    if (/\(\s*self\s*(?:,|:|\)|\s*=)/.test(code)) return true;
-    if (/\(\s*[^)]*,\s*self\s*(?:,|:|\)|\s*=)/.test(code)) return true;
+    // A parenthesized group only counts as a parameter list when it is
+    // arrow-function params (`(self) =>`, `(x, self) =>`) or a method
+    // definition (`name(self) { ... }`, with an optional `: ReturnType`).
+    // A call like `foo(self)` or a parenthesized value like `(self).foo`
+    // must not count — those are bare uses of the global.
+    if (/\(\s*self\b[^)]*\)\s*=>/.test(code)) return true;
+    if (/\(\s*[^)]*,\s*self\b[^)]*\)\s*=>/.test(code)) return true;
+    if (/\b(?!if\b|while\b|for\b|switch\b|catch\b)\w+\s*\(\s*self\b[^)]*\)\s*(?::\s*[^,{]*)?\s*\{/.test(code)) return true;
+    if (/\b(?!if\b|while\b|for\b|switch\b|catch\b)\w+\s*\(\s*[^)]*,\s*self\b[^)]*\)\s*(?::\s*[^,{]*)?\s*\{/.test(code)) return true;
     if (/(^|[^\w$.])self\s*=>/.test(code)) return true;
-    if (/\b\w+\s*\(\s*self\s*(?:,|:|\)|\s*=)/.test(code)) return true;
     return false;
 }
 
