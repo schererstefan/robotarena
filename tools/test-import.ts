@@ -177,6 +177,69 @@ async function main(): Promise<void> {
             check('HTTP error still surfaces status', !http.ok && http.error === importFetchHttp(404), http.ok ? 'ok' : http.error);
         }
 
+        // ---- denylist scanner bypasses ------------------------------------
+        console.log('[import: denylist bypasses]');
+        {
+            const templateFetch = "const u = `${fetch('https://evil.example/x')}`;";
+            const templateResult = await importRobotFromText(templateFetch);
+            check(
+                'template interpolation fetch is blocked',
+                !templateResult.ok && templateResult.error.startsWith('blocked API:'),
+                templateResult.ok ? 'unexpected ok' : templateResult.error,
+            );
+
+            const regexFetch = 'const r = /https:\\/\\//; fetch(\'https://evil.example/x\');';
+            const regexResult = await importRobotFromText(regexFetch);
+            check(
+                'regex-hidden fetch is blocked',
+                !regexResult.ok && regexResult.error.startsWith('blocked API:'),
+                regexResult.ok ? 'unexpected ok' : regexResult.error,
+            );
+
+            const computedGlobal = "const d = globalThis['doc'+'ument'];";
+            const computedGlobalResult = await importRobotFromText(computedGlobal);
+            check(
+                'computed globalThis document access is blocked',
+                !computedGlobalResult.ok && computedGlobalResult.error.startsWith('blocked API:'),
+                computedGlobalResult.ok ? 'unexpected ok' : computedGlobalResult.error,
+            );
+
+            const ctorAccess = 'const c = (()=>{}).constructor;';
+            const ctorResult = await importRobotFromText(ctorAccess);
+            check(
+                'constructor access is blocked',
+                !ctorResult.ok && ctorResult.error.startsWith('blocked API:'),
+                ctorResult.ok ? 'unexpected ok' : ctorResult.error,
+            );
+
+            for (const banned of ['self', 'top', 'parent', 'frames']) {
+                const hostResult = await importRobotFromText(`const x = ${banned};`);
+                check(
+                    `${banned} is blocked`,
+                    !hostResult.ok && hostResult.error.startsWith('blocked API:'),
+                    hostResult.ok ? 'unexpected ok' : hostResult.error,
+                );
+            }
+
+            // The same tokens in comments/strings/template text must not
+            // block: the scanner only sees real code.
+            const commentOnly = [
+                '// fetch Math.random document globalThis self top parent frames constructor eval',
+                '/* fetch document eval("x") */',
+                'const a = "fetch document globalThis constructor self top";',
+                "const b = 'Math.random fetch eval';",
+                'const c = `fetch document constructor`;',
+                'const x = 1;',
+                '',
+            ].join('\n');
+            const passResult = await importRobotFromText(commentOnly);
+            check(
+                'tokens in comments/strings are not blocked',
+                passResult.ok || (passResult.error !== IMPORT_ERROR.tooLarge && !passResult.error.startsWith('blocked API:')),
+                passResult.ok ? '' : passResult.error,
+            );
+        }
+
         // ---- d. slow URL times out (kept last: the only slow test) ----------
         console.log('[url: timeout]');
         {
