@@ -1,5 +1,7 @@
 # RobotArena Roadmap: 22 Improvement Phases
 
+> **Superseded — facts as of Sep 2026. For the current state, see `README.md` and `docs/ROBOT_API.md`.**
+
 ## Goal
 
 Grow the shipped game (pixel-art battles + symmetric skill loadouts, live at

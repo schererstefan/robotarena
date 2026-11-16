@@ -16,6 +16,8 @@ npm install
 npm run dev
 ```
 
+Requires Node 22 (see `.nvmrc`); run `nvm use` if you use nvm.
+
 Open http://localhost:8080 (Space pauses, 1x/2x/4x changes sim speed). Pick 1v1, 2v2,
 or 3v3, assign a robot to each slot, dress it up (callsign, paint, finish, motion
 trails — all cosmetic, zero effect on performance), start the battle. Click a results
@@ -60,6 +62,7 @@ and is not part of main.
 | `npm run dev`              | Start the dev server (port 8080) |
 | `npm run build`            | Production build into `dist/` |
 | `npm run test:sim`         | Headless sim checks: determinism, intent clamping, error isolation, bot-vs-bot soak across 1v1/2v2/3v3 (`tools/soak.ts`) |
+| `npm run test:sim:fast`    | Fast pinned subset of the soak (determinism, brain, pinned-codes; PR gate) |
 | `npm run eval:build`       | Bundle the eval harness (`tools/eval.ts`) |
 | `npm run eval:smoke`       | Eval harness, smoke mode |
 | `npm run eval:rr`          | Eval harness, round-robin mode |

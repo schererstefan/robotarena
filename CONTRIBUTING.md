@@ -23,6 +23,7 @@
    npm run test:import
    npm run test:sim:fast
    npm run art:qa
+   npm run verify:manifests
    ```
    `npm run test:sim` is NOT a PR gate — it is a long soak with 4 pre-existing failures on main (see the EXCLUDED note in `.github/workflows/ci.yml`); run it locally, but a test:sim failure alone does not block a PR. Its fast subset `npm run test:sim:fast` IS a PR gate (baseline-diff vs `.github/ci-expected-soak-fast.txt`).
 6. Open a pull request. Include: robot name, what strategy it plays, and which
@@ -46,5 +47,7 @@ By submitting, you agree your robot is accepted under the repo's MIT license.
 
 Changes to `src/sim/` affect every robot. They need a reason (fairness bug,
 performance, new sensor/weapon semantics), must keep the sim deterministic and
-headless-runnable, and must keep `npm run test:sim` green. New sense/intent
+headless-runnable, and must keep `test:sim` failures to the baselined set
+(`npm run test:sim` is not green on main — it has 4 pre-existing baselined
+failures, see the EXCLUDED note in `.github/workflows/ci.yml`). New sense/intent
 fields must be documented in `docs/ROBOT_API.md` in the same PR.
