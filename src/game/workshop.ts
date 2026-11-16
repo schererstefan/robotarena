@@ -456,7 +456,7 @@ function importSpecifiers(source: string): string[] {
 }
 
 const BANNED_TIME = ['Math.random', 'Date.now', 'performance.now', 'setTimeout', 'setInterval', 'requestAnimationFrame'];
-const BANNED_IO = ['fetch', 'XMLHttpRequest', 'WebSocket', 'localStorage', 'sessionStorage', 'indexedDB'];
+const BANNED_IO = ['fetch', 'XMLHttpRequest', 'WebSocket', 'localStorage', 'sessionStorage', 'indexedDB', 'Image', 'Audio', 'EventSource', 'SharedWorker', 'BroadcastChannel'];
 const BANNED_HOST = [
     'document',
     'window',
@@ -476,6 +476,14 @@ const BANNED_HOST = [
     'parent',
     'frames',
     'constructor',
+    'addEventListener',
+    'removeEventListener',
+    'caches',
+    'open',
+    'crypto',
+    'history',
+    'queueMicrotask',
+    'postMessage',
 ];
 
 function offenders(code: string, names: string[]): string[] {

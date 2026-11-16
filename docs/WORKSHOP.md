@@ -33,3 +33,11 @@ not via dynamic import. The checks are guidance, not a sandbox: the guarantee
 is the absence of execution. Test your robot locally (`npm run test:sim`, plus
 your own matchups in a scratch script) and submit it via pull request as
 described in `CONTRIBUTING.md`.
+
+The import denylist is gap-closure, not a sandbox. A denylist can narrow the
+obvious bare-word globals (e.g. `addEventListener`, `Image`, `open`,
+`EventSource`), but the self-decoy + bracket-access hole (`workshop.ts:366-396`)
+remains by construction of a denylist: a file can declare a local `self`
+binding while still reaching the global, and dynamically constructed member
+access can evade a token scan. The Worker sandbox (PR #2) is the real fix for
+imported-robot execution — a decision for Stefan, not part of this change.
