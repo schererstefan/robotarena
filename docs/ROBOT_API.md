@@ -436,9 +436,12 @@ index into it). Study them before writing your own.
 ## Test your robot
 
 ```sh
-npm run test:sim
+npm run test:sim:fast
 ```
 
-Add your robot to the soak first (temporarily swap an id in `tools/soak.ts`, or
-better: keep the committed soak on the launch five and run your own matchups in a
-scratch script under `/tmp`). It must complete 1v1s without errors before it ships.
+The soak runs every registered bot automatically (the roster comes from
+`ROBOTS` in `src/robots/registry.ts` via `tools/soak.ts`), so just register
+your robot and run the fast gate first. To run just the soak section of the
+full soak, use `SOAK_SECTIONS=soak npm run test:sim` or
+`npm run test:sim -- --only=soak`. It must complete 1v1s without errors before
+it ships.
