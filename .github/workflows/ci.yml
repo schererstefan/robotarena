@@ -54,6 +54,17 @@ jobs:
       - name: Test (sim fast pins)
         run: npm run test:sim:fast
 
+      # Full soak (test:sim, all 30 sections, ~32s) via the generalized
+      # helper: baseline-diff verdict vs .github/nightly-expected-soak.txt.
+      # Green iff the sorted `  FAIL ` line sets are identical; any drift
+      # (new failure, fix, changed figure) exits 1. The 4 pre-existing
+      # failures on main are baselined in that file. No baseline file is
+      # written; the diff is the verdict.
+      - name: Test (sim full soak baseline-diff)
+        run: |
+          npx esbuild tools/soak.ts --bundle --platform=node --format=esm --outfile=/tmp/robotarena-soak.mjs --log-level=warning
+          SOAK_SECTIONS='' SOAK_EXPECTED_FILE=.github/nightly-expected-soak.txt node tools/soak-fast.mjs
+
       # Fast static checks over procedural pixel art (~0.1s, plain node).
       - name: Art QA
         run: npm run art:qa
@@ -77,17 +88,19 @@ jobs:
             exit 1
           fi
 
-      # EXCLUDED: `npm run test:sim` (tools/soak.ts, full soak) is a long
-      # soak, not a PR gate. It runs pairwise bot-vs-bot matches across
-      # every bot x seed x arena (~32s locally and growing with the
-      # roster) and currently has 4 pre-existing failures on main (1v1
-      # regression vs pre-brain hunter, featured-code re-sims, RA1/RA2
-      # pinned codes). Run the full soak locally/nightly, not per-PR.
-      # The fast pinned subset above (`npm run test:sim:fast`) does gate
-      # PRs: it runs only determinism, brain, and pinned-codes and is
-      # green iff its failure lines are unchanged vs
-      # .github/ci-expected-soak-fast.txt. The full soak (incl. the
-      # manifests/featured-code re-sims) stays Nightly-only.
+      # PR-gated full soak: `npm run test:sim` (tools/soak.ts, full soak)
+      # runs pairwise bot-vs-bot matches across every bot x seed x arena
+      # (~32s locally and growing with the roster) and currently has 4
+      # pre-existing failures on main (1v1 regression vs pre-brain
+      # hunter, featured-code re-sims, RA1/RA2 pinned codes). It IS a PR
+      # gate via baseline-diff through the generalized helper (see
+      # "Test (sim full soak baseline-diff)" above): green iff its
+      # `  FAIL ` lines are unchanged vs
+      # .github/nightly-expected-soak.txt. The fast pinned subset
+      # (`npm run test:sim:fast`) remains the fast PR gate (only
+      # determinism, brain, and pinned-codes) vs
+      # .github/ci-expected-soak-fast.txt. Nightly still runs the full
+      # soak daily as the baseline record and keeps artifact logs.
       #
       # EXCLUDED: `npm run eval:*` (smoke/rr/ladder/full) are long-running
       # balance/evolution harnesses (rr defaults to 50 seeds per pairing,
