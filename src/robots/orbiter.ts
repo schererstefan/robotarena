@@ -4,7 +4,8 @@
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../sim/constants';
 import { angleDiff, TAU } from '../sim/math';
 import type { SkillLoadout } from '../sim/skills';
-import type { Intent, RobotController, RobotMeta, SensedRobot, SenseState } from '../sim/types';
+import type { Intent, RobotController, RobotMeta, SenseState } from '../sim/types';
+import { pickTarget, type BrainTargetPolicy } from './brain';
 import { aimed, aimTurret, createUtilityMemory, steerTo, utilityDrive, type UtilityMemory } from './common';
 import type { Genome } from './genome';
 
@@ -18,7 +19,7 @@ export const meta: RobotMeta = {
 
 export const loadout: SkillLoadout = { overdrive: 2, servos: 1, trigger: 2, plating: 1 };
 
-export type TargetPolicy = 'first' | 'nearest' | 'weakest' | 'strongest';
+export type TargetPolicy = BrainTargetPolicy;
 
 /** Tunable knobs (genome §1.4 groups). Defaults = legacy behavior exactly. */
 export interface OrbiterParams {
@@ -78,21 +79,6 @@ export function orbiterParamsFromGenome(genome: Genome): OrbiterParams {
                 : ORBITER_DEFAULTS.targetPolicy,
         utility: true,
     };
-}
-
-function pickTarget(foes: SensedRobot[], policy: TargetPolicy): SensedRobot | undefined {
-    if (policy === 'first') return foes[0];
-    let best: SensedRobot | undefined;
-    for (const candidate of foes) {
-        if (!best) {
-            best = candidate;
-            continue;
-        }
-        if (policy === 'nearest' && candidate.distance < best.distance) best = candidate;
-        else if (policy === 'weakest' && candidate.health < best.health) best = candidate;
-        else if (policy === 'strongest' && candidate.health > best.health) best = candidate;
-    }
-    return best;
 }
 
 export function createWithParams(overrides?: Partial<OrbiterParams>): RobotController {
