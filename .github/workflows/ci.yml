@@ -38,6 +38,9 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Typecheck (tools)
+        run: npx tsc -p tsconfig.tools.json --noEmit
+
       - name: Build
         run: npm run build
 

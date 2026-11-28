@@ -62,7 +62,7 @@ async function main(): Promise<void> {
         // ---- b. Content-Length over the cap rejects without reading --------
         console.log('[url: content-length]');
         {
-            let seen: Response | null = null;
+            let seen: Response | null = null as Response | null;
             stubFetch(async () => {
                 seen = new Response('small body', {
                     status: 200,
@@ -82,7 +82,7 @@ async function main(): Promise<void> {
         // ---- c. Oversized body without a truthful Content-Length -----------
         console.log('[url: capped body read]');
         {
-            let seen: Response | null = null;
+            let seen: Response | null = null as Response | null;
             stubFetch(async () => {
                 // No explicit Content-Length: Node leaves the header unset,
                 // so only the capped body read can catch the oversize.
