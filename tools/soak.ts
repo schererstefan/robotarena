@@ -2,7 +2,7 @@
 // and bot-vs-bot soak across 1v1 / 2v2 / 3v3. Run with `npm run test:sim`.
 // Exits non-zero on any failure.
 
-import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BARRIER_COUNT, BARRIER_MIN_GAP, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, HAZ_COOLDOWN_TICKS, HAZ_DAMAGE, HAZ_FIRST_TICK, HAZ_RADIUS, HAZ_SALT, HAZ_FLY_MAX_TICKS, HAZ_SCORCH_TICKS, HAZ_TARGET_MARGIN, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_BAND, PAD_COUNT, PAD_MIN_GAP, PAD_MIN_SPAWN_DIST, PAD_MIN_TURRET_DIST, PAD_OBSTACLE_CLEAR, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, BARRIER_TURRET_CLEAR, CROSSFIRE_BARRIER_COUNT, FOUNDRY_BARRIER_COUNT, RUINS_BARRIER_COUNT, barriersForArena, barriersForSeed, isExhibition, sanitizeModifiers, turretSpotsForArena, type ArenaId, type ArenaObstacle, type MatchModifiers } from '../src/sim/constants';
+import { ACCEL, AMP_TICKS, ARENA_HEIGHT, ARENA_IDS, ARENA_OBSTACLES, ARENA_WIDTH, BARRIER_COUNT, BARRIER_MIN_GAP, BULLET_DAMAGE, BULLET_SPEED, COMMS_DELAY, COMMS_INBOX_MAX, DASH_COOLDOWN_TICKS, EMP_COOLDOWN_TICKS, EMP_RADIUS, EMP_SLOW_TICKS, GUN_RANGE, HAZ_COOLDOWN_TICKS, HAZ_FIRST_TICK, HAZ_FLY_MAX_TICKS, HAZ_TARGET_MARGIN, INBOX_MAX, MAX_SPEED, MAX_TICKS, MAX_TICKS_TOTAL, OVERDRIVE_TICKS, PAD_BAND, PAD_COUNT, PAD_MIN_GAP, PAD_MIN_SPAWN_DIST, PAD_MIN_TURRET_DIST, PAD_OBSTACLE_CLEAR, PAD_RESPAWN_TICKS, REPAIR_HP, ROBOT_RADIUS, SENSE_BULLETS_MAX, SENSE_EVENTS_MAX, SENSE_GRID_CELL, SENSE_GRID_H, SENSE_GRID_STAMP, SENSE_GRID_W, SENSOR_RANGE, SENSOR_SHARE_DELAY, STRAFE_FACTOR, SUDDEN_DEATH_TICKS, TURRET_CAPTURE_RADIUS, TURRET_CAPTURE_TICKS, TURRET_DAMAGE, TURRET_DECAY_TICKS, TURRET_FIRE_INTERVAL, TURRET_RANGE, BARRIER_TURRET_CLEAR, CROSSFIRE_BARRIER_COUNT, FOUNDRY_BARRIER_COUNT, RUINS_BARRIER_COUNT, barriersForArena, barriersForSeed, isExhibition, sanitizeModifiers, turretSpotsForArena, type ArenaId, type ArenaObstacle, type MatchModifiers } from '../src/sim/constants';
 import { DT } from '../src/sim/constants';
 import { Match, sanitizeIntent, type LineupEntry, type RobotSnapshot } from '../src/sim/engine';
 import { decodeReplay, encodeReplay, encodeReplayCompact, encodeReplayLegacy, type ReplaySpec } from '../src/sim/replay';
@@ -146,7 +146,7 @@ if (shouldRun('hazards')) {
             seed,
             { modifiers },
         );
-        for (let i = 0; i < 400 && !match.over; i += 1) match.step();
+        for (let i = 0; i < 400 && !match.result.over; i += 1) match.step();
         return match;
     }
     const h1 = hazardMatch(42);
@@ -382,7 +382,7 @@ if (shouldRun('skills')) {
     const gunner: RobotController = {
         meta: { id: 'gunner', name: 'Gunner', author: 'test', version: '0', description: '' },
         update: (sense: SenseState): Intent => {
-            const foe = sense.foes[0] ?? sense.scout[0] ?? sense.tracks[0];
+            const foe = sense.foes[0] ?? sense.scout[0] ?? sense.tracks![0];
             if (!foe) return { throttle: 1, turn: 0, towerTurn: 0.5, fire: true, charge: false };
             const goal = Math.atan2(foe.y - sense.self.y, foe.x - sense.self.x);
             const wrap = (a: number): number => {
@@ -1890,7 +1890,7 @@ if (shouldRun('modifiers')) {
     const shooter: RobotController = {
         meta: { id: 'shooter', name: 'Shooter', author: 'test', version: '0', description: '' },
         update: (sense: SenseState): Intent => {
-            const foe = sense.foes[0] ?? sense.scout[0] ?? sense.tracks[0];
+            const foe = sense.foes[0] ?? sense.scout[0] ?? sense.tracks![0];
             if (!foe) return { throttle: 1, turn: 0, towerTurn: 0.5, fire: true, charge: false };
             const goal = Math.atan2(foe.y - sense.self.y, foe.x - sense.self.x);
             const wrap = (a: number): number => {
@@ -2750,7 +2750,7 @@ if (shouldRun('tutorial')) {
         removeItem: (): void => {
             throw new Error('denied');
         },
-    } as Storage;
+    } as unknown as Storage;
     (globalThis as unknown as { localStorage: Storage }).localStorage = throwing;
     let threw = false;
     try {
@@ -3221,7 +3221,7 @@ if (shouldRun('senses')) {
         const rammer = (id: string): RobotController => ({
             meta: { id, name: id, author: 'test', version: '0', description: '' },
             update: (sense: SenseState): Intent => {
-                const foe = sense.foes[0] ?? sense.scout[0] ?? sense.tracks[0];
+                const foe = sense.foes[0] ?? sense.scout[0] ?? sense.tracks![0];
                 if (!foe) return { throttle: 1 };
                 const goal = Math.atan2(foe.y - sense.self.y, foe.x - sense.self.x);
                 let diff = goal - sense.self.heading;
@@ -3299,7 +3299,7 @@ if (shouldRun('senses')) {
             update: (): Intent => ({}),
         };
         let firstSeen = -1;
-        let stale: { lastSeenTick: number; seenNow: boolean } | null = null;
+        let stale: { lastSeenTick: number; seenNow: boolean } | null = null as { lastSeenTick: number; seenNow: boolean } | null;
         let stampAtSight = -1;
         let decayed = false;
         const tracker: RobotController = {

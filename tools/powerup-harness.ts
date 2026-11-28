@@ -215,7 +215,7 @@ function runOneGame(ids: string[], teams: Array<0 | 1>, seed: number, arena: Are
     const seen = new Set<number>();
     let first = 0;
     let steals = 0;
-    const turretCapsByRobot = ids.map(() => (kind === '1v1' ? 0 : -1));
+    const turretCapsByRobot: number[] = ids.map(() => (kind === '1v1' ? 0 : -1));
     for (const record of match.turretCaptureLog) {
         const parts = record.split(':');
         const idx = Number(parts[1]);

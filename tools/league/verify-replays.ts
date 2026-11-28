@@ -9,6 +9,7 @@ import { parseGenome } from '../../src/robots/bt/serialization';
 import { cloneTree, type BTNode } from '../../src/robots/bt/tree';
 import { createBTTreeBrain } from '../../src/robots/bt/brain';
 import { BT_LOADOUT } from '../../src/robots/bt/gp';
+import type { SenseState } from '../../src/sim/types';
 import { LEAGUE_ID_PREFIX } from './roster';
 
 interface SeasonMatch {
@@ -58,7 +59,7 @@ for (const m of season.matches) {
         const brain = createBTTreeBrain(treeFor(fid));
         return {
             meta: { id: fid, name: fid, author: 'verify', version: '1.0.0', description: '' },
-            update: (sense: never) => brain.update(sense).intent,
+            update: (sense: SenseState) => brain.update(sense).intent,
         };
     };
     const match = new Match(

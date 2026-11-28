@@ -89,10 +89,10 @@ function simOnce(aTree: BTNode, bTree: BTNode, seed: number, arena: ArenaId, tag
     let minDefB = Infinity;
     let guard = 0;
     const maxGuard = 200000;
-    while (!match.over && guard < maxGuard) {
+    while (!match.result.over && guard < maxGuard) {
         match.step();
         guard += 1;
-        if (match.tick % SAMPLE_EVERY === 0) {
+        if (match.result.tick % SAMPLE_EVERY === 0) {
             const snaps = match.robotSnapshots;
             const a = snaps.find((s) => s.team === 0);
             const b = snaps.find((s) => s.team === 1);
