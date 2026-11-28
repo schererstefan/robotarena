@@ -3,10 +3,15 @@
 ## Submit your own robot
 
 1. Fork the repo and create a branch.
-2. Copy an existing robot (e.g. `src/robots/rusher.ts`) to `src/robots/<your-id>.ts`.
-   Keep the id lowercase and matching the filename. Strip the internal-only
-   `./brain` and `./genome` imports the shipped bots use — user robots may only
-   import from `../sim/*`, `./common.ts`, and `./comms.ts`
+2. Start from the in-game WORKSHOP template (menu: WORKSHOP, see
+   `docs/WORKSHOP.md`: one-file robot shape, aim-and-chase stub, static checks
+   as you type, downloadable `.ts`) and save it as `src/robots/<your-id>.ts`.
+   Keep the id lowercase and matching the filename. Do not copy a shipped
+   robot (e.g. `src/robots/rusher.ts`) and delete its internals: every shipped
+   robot (all 8 base robots) runs its strategy through internal-only `./brain`
+   + `./genome` (`rusher.ts` routes through `createBrain`/`BRAIN_PRESETS`), so
+   stripping those imports leaves a husk, not a working robot. User robots may
+   only import from `../sim/*`, `./common.ts`, and `./comms.ts`
    (see `docs/ROBOT_API.md` §Rules for robot code).
 3. Write your strategy against `docs/ROBOT_API.md`. One file, deterministic, fast.
 4. Register it in `src/robots/registry.ts` (one import + one entry) and
@@ -23,9 +28,37 @@
    npm run test:import
    npm run test:sim:fast
    npm run art:qa
-   npm run verify:manifests
+   # Full soak baseline-diff (PR gate, `.github/workflows/ci.yml:63`):
+   # same helper as `npm run test:sim:fast`, but with empty
+   # SOAK_SECTIONS it runs the full soak (see header in
+   # `tools/soak-fast.mjs:17-22`):
+   npx esbuild tools/soak.ts --bundle --platform=node --format=esm --outfile=/tmp/robotarena-soak.mjs --log-level=warning
+   SOAK_SECTIONS='' SOAK_EXPECTED_FILE=.github/nightly-expected-soak.txt node tools/soak-fast.mjs
+   # Verify manifests baseline-diff (PR gate, `.github/workflows/ci.yml:77`):
+   npm run verify:manifests 2>&1 | tee ci-manifests.log || true
+   grep -E '^  MISMATCH ' ci-manifests.log | LC_ALL=C sort > ci-manifests-actual.txt || true
+   grep -E '^  MISMATCH ' .github/nightly-expected-manifests.txt | LC_ALL=C sort > ci-manifests-expected.txt || true
+   diff -u ci-manifests-expected.txt ci-manifests-actual.txt
    ```
-   `npm run test:sim` is NOT a PR gate — it is a long soak with 4 pre-existing failures on main (see the EXCLUDED note in `.github/workflows/ci.yml`); run it locally, but a test:sim failure alone does not block a PR. Its fast subset `npm run test:sim:fast` IS a PR gate (baseline-diff vs `.github/ci-expected-soak-fast.txt`).
+   `npm run test:sim` IS a PR gate via baseline-diff (since PR #23):
+   `.github/workflows/ci.yml:11-13` runs on every `pull_request` and the
+   "Test (sim full soak baseline-diff)" step at `ci.yml:63` (implemented at
+   `ci.yml:65-66`) is green only if the soak's sorted `  FAIL ` lines are
+   unchanged vs `.github/nightly-expected-soak.txt` (`ci.yml:57-66`). Only
+   the 4 baselined failures are tolerated; any new, fixed, or changed
+   `  FAIL ` line blocks the PR. In particular, if you FIX one of the 4
+   baselined failures you will FAIL the gate unless you update
+   `.github/nightly-expected-soak.txt` in the same PR and explain it (that
+   instruction is printed by `tools/soak-fast.mjs:166` and the CI gates).
+   Its fast subset `npm run test:sim:fast` is likewise a PR gate
+   (baseline-diff vs `.github/ci-expected-soak-fast.txt`).
+   `npm run verify:manifests` is likewise a baseline-diff PR gate
+   (`ci.yml:77`), not a plain pass/fail command: raw `npm run
+   verify:manifests` exits 1 on a clean main checkout because main carries
+   11 baselined mismatches (`tools/verify-manifest.ts:74-80` returns 1 on
+   any mismatch; `.github/nightly-expected-manifests.txt` has 11
+   `  MISMATCH ` lines). Use the baseline-diff comparison above (same as
+   `ci.yml:79-82`): the `  MISMATCH ` sets must be unchanged.
 6. Open a pull request. Include: robot name, what strategy it plays, and which
    built-in robot(s) you tested it against. A maintainer reviews the code, runs the
    soak, and merges — your robot ships in the next deploy.
